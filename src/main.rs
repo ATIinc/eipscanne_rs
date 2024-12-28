@@ -1,7 +1,10 @@
 use bincode::{deserialize, serialize};
 use std::error::Error;
 
-use eipscanne_rs::samples::{ChildStruct, MyStruct};
+use eipscanne_rs::{
+    cip::types::CipByte,
+    samples::{ChildStruct, MyStruct},
+};
 
 // Serialize function for MyStruct
 fn serialize_struct(my_struct: &MyStruct) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -40,13 +43,31 @@ fn sample_struct() {
     println!("Deserialized struct: {:?}", deserialized_struct);
 }
 
-// fn identity_object() -> Result<(), Box<dyn Error>> {
+fn identity_object() -> Result<(), Box<dyn Error>> {
+    // auto si = std::make_shared<SessionInfo>("172.28.1.3", 0xAF12);
+    // IdentityObject identityObject(1, si);
 
-//     auto si = std::make_shared<SessionInfo>("172.28.1.3", 0xAF12);
-//     IdentityObject identityObject(1, si);
+    // extract from SessionInfo
+    let session_handle = 0;
 
-//     Ok(())
-// }
+    // create an empty packet
+    let empty_eip_packet =
+        eipscanne_rs::eip::packet::EncapsulatedPacket::new_empty(session_handle, 0);
+
+    // // read the header
+    // auto header = _socket.Receive(EncapsPacket::HEADER_SIZE);
+    // auto length = EncapsPacket::getLengthFromHeader(header);
+
+    // // read the rest of the packet
+    // auto data = _socket.Receive(length);
+    // header.insert(header.end(), data.begin(), data.end());
+
+    // // deserialize the packet
+    // EncapsPacket recvPacket;
+    // recvPacket.expand(header);
+
+    Ok(())
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     sample_struct();
