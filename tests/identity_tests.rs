@@ -218,3 +218,27 @@ fn test_serialize_identity_response() {
     // Assert equality
     assert_eq!(0x0, 0x0);
 }
+
+#[test]
+fn test_serialize_unregister_session_request() {
+    /*
+    EtherNet/IP (Industrial Protocol), Session: 0x00000006, Unregister Session
+    Encapsulation Header
+        Command: Unregister Session (0x0066)
+        Length: 0
+        Session Handle: 0x00000006
+        Status: Success (0x00000000)
+        Sender Context: 0000000000000000
+        Options: 0x00000000
+
+    -------------------------------------
+    Hex Dump:
+
+    0000   66 00 00 00 06 00 00 00 00 00 00 00 00 00 00 00
+    0010   00 00 00 00 00 00 00 00
+
+    */
+
+    // Assert equality
+    assert_eq!(0x0, 0x0);
+}
