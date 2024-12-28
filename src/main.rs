@@ -1,7 +1,7 @@
 use bincode::{deserialize, serialize};
 use std::error::Error;
 
-use eipscanne_rs::{ChildStruct, MyStruct};
+use eipscanne_rs::samples::{ChildStruct, MyStruct};
 
 // Serialize function for MyStruct
 fn serialize_struct(my_struct: &MyStruct) -> Result<Vec<u8>, Box<dyn Error>> {

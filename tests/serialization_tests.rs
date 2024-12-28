@@ -1,6 +1,6 @@
 use bincode::{deserialize, serialize};
 
-use eipscanne_rs::{ChildStruct, MyStruct};
+use eipscanne_rs::samples::{ChildStruct, MyStruct};
 
 #[test]
 fn test_serialize_deserialize() {
