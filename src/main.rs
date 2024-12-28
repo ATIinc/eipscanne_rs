@@ -13,7 +13,7 @@ fn identity_object() -> Result<(), Box<dyn Error>> {
 
     // create an empty packet
     let empty_eip_packet =
-        eipscanne_rs::eip::packet::EncapsulatedPacket::new_empty(session_handle, 0);
+        eipscanne_rs::eip::packet::EncapsulatedPacket::new_empty_data(session_handle, 0);
 
     // Serialize the struct into a byte array
     let byte_array = serialize(&empty_eip_packet).unwrap();

@@ -4,7 +4,7 @@ use std::{mem, vec};
 use crate::cip::types::{CipByte, CipUint};
 
 // Enum definition with `Serialize` and `Deserialize` traits.
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
 #[repr(u16)]
 pub enum CommonPacketItemId {
     NullAddr = 0x0000,
@@ -18,7 +18,7 @@ pub enum CommonPacketItemId {
 }
 
 // Modify the struct to require both `Serialize` and `Deserialize` for the generic `T`
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct CommonPacketItem<T> {
     pub type_id: CommonPacketItemId,
@@ -27,7 +27,7 @@ pub struct CommonPacketItem<T> {
 }
 
 // Modify the struct to require both `Serialize` and `Deserialize` for the generic `T`
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct CipDataPacket<T> {
     pub items: Vec<CommonPacketItem<T>>,
