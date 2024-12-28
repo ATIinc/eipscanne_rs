@@ -15,7 +15,7 @@ fn deserialize_struct(bytes: &[u8]) -> Result<MyStruct, Box<dyn Error>> {
     Ok(deserialized)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn sample_struct() {
     // Create an instance of MyStruct with a ChildStruct field
     let my_struct = MyStruct {
         byte_field: 10,
@@ -30,14 +30,26 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     // Serialize the struct into a byte array
-    let byte_array = serialize_struct(&my_struct)?;
+    let byte_array = serialize_struct(&my_struct).unwrap();
 
     println!("Serialized byte array: {:?}", byte_array);
 
     // Deserialize the byte array back into a struct
-    let deserialized_struct = deserialize_struct(&byte_array)?;
+    let deserialized_struct = deserialize_struct(&byte_array).unwrap();
 
     println!("Deserialized struct: {:?}", deserialized_struct);
+}
 
+// fn identity_object() -> Result<(), Box<dyn Error>> {
+
+//     auto si = std::make_shared<SessionInfo>("172.28.1.3", 0xAF12);
+//     IdentityObject identityObject(1, si);
+
+//     Ok(())
+// }
+
+fn main() -> Result<(), Box<dyn Error>> {
+    sample_struct();
+    // identity_object()?;
     Ok(())
 }
