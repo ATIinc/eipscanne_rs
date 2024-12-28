@@ -43,7 +43,7 @@ pub struct PacketData<T> {
 }
 
 // These should be equal
-const ENCAPSULATED_HEADER_SIZE: usize = 24;
+// const ENCAPSULATED_HEADER_SIZE: usize = 24;
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct EncapsulatedHeader {
     pub command: EncapsCommand,
