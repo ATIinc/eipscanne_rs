@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "eipScanneRS"
+name = "eipscanne-rs"
 version = "0.1.0"
 dependencies = [
  "bincode",

@@ -1,24 +1,7 @@
 use bincode::{deserialize, serialize};
-use serde::{Deserialize, Serialize};
 use std::error::Error;
 
-// Define the child struct
-#[derive(Serialize, Deserialize, Debug)]
-struct ChildStruct {
-    id: u32,
-    description: String,
-}
-
-// Define the parent struct
-#[derive(Serialize, Deserialize, Debug)]
-struct MyStruct {
-    byte_field: u8,
-    int_field: i32,
-    double_field: f64,
-    ubyte_field: u8,
-    byte_array: [u8; 6],
-    child: ChildStruct, // Include the child struct as a field
-}
+use eipscanne_rs::{ChildStruct, MyStruct};
 
 // Serialize function for MyStruct
 fn serialize_struct(my_struct: &MyStruct) -> Result<Vec<u8>, Box<dyn Error>> {
