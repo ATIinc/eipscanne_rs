@@ -1,7 +1,7 @@
 use bincode::serialize; // deserialize,
 
-use eipscanne_rs::cip::message::MessageRouterRequest;
-use eipscanne_rs::cip::types::{CipByte, CipPath, CIP_BOOL_TRUE};
+use eipscanne_rs::cip::message::{CipPath, MessageRouterRequest, ServiceCode};
+use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::cip_data::CipDataPacket;
 use eipscanne_rs::eip::packet::EncapsulatedPacket;
 
@@ -50,15 +50,15 @@ fn test_serialize_identity_request() {
         session_handle,
         timeout,
         CipDataPacket::new(MessageRouterRequest {
-            service_code: 0x01,
+            service_code: ServiceCode::GetAttributeAll,
             path: CipPath {
-                class_id: 0x01,
-                instance_id: 0x01,
-                attribute_id: 0,
-                size: 10,
+                logical_segment: 0x01,
+                class_id: 0x07,
+                instance_id: 0x08,
+                attribute_id: None,
             },
             data: vec![],
-            use_8_bit_path_segments: CIP_BOOL_TRUE,
+            use_8_bit_path_segments: true,
         }),
     );
 

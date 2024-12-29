@@ -1,10 +1,11 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize, Serializer};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::mem;
 
 use super::cip_data::CipDataPacket;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-#[derive(Deserialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
 #[repr(u16)]
 pub enum EncapsCommand {
     // Needs to be of type CipUint (u16)
@@ -20,18 +21,7 @@ pub enum EncapsCommand {
     Cancel = 0x0073,
 }
 
-impl Serialize for EncapsCommand {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Use the underlying numeric value of the enum for serialization
-        let value = *self as CipUint;
-        serializer.serialize_u16(value)
-    }
-}
-
-#[derive(Deserialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
 #[repr(u32)]
 pub enum EncapsStatusCode {
     // Needs to be of type CipUdint (u32)
@@ -43,23 +33,24 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
-impl Serialize for EncapsStatusCode {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Use the underlying numeric value of the enum for serialization
-        let value = *self as CipUdint;
-        serializer.serialize_u32(value)
-    }
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct PacketData<T> {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
     pub cip_data_packet: CipDataPacket<T>,
+}
+
+impl<T> PacketData<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    // Method to get the size of the contained value in the enum
+    pub fn get_size(&self) -> usize {
+        mem::size_of_val(&self.interface_handle)
+            + mem::size_of_val(&self.timeout)
+            + self.cip_data_packet.get_size()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -88,7 +79,7 @@ where
             }
             CommandSpecificData::SendRrData(packet_data) => {
                 // Calculate the size of CipDataPacket<T>
-                mem::size_of_val(packet_data)
+                packet_data.get_size()
             }
         }
     }

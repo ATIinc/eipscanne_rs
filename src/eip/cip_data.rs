@@ -1,10 +1,11 @@
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{mem, vec};
 
 use crate::cip::types::{CipByte, CipUint};
 
 // Enum definition with `Serialize` and `Deserialize` traits.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
 #[repr(u16)]
 pub enum CommonPacketItemId {
     NullAddr = 0x0000,
@@ -31,6 +32,18 @@ pub struct CommonPacketItem<T> {
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct CipDataPacket<T> {
     pub items: Vec<CommonPacketItem<T>>,
+}
+
+impl<T> CipDataPacket<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    // Method to get the size of the contained value in the enum
+    pub fn get_size(&self) -> usize {
+        self.items.iter().fold(0, |acc, item| {
+            acc + mem::size_of_val(&item.type_id) + mem::size_of_val(&item.length)
+        })
+    }
 }
 
 // Implementing the `new` function for `CipDataPacket`

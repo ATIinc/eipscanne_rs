@@ -18,9 +18,6 @@ pub type CipLword = u64; // 64-bit unsigned integer
 pub type CipLint = i64; // 64-bit signed integer
 pub type CipUlint = u64; // 64-bit unsigned integer
 
-pub const CIP_BOOL_TRUE: CipBool = 0x01;
-pub const CIP_BOOL_FALSE: CipBool = 0x00;
-
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CipRevision {
     pub major_revision: CipUsint,
@@ -38,13 +35,4 @@ pub struct CipString {
 pub struct CipShortString {
     pub length: CipUsint,
     pub value: Vec<CipByte>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct CipPath {
-    // Previous EPath (in the EIPScanner project)
-    pub class_id: CipUint,
-    pub instance_id: CipUint,
-    pub attribute_id: CipUint,
-    pub size: CipUsint,
 }
