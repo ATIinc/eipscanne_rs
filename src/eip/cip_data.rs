@@ -49,7 +49,11 @@ impl<T> CipDataPacket<T> {
         let data_packet = CommonPacketItem {
             type_id: CommonPacketItemId::UnconnectedMessage,
             length: cip_object_byte_length,
-            data: Some(cip_object),
+            data: if cip_object_byte_length > 0 {
+                Some(cip_object)
+            } else {
+                None
+            },
         };
 
         CipDataPacket {

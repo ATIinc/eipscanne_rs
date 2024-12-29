@@ -9,11 +9,10 @@ fn identity_object() -> Result<(), Box<dyn Error>> {
     // IdentityObject identityObject(1, si);
 
     // extract from SessionInfo
-    let session_handle = 3;
+    // let session_handle = 3;
 
     // create an empty packet
-    let empty_eip_packet =
-        eipscanne_rs::eip::packet::EncapsulatedPacket::new_empty_data(session_handle, 0);
+    let empty_eip_packet = eipscanne_rs::eip::packet::EncapsulatedPacket::new_registration();
 
     // Serialize the struct into a byte array
     let byte_array = serialize(&empty_eip_packet).unwrap();

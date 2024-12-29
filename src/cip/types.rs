@@ -18,6 +18,9 @@ pub type CipLword = u64; // 64-bit unsigned integer
 pub type CipLint = i64; // 64-bit signed integer
 pub type CipUlint = u64; // 64-bit unsigned integer
 
+pub const CIP_BOOL_TRUE: CipBool = 0x01;
+pub const CIP_BOOL_FALSE: CipBool = 0x00;
+
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CipRevision {
     pub major_revision: CipUsint,

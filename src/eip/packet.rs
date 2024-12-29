@@ -186,8 +186,4 @@ impl EncapsulatedPacket<CipByte> {
             }),
         )
     }
-
-    pub fn new_empty_data(session_handle: CipUdint, timeout: CipUint) -> Self {
-        EncapsulatedPacket::new_data(session_handle, timeout, CipDataPacket::new_empty())
-    }
 }

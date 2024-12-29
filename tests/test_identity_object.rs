@@ -1,3 +1,10 @@
+use bincode::serialize; // deserialize,
+
+use eipscanne_rs::cip::message::MessageRouterRequest;
+use eipscanne_rs::cip::types::{CipByte, CipPath, CIP_BOOL_TRUE};
+use eipscanne_rs::eip::cip_data::CipDataPacket;
+use eipscanne_rs::eip::packet::EncapsulatedPacket;
+
 #[test]
 fn test_serialize_identity_request() {
     /*
@@ -28,6 +35,38 @@ fn test_serialize_identity_request() {
     0030   01 00
 
     */
+
+    let expected_byte_array: Vec<CipByte> = vec![
+        0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00, 0x01, 0x04, 0x21, 0x00, 0x01,
+        0x00, 0x25, 0x00, 0x01, 0x00,
+    ];
+
+    // create an empty packet
+    let session_handle = 6;
+    let timeout = 0;
+    let data_packet = EncapsulatedPacket::new_data(
+        session_handle,
+        timeout,
+        CipDataPacket::new(MessageRouterRequest {
+            service_code: 0x01,
+            path: CipPath {
+                class_id: 0x01,
+                instance_id: 0x01,
+                attribute_id: 0,
+                size: 10,
+            },
+            data: vec![],
+            use_8_bit_path_segments: CIP_BOOL_TRUE,
+        }),
+    );
+
+    // Serialize the struct into a byte array
+    let data_byte_array = serialize(&data_packet).unwrap();
+
+    // Assert equality
+    assert_eq!(expected_byte_array, data_byte_array);
 
     /*
     Common Industrial Protocol
