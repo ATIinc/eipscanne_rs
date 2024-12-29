@@ -54,15 +54,64 @@ impl Serialize for EncapsStatusCode {
     }
 }
 
-const DEFAULT_PACKET_OPTIONS: CipUint = 8;
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct PacketData<T> {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
     pub cip_data_packet: CipDataPacket<T>,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct RegisterData {
+    pub protocol_version: CipUint,
+    pub option_flags: CipUint,
+}
+
+#[derive(Deserialize, Debug, PartialEq)]
+#[serde(bound = "T: Serialize + DeserializeOwned")]
+pub enum CommandSpecificData<T> {
+    RegisterSession(RegisterData),
+    SendRrData(PacketData<T>),
+}
+
+impl<T> CommandSpecificData<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    // Method to get the size of the contained value in the enum
+    pub fn get_size(&self) -> usize {
+        match self {
+            CommandSpecificData::RegisterSession(register_data) => {
+                // Calculate the size of RegisterData
+                mem::size_of_val(register_data)
+            }
+            CommandSpecificData::SendRrData(packet_data) => {
+                // Calculate the size of CipDataPacket<T>
+                mem::size_of_val(packet_data)
+            }
+        }
+    }
+}
+
+impl<T> Serialize for CommandSpecificData<T>
+where
+    T: Serialize + DeserializeOwned,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            CommandSpecificData::RegisterSession(register_data) => {
+                register_data.serialize(serializer)
+            }
+            CommandSpecificData::SendRrData(packet_data) => packet_data.serialize(serializer),
+        }
+    }
+}
+
+const SENDER_CONTEXT_SIZE: usize = 8;
 
 // These should be equal
 // const ENCAPSULATED_HEADER_SIZE: usize = 24;
@@ -72,15 +121,15 @@ pub struct EncapsulatedHeader {
     pub length: CipUint,
     pub session_handle: CipUdint,
     pub status_code: EncapsStatusCode,
-    pub sender_context: CipUint,
-    pub options: CipUint,
+    pub sender_context: [CipByte; SENDER_CONTEXT_SIZE],
+    pub options: CipUdint,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 #[serde(bound = "T: Serialize + DeserializeOwned")]
 pub struct EncapsulatedPacket<T> {
     pub header: EncapsulatedHeader,
-    pub data: PacketData<T>,
+    pub data: CommandSpecificData<T>,
 }
 
 impl<T> EncapsulatedPacket<T>
@@ -90,19 +139,10 @@ where
     pub fn new(
         command: EncapsCommand,
         session_handle: CipUdint,
-        timeout: CipUint,
-        cip_data_packet: CipDataPacket<T>,
+        command_specific_data: CommandSpecificData<T>,
     ) -> Self {
         // with explicit messaging, there is no interface handle
-        let interface_handle: CipUdint = 0;
-
-        let data_packet_size: CipUint = mem::size_of_val(&cip_data_packet) as CipUint;
-
-        let packet_data = PacketData {
-            interface_handle,
-            timeout,
-            cip_data_packet,
-        };
+        let data_packet_size = command_specific_data.get_size() as CipUint;
 
         EncapsulatedPacket {
             header: EncapsulatedHeader {
@@ -110,10 +150,10 @@ where
                 length: data_packet_size,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
-                sender_context: DEFAULT_PACKET_OPTIONS,
-                options: 0,
+                sender_context: [0x00; SENDER_CONTEXT_SIZE],
+                options: 0x00,
             },
-            data: packet_data,
+            data: command_specific_data,
         }
     }
 
@@ -125,20 +165,25 @@ where
         EncapsulatedPacket::new(
             EncapsCommand::SendRrData,
             session_handle,
-            timeout,
-            cip_data_packet,
+            CommandSpecificData::SendRrData(PacketData {
+                interface_handle: 0,
+                timeout,
+                cip_data_packet,
+            }),
         )
     }
 }
 
 // create a default implementation for EncapsulatedPacket with CipByte
 impl EncapsulatedPacket<CipByte> {
-    pub fn new_registration(timeout: CipUint) -> Self {
+    pub fn new_registration() -> Self {
         EncapsulatedPacket::new(
             EncapsCommand::RegisterSession,
             0,
-            timeout,
-            CipDataPacket::new_empty(),
+            CommandSpecificData::RegisterSession(RegisterData {
+                protocol_version: 1,
+                option_flags: 0,
+            }),
         )
     }
 

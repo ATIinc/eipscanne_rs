@@ -1,4 +1,4 @@
-use bincode::{config::BigEndian, serialize, Options};
+use bincode::serialize;
 
 use eipscanne_rs::{cip::types::CipUint, eip::packet::EncapsCommand};
 

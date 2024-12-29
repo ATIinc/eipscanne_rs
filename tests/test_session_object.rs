@@ -44,7 +44,7 @@ fn test_serialize_register_session_request() {
     ];
 
     // create an empty packet
-    let registration_packet = EncapsulatedPacket::new_registration(0);
+    let registration_packet = EncapsulatedPacket::new_registration();
 
     // Serialize the struct into a byte array
     let registration_byte_array = serialize(&registration_packet).unwrap();
