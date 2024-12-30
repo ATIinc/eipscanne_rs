@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
 use super::path::CipPath;
+use super::types::CipUint;
 
 #[bitsize(7)]
 #[derive(TryFromBits, PartialEq, Debug)]
@@ -90,7 +91,18 @@ pub struct MessageRouter {
     pub data_word_size: u8,
 
     // TODO: Create a generic so different types of requests can be handled
-    pub path: CipPath,
+    pub data: CipPath,
+}
+
+impl MessageRouter {
+    pub fn byte_size(&self) -> CipUint {
+        // Creating a manual function because std::mem::size_of_val not playing nice
+        let service_container_size = mem::size_of_val(&self.service_container);
+        let data_word_size = mem::size_of_val(&self.data_word_size);
+        let data_size = mem::size_of_val(&self.data);
+
+        (service_container_size + data_word_size + data_size) as CipUint
+    }
 }
 
 impl MessageRouter {
@@ -101,7 +113,7 @@ impl MessageRouter {
         MessageRouter {
             service_container: ServiceContainer::new(service_code, false),
             data_word_size: total_data_word_size.try_into().unwrap(),
-            path: cip_path,
+            data: cip_path,
         }
     }
 }

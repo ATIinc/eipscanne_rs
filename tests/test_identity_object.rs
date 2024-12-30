@@ -1,8 +1,8 @@
 use bincode::serialize; // deserialize,
 
-use eipscanne_rs::cip::message::{CipPath, MessageRouterRequest, ServiceCode};
+use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::cip_data::CipDataPacket;
 use eipscanne_rs::eip::packet::EncapsulatedPacket;
 
 #[test]
@@ -36,37 +36,11 @@ fn test_serialize_identity_request() {
 
     */
 
-    let expected_byte_array: Vec<CipByte> = vec![
+    let expected_eip_byte_array: Vec<CipByte> = vec![
         0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00, 0x01, 0x04, 0x21, 0x00, 0x01,
-        0x00, 0x25, 0x00, 0x01, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00,
     ];
-
-    // create an empty packet
-    let session_handle = 6;
-    let timeout = 0;
-    let data_packet = EncapsulatedPacket::new_data(
-        session_handle,
-        timeout,
-        CipDataPacket::new(MessageRouterRequest {
-            service_code: ServiceCode::GetAttributeAll,
-            path: CipPath {
-                logical_segment: 0x01,
-                class_id: 0x07,
-                instance_id: 0x08,
-                attribute_id: None,
-            },
-            data: vec![],
-            use_8_bit_path_segments: true,
-        }),
-    );
-
-    // Serialize the struct into a byte array
-    let data_byte_array = serialize(&data_packet).unwrap();
-
-    // Assert equality
-    assert_eq!(expected_byte_array, data_byte_array);
 
     /*
     Common Industrial Protocol
@@ -94,8 +68,30 @@ fn test_serialize_identity_request() {
 
     */
 
+    let expected_cip_byte_array: Vec<CipByte> =
+        vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
+
+    let full_expected_byte_array =
+        [&expected_eip_byte_array[..], &expected_cip_byte_array[..]].concat();
+
+    // create an empty packet
+    let identity_message =
+        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+
+    let session_handle = 6;
+    let timeout = 0;
+    let encapsulated_packet =
+        EncapsulatedPacket::new_cip(session_handle, timeout, &identity_message);
+
+    // Serialize the struct into a byte array
+    let eip_byte_array = serialize(&encapsulated_packet).unwrap();
+    let cip_byte_array = serialize(&identity_message).unwrap();
+
+    let full_message_bytes = [&eip_byte_array[..], &cip_byte_array[..]].concat();
+
     // Assert equality
-    assert_eq!(0x0, 0x0);
+    assert_eq!(expected_cip_byte_array, cip_byte_array);
+    assert_eq!(full_expected_byte_array, full_message_bytes);
 }
 
 #[test]

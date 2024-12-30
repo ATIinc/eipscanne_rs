@@ -1,8 +1,9 @@
 use bincode::{deserialize, serialize};
 use std::error::Error;
 
-use eipscanne_rs::cip::types::CipByte;
-// use eipscanne_rs::samples::IdentityObject;
+use eipscanne_rs::eip::packet::{
+    EncapsCommand, EncapsStatusCode, EncapsulatedHeader, RegisterData,
+};
 
 fn identity_object() -> Result<(), Box<dyn Error>> {
     // auto si = std::make_shared<SessionInfo>("172.28.1.3", 0xAF12);
@@ -12,14 +13,29 @@ fn identity_object() -> Result<(), Box<dyn Error>> {
     // let session_handle = 3;
 
     // create an empty packet
-    let empty_eip_packet = eipscanne_rs::eip::packet::EncapsulatedPacket::new_registration();
+    let empty_eip_packet = eipscanne_rs::eip::packet::EncapsulatedPacket {
+        header: EncapsulatedHeader {
+            command: EncapsCommand::RegisterSession,
+            length: 0x2,
+            session_handle: 0x1,
+            status_code: EncapsStatusCode::Success,
+            sender_context: [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0],
+            options: 0x00,
+        },
+        command_data: eipscanne_rs::eip::packet::CommandSpecificData::RegisterSession(
+            RegisterData {
+                protocol_version: 0x1,
+                option_flags: 0x0,
+            },
+        ),
+    };
 
     // Serialize the struct into a byte array
     let byte_array = serialize(&empty_eip_packet).unwrap();
 
     println!("Serialized byte array: {:?}", byte_array);
 
-    let deserialized_struct: eipscanne_rs::eip::packet::EncapsulatedPacket<CipByte> =
+    let deserialized_struct: eipscanne_rs::eip::packet::EncapsulatedPacket =
         deserialize(&byte_array).unwrap();
 
     println!("Deserialized struct: {:?}", deserialized_struct);
