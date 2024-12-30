@@ -1,7 +1,5 @@
 use std::vec;
 
-use bincode::Options;
-
 use eipscanne_rs::cip::path::{
     CipPath, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType, SegmentType,
 };

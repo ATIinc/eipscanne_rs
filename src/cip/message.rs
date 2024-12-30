@@ -1,13 +1,16 @@
 use std::fmt;
 use std::mem;
 
-use serde::de::{DeserializeOwned, Deserializer, Visitor};
-use serde::ser::{SerializeSeq, Serializer};
+use serde::de::{Deserializer, Visitor};
+use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
-use serde_repr::{Deserialize_repr, Serialize_repr};
 
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq)]
-#[repr(u8)]
+use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
+
+use super::path::CipPath;
+
+#[bitsize(7)]
+#[derive(TryFromBits, PartialEq, Debug)]
 pub enum ServiceCode {
     None = 0x00,
     /* Start CIP common services */
@@ -36,13 +39,71 @@ pub enum ServiceCode {
     GroupSync = 0x1C, /* End CIP common services */
 }
 
-pub enum MessageData {}
+#[bitsize(8)]
+#[derive(TryFromBits, PartialEq, DebugBits)]
+pub struct ServiceContainer {
+    service: ServiceCode,
+    // NOTE: This bit is at the front of the byte in testing
+    response: bool,
+}
 
-#[derive(Deserialize, Debug, PartialEq)]
-pub struct MessageRouterRequest {
-    pub service_code: ServiceCode,
-    // TODO: Make the option to use an ByteAlignedCipPath (use_8_bit_path_segments = True)
+impl Serialize for ServiceContainer {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        // Serialize the u32 as little endian
+        serializer.serialize_u8(self.value)
+    }
+}
+
+struct ServiceContainerVisitor;
+
+impl<'de> Visitor<'de> for ServiceContainerVisitor {
+    type Value = ServiceContainer;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("an integer between 0 and 2^32")
+    }
+
+    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let logical_segment = ServiceContainer::try_from(value).unwrap();
+        Ok(logical_segment)
+    }
+}
+
+impl<'de> Deserialize<'de> for ServiceContainer {
+    fn deserialize<D>(deserializer: D) -> Result<ServiceContainer, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_u8(ServiceContainerVisitor)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct MessageRouter {
+    pub service_container: ServiceContainer,
+    pub data_word_size: u8,
+
+    // TODO: Create a generic so different types of requests can be handled
     pub path: CipPath,
+}
+
+impl MessageRouter {
+    pub fn new_request(service_code: ServiceCode, cip_path: CipPath) -> MessageRouter {
+        let total_data_size = mem::size_of_val(&cip_path);
+        let total_data_word_size = total_data_size / mem::size_of::<u16>();
+
+        MessageRouter {
+            service_container: ServiceContainer::new(service_code, false),
+            data_word_size: total_data_word_size.try_into().unwrap(),
+            path: cip_path,
+        }
+    }
 }
 
 // NOTE: A RouterResponse sets the first bit to 0x1
