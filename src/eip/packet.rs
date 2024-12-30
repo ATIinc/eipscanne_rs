@@ -33,24 +33,31 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(bound = "T: Serialize + DeserializeOwned")]
-pub struct PacketData<T> {
-    pub interface_handle: CipUdint,
-    pub timeout: CipUint,
-    pub cip_data_packet: CipDataPacket<T>,
+// Enum definition with `Serialize` and `Deserialize` traits.
+#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
+#[repr(u16)]
+pub enum CommonPacketItemId {
+    NullAddr = 0x0000,
+    ListIdentity = 0x000C,
+    ConnectionAddressItem = 0x00A1,
+    ConnectedTransportPacket = 0x00B1,
+    UnconnectedMessage = 0x00B2,
+    O2TSockAddrInfo = 0x8000,
+    T2OSockAddrInfo = 0x8001,
+    SequencedAddressItem = 0x8002,
 }
 
-impl<T> PacketData<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    // Method to get the size of the contained value in the enum
-    pub fn get_size(&self) -> usize {
-        mem::size_of_val(&self.interface_handle)
-            + mem::size_of_val(&self.timeout)
-            + self.cip_data_packet.get_size()
-    }
+#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+pub struct CommonPacketDescriptor {
+    pub type_id: CommonPacketItemId,
+    pub packet_length: CipUint,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct PacketData {
+    pub interface_handle: CipUdint,
+    pub timeout: CipUint,
+    pub cip_data_packet: [CommonPacketDescriptor; 2],
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -60,35 +67,12 @@ pub struct RegisterData {
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
-#[serde(bound = "T: Serialize + DeserializeOwned")]
-pub enum CommandSpecificData<T> {
+pub enum CommandSpecificData {
     RegisterSession(RegisterData),
-    SendRrData(PacketData<T>),
+    SendRrData(PacketData),
 }
 
-impl<T> CommandSpecificData<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    // Method to get the size of the contained value in the enum
-    pub fn get_size(&self) -> usize {
-        match self {
-            CommandSpecificData::RegisterSession(register_data) => {
-                // Calculate the size of RegisterData
-                mem::size_of_val(register_data)
-            }
-            CommandSpecificData::SendRrData(packet_data) => {
-                // Calculate the size of CipDataPacket<T>
-                packet_data.get_size()
-            }
-        }
-    }
-}
-
-impl<T> Serialize for CommandSpecificData<T>
-where
-    T: Serialize + DeserializeOwned,
-{
+impl Serialize for CommandSpecificData {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -117,64 +101,64 @@ pub struct EncapsulatedHeader {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-#[serde(bound = "T: Serialize + DeserializeOwned")]
-pub struct EncapsulatedPacket<T> {
+pub struct EncapsulatedPacket {
     pub header: EncapsulatedHeader,
-    pub data: CommandSpecificData<T>,
+    pub command_data: CommandSpecificData,
+    // pub data: CipDataPacket<CipByte>,
 }
 
-impl<T> EncapsulatedPacket<T>
-where
-    T: Serialize + DeserializeOwned,
-{
-    pub fn new(
-        command: EncapsCommand,
-        session_handle: CipUdint,
-        command_specific_data: CommandSpecificData<T>,
-    ) -> Self {
-        // with explicit messaging, there is no interface handle
-        let data_packet_size = command_specific_data.get_size() as CipUint;
+// impl EncapsulatedPacket
+// where
+//     T: Serialize + DeserializeOwned,
+// {
+//     pub fn new(
+//         command: EncapsCommand,
+//         session_handle: CipUdint,
+//         command_specific_data: CommandSpecificData,
+//     ) -> Self {
+//         // with explicit messaging, there is no interface handle
+//         let data_packet_size = command_specific_data.get_size() as CipUint;
 
-        EncapsulatedPacket {
-            header: EncapsulatedHeader {
-                command,
-                length: data_packet_size,
-                session_handle,
-                status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; SENDER_CONTEXT_SIZE],
-                options: 0x00,
-            },
-            data: command_specific_data,
-        }
-    }
+//         EncapsulatedPacket {
+//             header: EncapsulatedHeader {
+//                 command,
+//                 length: data_packet_size,
+//                 session_handle,
+//                 status_code: EncapsStatusCode::Success,
+//                 sender_context: [0x00; SENDER_CONTEXT_SIZE],
+//                 options: 0x00,
+//             },
+//             data: command_specific_data,
+//         }
+//     }
 
-    pub fn new_data(
-        session_handle: CipUdint,
-        timeout: CipUint,
-        cip_data_packet: CipDataPacket<T>,
-    ) -> Self {
-        EncapsulatedPacket::new(
-            EncapsCommand::SendRrData,
-            session_handle,
-            CommandSpecificData::SendRrData(PacketData {
-                interface_handle: 0,
-                timeout,
-                cip_data_packet,
-            }),
-        )
-    }
-}
+//     pub fn new_data(
+//         session_handle: CipUdint,
+//         timeout: CipUint,
+//         cip_data_packet: CipDataPacket<T>,
+//     ) -> Self {
+//         EncapsulatedPacket::new(
+//             EncapsCommand::SendRrData,
+//             session_handle,
+//             CommandSpecificData::SendRrData(PacketData {
+//                 interface_handle: 0,
+//                 timeout,
+//                 cip_data_packet,
+//             }),
+//         )
+//     }
+// }
 
 // create a default implementation for EncapsulatedPacket with CipByte
-impl EncapsulatedPacket<CipByte> {
-    pub fn new_registration() -> Self {
-        EncapsulatedPacket::new(
-            EncapsCommand::RegisterSession,
-            0,
-            CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0,
-            }),
-        )
-    }
-}
+// impl EncapsulatedPacket<CipByte> {
+//     pub fn new_registration() -> Self {
+//         EncapsulatedPacket::new(
+//             EncapsCommand::RegisterSession,
+//             0,
+//             CommandSpecificData::RegisterSession(RegisterData {
+//                 protocol_version: 1,
+//                 option_flags: 0,
+//             }),
+//         )
+//     }
+// }

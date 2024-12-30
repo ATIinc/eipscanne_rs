@@ -1,5 +1,3 @@
-use bincode::serialize; // deserialize,
-
 use eipscanne_rs::cip::message::{CipPath, MessageRouterRequest, ServiceCode};
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::cip_data::CipDataPacket;
@@ -35,14 +33,17 @@ fn test_serialize_get_attributes_all_request() {
     let expected_byte_array: Vec<CipByte> =
         vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
-    let cip_data_packet = CipDataPacket::new(MessageRouterRequest {
-        service_code: ServiceCode::GetAttributeAll,
-        path: CipPath {
-            logical_segment: 0x01,
-            class_id: 0x01,
-            instance_id: 0x01,
-            attribute_id: None,
-        },
+    let message_router = MessageRouterRequest {
+            service_code: ServiceCode::GetAttributeAll,
+            path: CipPath {
+                logical_segment: 0x01,
+                class_id: 0x01,
+                instance_id: 0x01,
+                attribute_id: None,
+            },
+        };
+
+    let cip_data_packet = CipDataPacket::new(
         data: vec![],
         use_8_bit_path_segments: true,
     });
