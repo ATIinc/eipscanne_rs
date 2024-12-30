@@ -95,7 +95,7 @@ fn test_serialize_identity_request() {
 }
 
 #[test]
-fn test_serialize_identity_response() {
+fn test_deserialize_identity_response() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Send RR Data
     Encapsulation Header

@@ -14,6 +14,28 @@ fn test_serialize_service_container() {
 }
 
 #[test]
+fn test_deserialize_request_service_container() {
+    let raw_byte_array: Vec<CipByte> = vec![0x1];
+
+    let expected_service_container = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
+
+    let service_container: ServiceContainer = bincode::deserialize(&raw_byte_array).unwrap();
+
+    assert_eq!(expected_service_container, service_container);
+}
+
+#[test]
+fn test_deserialize_response_service_container() {
+    let raw_byte_array: Vec<CipByte> = vec![0b10000101];
+
+    let expected_service_container = ServiceContainer::new(ServiceCode::Reset, true);
+
+    let service_container: ServiceContainer = bincode::deserialize(&raw_byte_array).unwrap();
+
+    assert_eq!(expected_service_container, service_container);
+}
+
+#[test]
 fn test_serialize_get_attributes_all_request() {
     /*
     Common Industrial Protocol
