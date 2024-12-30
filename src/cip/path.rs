@@ -1,5 +1,4 @@
 use std::fmt;
-use std::mem;
 
 use serde::de::{Deserializer, Visitor};
 use serde::ser::Serializer;
@@ -7,25 +6,42 @@ use serde::{Deserialize, Serialize};
 
 //  Tried to use bilge: https://github.com/hecatia-elegua/bilge
 //      * Apparently Deku may be slower because there are a LOT of transforms
-use deku::prelude::*;
+use bilge::prelude::*;
 
-#[repr(u8)]
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8")]
+#[bitsize(3)]
+#[derive(Debug, Clone, TryFromBits, PartialEq)]
+#[non_exhaustive]
 pub enum SegmentType {
     LogicalSegment = 0x01,
 }
 
+#[bitsize(3)]
+#[derive(Debug, Clone, TryFromBits, PartialEq)]
+#[non_exhaustive]
+pub enum LogicalSegmentType {
+    ClassId = 0x00,
+    InstanceId = 0x01,
+    Sample = 0x05,
+}
+
+#[bitsize(2)]
+#[derive(Debug, Clone, TryFromBits, PartialEq)]
+#[non_exhaustive]
+pub enum LogicalSegmentFormat {
+    FormatAsU16 = 0x01,
+    FormatAsUWhat = 0x03,
+}
+
 // The whole CipPath is a CipUint (16 bit number)
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "little")]
+#[bitsize(32)]
+#[derive(TryFromBits, PartialEq)]
 pub struct LogicalPathSegment {
-    #[deku(bits = 3)]
+    // For some reason, the segment sections need to be inverted... Should be u3, u3, u2
+    pub logical_segment_format: LogicalSegmentFormat,
+    pub logical_segment_type: LogicalSegmentType,
     pub segment_type: SegmentType,
-    #[deku(bits = 3)]
-    pub logical_segment_type: u8,
-    #[deku(bits = 2)]
-    pub logical_segment_format: u8,
+    pub padded_bytes: u8,
+    pub data: u16,
 }
 
 impl Serialize for LogicalPathSegment {
@@ -33,22 +49,8 @@ impl Serialize for LogicalPathSegment {
     where
         S: Serializer,
     {
-        let serialized_byte_vec = self.to_bytes().unwrap();
-
-        const U16_BYTE_ARRAY_SIZE: usize = mem::size_of::<u16>();
-
-        if serialized_byte_vec.len() != U16_BYTE_ARRAY_SIZE {
-            panic!(
-                "CipPath serialization error: serialized bytes vector length is not {}",
-                U16_BYTE_ARRAY_SIZE
-            );
-        }
-
-        let serialized_byte_array: [u8; U16_BYTE_ARRAY_SIZE] =
-            serialized_byte_vec.try_into().unwrap();
-
-        // Serialize the u16 as little endian
-        serializer.serialize_u16(u16::from_le_bytes(serialized_byte_array))
+        // Serialize the u32 as little endian
+        serializer.serialize_u32(self.value.to_le())
     }
 }
 
@@ -58,21 +60,15 @@ impl<'de> Visitor<'de> for LogicalPathSegmentVisitor {
     type Value = LogicalPathSegment;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an integer between -2^31 and 2^31")
+        formatter.write_str("an integer between 0 and 2^32")
     }
 
-    fn visit_u16<E>(self, value: u16) -> Result<Self::Value, E>
+    fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
-        let byte_offset = 0;
-        // NOTE: This is a bit inneficient, but it takes advantage of the existing bytes method
-        let converted_bytes: Vec<u8> = value.to_le_bytes().to_vec();
-
-        let ((_remaining_bytes, _remaining_byte_size), deserialized_path) =
-            LogicalPathSegment::from_bytes((converted_bytes.as_ref(), byte_offset)).unwrap();
-
-        Ok(deserialized_path)
+        let logical_segment = LogicalPathSegment::try_from(value).unwrap();
+        Ok(logical_segment)
     }
 }
 
@@ -81,12 +77,33 @@ impl<'de> Deserialize<'de> for LogicalPathSegment {
     where
         D: Deserializer<'de>,
     {
-        deserializer.deserialize_u16(LogicalPathSegmentVisitor)
+        deserializer.deserialize_u32(LogicalPathSegmentVisitor)
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct CipPath {
-    pub class_id: LogicalPathSegment,
-    pub instance_id: LogicalPathSegment,
-    pub attribute_id: LogicalPathSegment,
+    pub class_id_segment: LogicalPathSegment,
+    pub instance_id_segment: LogicalPathSegment,
+}
+
+impl CipPath {
+    pub fn new(class_id: u16, instance_id: u16) -> CipPath {
+        CipPath {
+            class_id_segment: LogicalPathSegment::new(
+                LogicalSegmentFormat::FormatAsU16,
+                LogicalSegmentType::ClassId,
+                SegmentType::LogicalSegment,
+                0x0,
+                class_id,
+            ),
+            instance_id_segment: LogicalPathSegment::new(
+                LogicalSegmentFormat::FormatAsU16,
+                LogicalSegmentType::InstanceId,
+                SegmentType::LogicalSegment,
+                0x0,
+                instance_id,
+            ),
+        }
+    }
 }
