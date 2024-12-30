@@ -4,9 +4,8 @@ use serde::de::{Deserializer, Visitor};
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
 
-//  Tried to use bilge: https://github.com/hecatia-elegua/bilge
-//      * Apparently Deku may be slower because there are a LOT of transforms
-use bilge::prelude::*;
+//  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
+use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, Number, TryFromBits};
 
 #[bitsize(3)]
 #[derive(Debug, Clone, TryFromBits, PartialEq)]
@@ -34,7 +33,7 @@ pub enum LogicalSegmentFormat {
 
 // The whole CipPath is a CipUint (16 bit number)
 #[bitsize(32)]
-#[derive(TryFromBits, PartialEq)]
+#[derive(TryFromBits, PartialEq, DebugBits)]
 pub struct LogicalPathSegment {
     // For some reason, the segment sections need to be inverted... Should be u3, u3, u2
     pub logical_segment_format: LogicalSegmentFormat,
@@ -81,7 +80,7 @@ impl<'de> Deserialize<'de> for LogicalPathSegment {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct CipPath {
     pub class_id_segment: LogicalPathSegment,
     pub instance_id_segment: LogicalPathSegment,
