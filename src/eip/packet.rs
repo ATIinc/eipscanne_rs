@@ -1,5 +1,8 @@
+use std::fmt;
+use std::io;
 use std::mem;
 
+use serde::de::{Deserializer, Visitor};
 use serde::{Deserialize, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -7,6 +10,8 @@ use crate::cip::{
     message::MessageRouter,
     types::{CipByte, CipUdint, CipUint},
 };
+
+// TODO: Investigate replacing all deserialize calls with bincode::Decode and bincode::Encode
 
 // Enum definition with `Serialize` and `Deserialize` traits.
 #[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
@@ -87,6 +92,7 @@ pub struct RegisterData {
 }
 
 #[derive(Deserialize, Debug, PartialEq)]
+#[serde(untagged)]
 pub enum CommandSpecificData {
     RegisterSession(RegisterData),
     SendRrData(PacketData),
@@ -139,7 +145,11 @@ pub struct EncapsulatedHeader {
     pub options: CipUdint,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+// TODO: Implement EncapsulatedPacket deserialization
+//  - First read the header, then decide how to handle the remaining bytes
+// Maybe: https://stackoverflow.com/questions/63306229/how-to-pass-options-to-rusts-serde-that-can-be-accessed-in-deserializedeseria
+
+#[derive(Serialize, Debug, PartialEq)]
 pub struct EncapsulatedPacket {
     pub header: EncapsulatedHeader,
     pub command_data: CommandSpecificData,
@@ -198,5 +208,68 @@ impl EncapsulatedPacket {
                 option_flags: 0,
             }),
         )
+    }
+}
+
+struct EncapsulatedPacketVisitor;
+
+impl EncapsulatedPacketVisitor {
+    fn deserialize_command_specific_data<E>(
+        self,
+        v: Vec<u8>,
+        command_type: EncapsCommand,
+    ) -> Result<CommandSpecificData, E>
+    where
+        E: serde::de::Error,
+    {
+        match command_type {
+            EncapsCommand::RegisterSession => {
+                let registration_data: RegisterData = bincode::deserialize(&v).unwrap();
+                Ok(CommandSpecificData::RegisterSession(registration_data))
+            }
+            EncapsCommand::SendRrData => {
+                let packet_data: PacketData = bincode::deserialize(&v).unwrap();
+                Ok(CommandSpecificData::SendRrData(packet_data))
+            }
+            _ => Err(E::custom(format!(
+                "Unable to deserialize the provided EncapsCommand: {:?}",
+                command_type
+            ))),
+        }
+    }
+}
+
+impl<'de> Visitor<'de> for EncapsulatedPacketVisitor {
+    type Value = EncapsulatedPacket;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a serialized EncapsulatedPacket")
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        let header_length = mem::size_of::<EncapsulatedHeader>();
+
+        let (header_bytes, command_bytes) = v.split_at(header_length);
+        let encapsulated_header: EncapsulatedHeader = bincode::deserialize(header_bytes).unwrap();
+
+        let encapsulated_command: Result<CommandSpecificData, E> = self
+            .deserialize_command_specific_data(command_bytes.to_vec(), encapsulated_header.command);
+
+        Ok(EncapsulatedPacket {
+            header: encapsulated_header,
+            command_data: encapsulated_command.unwrap(),
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for EncapsulatedPacket {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_any(EncapsulatedPacketVisitor)
     }
 }

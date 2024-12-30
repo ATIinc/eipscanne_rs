@@ -1,7 +1,7 @@
 use bincode::serialize; // deserialize,
 
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::EncapsulatedPacket;
+use eipscanne_rs::eip::packet::{EncapsCommand, EncapsulatedPacket};
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -76,8 +76,17 @@ fn test_serialize_register_session_response() {
 
     */
 
+    let raw_response: Vec<CipByte> = vec![
+        0x65, 0x00, 0x04, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ];
+
+    let session_response: EncapsulatedPacket = bincode::deserialize(&raw_response).unwrap();
+
+    let expected_session_command = EncapsCommand::RegisterSession;
+
     // Assert equality
-    assert_eq!(0x0, 0x0);
+    assert_eq!(expected_session_command, session_response.header.command);
 }
 
 #[test]
