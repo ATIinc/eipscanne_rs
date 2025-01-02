@@ -97,7 +97,7 @@ fn test_deserialize_register_session_response() {
         length: 0x04,
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
-        sender_context: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        sender_context: [0x00; 8],
         options: 0x00,
     };
 

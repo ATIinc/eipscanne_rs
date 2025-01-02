@@ -83,7 +83,7 @@ pub enum EncapsStatusCode {
 pub struct PacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
-    pub item_count: CipUint,
+    pub item_count: CipUint, // will always be 2
     pub cip_data_packets: [CommonPacketDescriptor; 2],
 }
 

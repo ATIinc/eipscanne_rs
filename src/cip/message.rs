@@ -85,7 +85,7 @@ impl<'de> Deserialize<'de> for ServiceContainer {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Serialize, PartialEq)]
 pub struct MessageRouter {
     pub service_container: ServiceContainer,
     pub data_word_size: u8,
