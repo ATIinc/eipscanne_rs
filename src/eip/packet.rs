@@ -1,8 +1,7 @@
-use std::fmt;
-use std::io;
+// use std::fmt;
 use std::mem;
 
-use serde::de::{Deserializer, Visitor};
+// use serde::de::{Deserializer, VariantAccess};
 use serde::{Deserialize, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -211,65 +210,32 @@ impl EncapsulatedPacket {
     }
 }
 
-struct EncapsulatedPacketVisitor;
+pub fn deserialize_packet_from<R, E>(mut reader: R) -> Result<EncapsulatedPacket, E>
+where
+    R: std::io::BufRead,
+    E: serde::de::Error,
+{
+    let deserialized_header: EncapsulatedHeader = bincode::deserialize_from(&mut reader).unwrap();
 
-impl EncapsulatedPacketVisitor {
-    fn deserialize_command_specific_data<E>(
-        self,
-        v: Vec<u8>,
-        command_type: EncapsCommand,
-    ) -> Result<CommandSpecificData, E>
-    where
-        E: serde::de::Error,
+    let deserialize_command_data: Result<CommandSpecificData, E> = match deserialized_header.command
     {
-        match command_type {
-            EncapsCommand::RegisterSession => {
-                let registration_data: RegisterData = bincode::deserialize(&v).unwrap();
-                Ok(CommandSpecificData::RegisterSession(registration_data))
-            }
-            EncapsCommand::SendRrData => {
-                let packet_data: PacketData = bincode::deserialize(&v).unwrap();
-                Ok(CommandSpecificData::SendRrData(packet_data))
-            }
-            _ => Err(E::custom(format!(
-                "Unable to deserialize the provided EncapsCommand: {:?}",
-                command_type
-            ))),
+        EncapsCommand::RegisterSession => {
+            let deserialized_register_data: RegisterData =
+                bincode::deserialize_from(&mut reader).unwrap();
+
+            Ok(CommandSpecificData::RegisterSession(
+                deserialized_register_data,
+            ))
         }
-    }
-}
+        _ => Err(serde::de::Error::custom(
+            "Command data length cannot be zero",
+        )),
+    };
 
-impl<'de> Visitor<'de> for EncapsulatedPacketVisitor {
-    type Value = EncapsulatedPacket;
+    let deserialized_packet = EncapsulatedPacket {
+        header: deserialized_header,
+        command_data: deserialize_command_data.unwrap(),
+    };
 
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a serialized EncapsulatedPacket")
-    }
-
-    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let header_length = mem::size_of::<EncapsulatedHeader>();
-
-        let (header_bytes, command_bytes) = v.split_at(header_length);
-        let encapsulated_header: EncapsulatedHeader = bincode::deserialize(header_bytes).unwrap();
-
-        let encapsulated_command: Result<CommandSpecificData, E> = self
-            .deserialize_command_specific_data(command_bytes.to_vec(), encapsulated_header.command);
-
-        Ok(EncapsulatedPacket {
-            header: encapsulated_header,
-            command_data: encapsulated_command.unwrap(),
-        })
-    }
-}
-
-impl<'de> Deserialize<'de> for EncapsulatedPacket {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_any(EncapsulatedPacketVisitor)
-    }
+    Ok(deserialized_packet)
 }

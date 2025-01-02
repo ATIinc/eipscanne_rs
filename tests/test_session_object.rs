@@ -1,7 +1,12 @@
-use bincode::serialize; // deserialize,
+use std::io::Cursor;
+
+use bincode::{serialize, Error}; // deserialize,
 
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::{EncapsCommand, EncapsulatedPacket};
+use eipscanne_rs::eip::packet::{
+    deserialize_packet_from, CommandSpecificData, EncapsCommand, EncapsStatusCode,
+    EncapsulatedHeader, EncapsulatedPacket, RegisterData,
+};
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -54,7 +59,7 @@ fn test_serialize_register_session_request() {
 }
 
 #[test]
-fn test_serialize_register_session_response() {
+fn test_deserialize_register_session_response() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Register Session
     Encapsulation Header
@@ -81,12 +86,41 @@ fn test_serialize_register_session_response() {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
     ];
 
-    let session_response: EncapsulatedPacket = bincode::deserialize(&raw_response).unwrap();
+    let byte_cursor = Cursor::new(raw_response);
 
-    let expected_session_command = EncapsCommand::RegisterSession;
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    let session_response = deserialize_packet_from::<
+        &mut std::io::BufReader<std::io::Cursor<Vec<u8>>>,
+        Error,
+    >(&mut buf_reader)
+    .unwrap();
+
+    let expected_session_header = EncapsulatedHeader {
+        command: EncapsCommand::RegisterSession,
+        length: 0x04,
+        session_handle: 0x006,
+        status_code: EncapsStatusCode::Success,
+        sender_context: [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        options: 0x00,
+    };
 
     // Assert equality
-    assert_eq!(expected_session_command, session_response.header.command);
+    assert_eq!(expected_session_header, session_response.header);
+
+    let expected_session_command_data = CommandSpecificData::RegisterSession(RegisterData {
+        protocol_version: 0x1,
+        option_flags: 0x00,
+    });
+
+    assert_eq!(expected_session_command_data, session_response.command_data);
+
+    let expected_packet = EncapsulatedPacket {
+        header: expected_session_header,
+        command_data: expected_session_command_data,
+    };
+
+    assert_eq!(expected_packet, session_response);
 }
 
 #[test]

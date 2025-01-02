@@ -17,7 +17,8 @@ fn test_serialize_path_segment() {
 
     let expected_bytes = vec![0x21, 0x0, 0x01, 0x0];
 
-    // let little_endian_option = bincode::DefaultOptions::new().with_little_endian();
+    // need variable_int_encoding to allow enums to be encoded/decoded as u8
+    // let little_endian_option = bincode::DefaultOptions::new().with_variable_int_encoding();
     let sample_path_bytes = bincode::serialize(&sample_path_segment).unwrap();
 
     assert_eq!(expected_bytes, sample_path_bytes);
