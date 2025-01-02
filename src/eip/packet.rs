@@ -5,6 +5,9 @@ use std::mem;
 use serde::{Deserialize, Serialize, Serializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
+use bincode::ErrorKind;
+use bincode::Result as BincodeResult;
+
 use crate::cip::{
     message::MessageRouter,
     types::{CipByte, CipUdint, CipUint},
@@ -210,31 +213,32 @@ impl EncapsulatedPacket {
     }
 }
 
-pub fn deserialize_packet_from<R, E>(mut reader: R) -> Result<EncapsulatedPacket, E>
+pub fn deserialize_packet_from<R>(mut reader: R) -> BincodeResult<EncapsulatedPacket>
 where
     R: std::io::BufRead,
-    E: serde::de::Error,
 {
+    // Deserialize the header first
     let deserialized_header: EncapsulatedHeader = bincode::deserialize_from(&mut reader).unwrap();
 
-    let deserialize_command_data: Result<CommandSpecificData, E> = match deserialized_header.command
-    {
+    // Deserialize the command-specific data based on the command in the header
+    let deserialize_command_data = match deserialized_header.command {
         EncapsCommand::RegisterSession => {
+            // Deserialize the specific data related to RegisterSession
             let deserialized_register_data: RegisterData =
                 bincode::deserialize_from(&mut reader).unwrap();
-
             Ok(CommandSpecificData::RegisterSession(
                 deserialized_register_data,
             ))
         }
-        _ => Err(serde::de::Error::custom(
-            "Command data length cannot be zero",
-        )),
+        _ => Err(Box::new(ErrorKind::Custom(
+            "Command not supported".to_string(),
+        ))),
     };
 
+    // Assemble the EncapsulatedPacket
     let deserialized_packet = EncapsulatedPacket {
         header: deserialized_header,
-        command_data: deserialize_command_data.unwrap(),
+        command_data: deserialize_command_data?,
     };
 
     Ok(deserialized_packet)

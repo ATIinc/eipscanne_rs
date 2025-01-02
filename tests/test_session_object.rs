@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use bincode::{serialize, Error}; // deserialize,
+use bincode::serialize; // deserialize,
 
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::packet::{
@@ -90,11 +90,7 @@ fn test_deserialize_register_session_response() {
 
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let session_response = deserialize_packet_from::<
-        &mut std::io::BufReader<std::io::Cursor<Vec<u8>>>,
-        Error,
-    >(&mut buf_reader)
-    .unwrap();
+    let session_response = deserialize_packet_from(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulatedHeader {
         command: EncapsCommand::RegisterSession,

@@ -41,11 +41,8 @@ fn identity_object() -> Result<(), Box<dyn Error>> {
     let byte_cursor = std::io::Cursor::new(byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let deserialized_struct = eipscanne_rs::eip::packet::deserialize_packet_from::<
-        &mut std::io::BufReader<std::io::Cursor<Vec<u8>>>,
-        bincode::Error,
-    >(&mut buf_reader)
-    .unwrap();
+    let deserialized_struct =
+        eipscanne_rs::eip::packet::deserialize_packet_from(&mut buf_reader).unwrap();
 
     println!("Deserialized struct: {:?}", deserialized_struct);
 
