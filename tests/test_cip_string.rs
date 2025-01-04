@@ -1,3 +1,5 @@
+use binrw::BinWrite;
+
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 
 #[test]
@@ -15,13 +17,14 @@ fn test_serialize_cip_string() {
     let expected_byte_array: Vec<CipByte> =
         vec![0x09, 0x43, 0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b];
 
-    // let cip_string = CipShortString::new(String::from("ClearLink"));
+    let cip_string = CipShortString::new(String::from("ClearLink"));
 
-    // let string_bytes: Vec<u8> = bincode::serialize(&cip_string).unwrap();
+    // Write the cip_string binary data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
 
-    // let string_bytes: Vec<u8> = String::from("ClearLink").as_bytes().to_vec();
-    let string_bytes: Vec<u8> = String::from("the Answer").as_bytes().to_vec();
+    cip_string.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, string_bytes);
+    assert_eq!(expected_byte_array, byte_array_buffer);
 }
