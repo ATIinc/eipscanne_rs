@@ -2,8 +2,8 @@ use bincode::serialize;
 
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
-    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EncapsCommand,
-    EncapsStatusCode, EncapsulatedHeader, EncapsulatedPacket, PacketData,
+    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand, EncapsStatusCode,
+    PacketData, PacketDescription, PacketDescriptionHeader,
 };
 
 /*
@@ -19,7 +19,7 @@ NOTE: To use another endianness, create an options object and call the serialize
 
 #[test]
 fn test_cast_encaps_command() {
-    let command = EncapsCommand::RegisterSession;
+    let command = EnIpCommand::RegisterSession;
 
     let expected_value = 0x0065;
 
@@ -29,7 +29,7 @@ fn test_cast_encaps_command() {
 
 #[test]
 fn test_serialize_encaps_command() {
-    let command = EncapsCommand::RegisterSession;
+    let command = EnIpCommand::RegisterSession;
 
     let command_byte_array = serialize(&command).unwrap();
 
@@ -77,9 +77,9 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = EncapsulatedPacket {
-        header: EncapsulatedHeader {
-            command: EncapsCommand::SendRrData,
+    let identity_request_packet = PacketDescription {
+        header: PacketDescriptionHeader {
+            command: EnIpCommand::SendRrData,
             length: 26,
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,

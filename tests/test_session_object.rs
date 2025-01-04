@@ -4,8 +4,8 @@ use bincode::serialize; // deserialize,
 
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::packet::{
-    deserialize_packet_from, CommandSpecificData, EncapsCommand, EncapsStatusCode,
-    EncapsulatedHeader, EncapsulatedPacket, RegisterData,
+    deserialize_packet_from, CommandSpecificData, EnIpCommand, EncapsStatusCode, PacketDescription,
+    PacketDescriptionHeader, RegisterData,
 };
 
 #[test]
@@ -49,7 +49,7 @@ fn test_serialize_register_session_request() {
     ];
 
     // create an empty packet
-    let registration_packet = EncapsulatedPacket::new_registration();
+    let registration_packet = PacketDescription::new_registration();
 
     // Serialize the struct into a byte array
     let registration_byte_array = serialize(&registration_packet).unwrap();
@@ -92,8 +92,8 @@ fn test_deserialize_register_session_response() {
 
     let session_response = deserialize_packet_from(&mut buf_reader).unwrap();
 
-    let expected_session_header = EncapsulatedHeader {
-        command: EncapsCommand::RegisterSession,
+    let expected_session_header = PacketDescriptionHeader {
+        command: EnIpCommand::RegisterSession,
         length: 0x04,
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
@@ -111,7 +111,7 @@ fn test_deserialize_register_session_response() {
 
     assert_eq!(expected_session_command_data, session_response.command_data);
 
-    let expected_packet = EncapsulatedPacket {
+    let expected_packet = PacketDescription {
         header: expected_session_header,
         command_data: expected_session_command_data,
     };

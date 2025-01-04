@@ -1,3 +1,3 @@
 pub mod cip;
 pub mod eip;
-pub mod samples;
+pub mod object_assembly;

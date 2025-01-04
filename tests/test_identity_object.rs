@@ -4,12 +4,13 @@ use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::packet::{
-    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EncapsCommand,
-    EncapsStatusCode, EncapsulatedHeader, EncapsulatedPacket, PacketData,
+    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand, EncapsStatusCode,
+    PacketData, PacketDescription, PacketDescriptionHeader,
 };
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
 #[test]
-fn test_serialize_identity_request() {
+fn test_serialize_full_identity_request() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Send RR Data
     Encapsulation Header
@@ -46,9 +47,9 @@ fn test_serialize_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = EncapsulatedPacket {
-        header: EncapsulatedHeader {
-            command: EncapsCommand::SendRrData,
+    let identity_request_packet = PacketDescription {
+        header: PacketDescriptionHeader {
+            command: EnIpCommand::SendRrData,
             length: 26,
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
@@ -114,6 +115,21 @@ fn test_serialize_identity_request() {
     let full_identity_request = [identity_byte_array, message_router_bytes].concat();
 
     assert_eq!(full_expected_identity_request, full_identity_request);
+}
+
+#[test]
+fn test_serialize_new_identity_request() {
+    let expected_identity_byte_array: Vec<CipByte> = vec![
+        0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00, 0x01, 0x04, 0x21, 0x00, 0x01,
+        0x00, 0x25, 0x00, 0x01, 0x00,
+    ];
+
+    // create an empty packet
+    let identity_request_packet = ObjectAssembly::new_registration();
+    let identity_byte_array = serialize(&identity_request_packet).unwrap();
+    assert_eq!(expected_identity_byte_array, identity_byte_array);
 }
 
 #[test]
