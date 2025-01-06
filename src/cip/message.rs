@@ -1,9 +1,10 @@
-use std::fmt;
 use std::mem;
 
-use serde::de::{Deserializer, Visitor};
-use serde::ser::Serializer;
-use serde::{Deserialize, Serialize};
+use binrw::{
+    binrw, // #[binrw] attribute
+           // BinRead,  // trait for reading
+           // BinWrite, // trait for writing
+};
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
@@ -42,50 +43,36 @@ pub enum ServiceCode {
 
 #[bitsize(8)]
 #[derive(TryFromBits, PartialEq, DebugBits)]
-pub struct ServiceContainer {
+pub struct ServiceContainerBits {
     service: ServiceCode,
     // NOTE: This bit is at the front of the byte in testing
     response: bool,
 }
 
-impl Serialize for ServiceContainer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize the u32 as little endian
-        serializer.serialize_u8(self.value)
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct ServiceContainer {
+    service_representation: u8,
+}
+
+impl From<ServiceContainer> for ServiceContainerBits {
+    fn from(container: ServiceContainer) -> Self {
+        ServiceContainerBits::try_from(container.service_representation).unwrap()
     }
 }
 
-struct ServiceContainerVisitor;
-
-impl<'de> Visitor<'de> for ServiceContainerVisitor {
-    type Value = ServiceContainer;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an integer between 0 and 2^32")
-    }
-
-    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let logical_segment = ServiceContainer::try_from(value).unwrap();
-        Ok(logical_segment)
+impl From<ServiceContainerBits> for ServiceContainer {
+    fn from(container: ServiceContainerBits) -> Self {
+        ServiceContainer {
+            service_representation: container.value,
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for ServiceContainer {
-    fn deserialize<D>(deserializer: D) -> Result<ServiceContainer, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_u8(ServiceContainerVisitor)
-    }
-}
-
-#[derive(Debug, Serialize, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct MessageRouter {
     pub service_container: ServiceContainer,
     pub data_word_size: u8,
@@ -111,7 +98,7 @@ impl MessageRouter {
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
 
         MessageRouter {
-            service_container: ServiceContainer::new(service_code, false),
+            service_container: ServiceContainerBits::new(service_code, false).into(),
             data_word_size: total_data_word_size.try_into().unwrap(),
             data: cip_path,
         }

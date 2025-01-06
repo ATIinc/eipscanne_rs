@@ -1,4 +1,8 @@
-use eipscanne_rs::cip::message::{MessageRouter, ServiceCode, ServiceContainer};
+use binrw::{BinRead, BinWrite};
+
+use eipscanne_rs::cip::message::{
+    MessageRouter, ServiceCode, ServiceContainer, ServiceContainerBits,
+};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 
@@ -6,33 +10,57 @@ use eipscanne_rs::cip::types::CipByte;
 fn test_serialize_service_container() {
     let expected_byte_array: Vec<CipByte> = vec![0x01];
 
-    let service_container = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
+    let service_container_bits = ServiceContainerBits::new(ServiceCode::GetAttributeAll, false);
+    let service_container = ServiceContainer::from(service_container_bits);
 
-    let service_container_bytes = bincode::serialize(&service_container).unwrap();
+    let mut service_container_bytes: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut service_container_bytes);
+
+    service_container.write(&mut writer).unwrap();
 
     assert_eq!(expected_byte_array, service_container_bytes);
 }
 
 #[test]
 fn test_deserialize_request_service_container() {
+    let expected_service_container = ServiceContainerBits::new(ServiceCode::GetAttributeAll, false);
+
     let raw_byte_array: Vec<CipByte> = vec![0x1];
 
-    let expected_service_container = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
+    let byte_cursor = std::io::Cursor::new(raw_byte_array);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let service_container: ServiceContainer = bincode::deserialize(&raw_byte_array).unwrap();
+    // Read from buffered reader
+    let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
 
-    assert_eq!(expected_service_container, service_container);
+    let deserialized_service_container_bits =
+        ServiceContainerBits::from(deserialized_service_container);
+
+    assert_eq!(
+        expected_service_container,
+        deserialized_service_container_bits
+    );
 }
 
 #[test]
 fn test_deserialize_response_service_container() {
+    let expected_service_container = ServiceContainerBits::new(ServiceCode::Reset, true);
+
     let raw_byte_array: Vec<CipByte> = vec![0b10000101];
 
-    let expected_service_container = ServiceContainer::new(ServiceCode::Reset, true);
+    let byte_cursor = std::io::Cursor::new(raw_byte_array);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let service_container: ServiceContainer = bincode::deserialize(&raw_byte_array).unwrap();
+    // Read from buffered reader
+    let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
 
-    assert_eq!(expected_service_container, service_container);
+    let deserialized_service_container_bits =
+        ServiceContainerBits::from(deserialized_service_container);
+
+    assert_eq!(
+        expected_service_container,
+        deserialized_service_container_bits
+    );
 }
 
 #[test]
@@ -69,8 +97,10 @@ fn test_serialize_get_attributes_all_request() {
     let message_router_request =
         MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
-    // Serialize the struct into a byte array
-    let message_router_bytes = bincode::serialize(&message_router_request).unwrap();
+    let mut message_router_bytes: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut message_router_bytes);
+
+    message_router_request.write(&mut writer).unwrap();
 
     // Assert equality
     assert_eq!(expected_byte_array, message_router_bytes);

@@ -1,11 +1,11 @@
 use std::io::Cursor;
 
-use bincode::serialize; // deserialize,
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::packet::{
-    deserialize_packet_from, CommandSpecificData, EnIpCommand, EncapsStatusCode, PacketDescription,
-    PacketDescriptionHeader, RegisterData,
+    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
+    RegisterData,
 };
 
 #[test]
@@ -49,10 +49,13 @@ fn test_serialize_register_session_request() {
     ];
 
     // create an empty packet
-    let registration_packet = PacketDescription::new_registration();
+    let registration_packet = EnIpPacketDescription::new_registration();
 
-    // Serialize the struct into a byte array
-    let registration_byte_array = serialize(&registration_packet).unwrap();
+    // Write into a byte array
+    let mut registration_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut registration_byte_array);
+
+    registration_packet.write(&mut writer).unwrap();
 
     // Assert equality
     assert_eq!(expected_byte_array, registration_byte_array);
@@ -90,9 +93,10 @@ fn test_deserialize_register_session_response() {
 
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let session_response = deserialize_packet_from(&mut buf_reader).unwrap();
+    // Read from buffered reader
+    let session_response = EnIpPacketDescription::read(&mut buf_reader).unwrap();
 
-    let expected_session_header = PacketDescriptionHeader {
+    let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
         length: 0x04,
         session_handle: 0x006,
@@ -111,7 +115,7 @@ fn test_deserialize_register_session_response() {
 
     assert_eq!(expected_session_command_data, session_response.command_data);
 
-    let expected_packet = PacketDescription {
+    let expected_packet = EnIpPacketDescription {
         header: expected_session_header,
         command_data: expected_session_command_data,
     };

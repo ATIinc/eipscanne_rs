@@ -1,4 +1,8 @@
-use serde::{Deserialize, Serialize};
+use binrw::{
+    binrw, // #[binrw] attribute
+           // BinRead,  // trait for reading
+           // BinWrite, // trait for writing
+};
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
 use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, Number, TryFromBits};
@@ -8,10 +12,12 @@ use crate::cip::path::CipPath;
 use crate::cip::types::{CipByte, CipShortString, CipUdint, CipUint};
 use crate::eip::packet::EnIpPacketDescription;
 
-#[derive(Debug, Serialize)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug)]
 pub struct ObjectAssembly {
-    packet_description: EnIpPacketDescription,
-    cip_message: Option<MessageRouter>,
+    pub packet_description: EnIpPacketDescription,
+    pub cip_message: Option<MessageRouter>,
 }
 
 impl ObjectAssembly {
@@ -63,21 +69,21 @@ Attribute: 7 (Product Name)
     Product Name: ClearLink
 */
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq)]
 #[repr(u16)]
 pub enum VendorId {
     TeknicInc = 0x01a8,
     Unknown(u16),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq)]
 #[repr(u16)]
 pub enum DeviceType {
     GenericDevice = 0x002b,
     Unknown(u16),
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq)]
 pub struct Revision {
     major: CipByte,
     minor: CipByte,

@@ -1,28 +1,51 @@
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
+use binrw::{
+    // BinRead,  // trait for reading
+    BinWrite, // trait for writing
+};
+
 use std::io::BufReader;
 
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::object_assembly::ObjectAssembly;
 
-use bincode::serialize;
 use std::error::Error;
-
-use eipscanne_rs::eip::packet::deserialize_packet_from;
 
 fn get_registration_object_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     // create an empty packet
     let registration_eip_packet_description = ObjectAssembly::new_registration();
 
-    Ok(serialize(&registration_eip_packet_description).unwrap())
+    // Write the object_assembly binary data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+
+    registration_eip_packet_description
+        .write(&mut writer)
+        .unwrap();
+
+    Ok(byte_array_buffer.clone())
 }
 
 #[allow(dead_code)]
 fn get_identity_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dyn Error>> {
     let identity_object = ObjectAssembly::new_identity(session_handle);
 
-    Ok(serialize(&identity_object).unwrap())
+    // Write the identity_object data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+
+    identity_object.write(&mut writer).unwrap();
+
+    Ok(byte_array_buffer.clone())
+}
+
+#[allow(dead_code)]
+fn deserialize_packet_from<T: std::io::Read>(
+    _reader: BufReader<T>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(Vec::new())
 }
 
 // #[tokio::main]
@@ -76,6 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let byte_cursor = std::io::Cursor::new(read_buf);
         let buf_reader = BufReader::new(byte_cursor);
+
         let _identity_response = deserialize_packet_from(buf_reader);
     });
 

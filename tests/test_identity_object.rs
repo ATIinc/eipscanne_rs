@@ -1,11 +1,11 @@
-use bincode::serialize; // deserialize,
+use binrw::BinWrite;
 
 use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::packet::{
-    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand, EncapsStatusCode,
-    PacketData, PacketDescription, PacketDescriptionHeader,
+    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
+    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, PacketData,
 };
 use eipscanne_rs::object_assembly::ObjectAssembly;
 
@@ -47,8 +47,8 @@ fn test_serialize_full_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = PacketDescription {
-        header: PacketDescriptionHeader {
+    let identity_request_packet = EnIpPacketDescription {
+        header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: 26,
             session_handle: 0x06,
@@ -73,7 +73,10 @@ fn test_serialize_full_identity_request() {
         }),
     };
 
-    let identity_byte_array = serialize(&identity_request_packet).unwrap();
+    let mut identity_byte_array: Vec<u8> = Vec::new();
+    let mut identity_writer = std::io::Cursor::new(&mut identity_byte_array);
+
+    identity_request_packet.write(&mut identity_writer).unwrap();
 
     /*
     Common Industrial Protocol
@@ -108,7 +111,10 @@ fn test_serialize_full_identity_request() {
         MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
     // Serialize the struct into a byte array
-    let message_router_bytes = bincode::serialize(&message_router_request).unwrap();
+    let mut message_router_bytes: Vec<u8> = Vec::new();
+    let mut message_writer = std::io::Cursor::new(&mut message_router_bytes);
+
+    message_router_request.write(&mut message_writer).unwrap();
 
     // Assert equality
     let full_expected_identity_request = [expected_eip_byte_array, expected_byte_array].concat();
@@ -128,7 +134,12 @@ fn test_serialize_new_identity_request() {
 
     // create an empty packet
     let identity_request_packet = ObjectAssembly::new_registration();
-    let identity_byte_array = serialize(&identity_request_packet).unwrap();
+
+    let mut identity_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+
+    identity_request_packet.write(&mut writer).unwrap();
+
     assert_eq!(expected_identity_byte_array, identity_byte_array);
 }
 

@@ -1,13 +1,16 @@
 use std::vec;
 
+use binrw::{BinRead, BinWrite};
+
 use eipscanne_rs::cip::path::{
-    CipPath, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType, SegmentType,
+    CipPath, CipPathBits, LogicalPathSegment, LogicalPathSegmentBits, LogicalSegmentFormat,
+    LogicalSegmentType, SegmentType,
 };
 use eipscanne_rs::cip::types::CipByte;
 
 #[test]
 fn test_serialize_path_segment() {
-    let sample_path_segment = LogicalPathSegment::new(
+    let sample_path_segment_bits = LogicalPathSegmentBits::new(
         LogicalSegmentFormat::FormatAsU16,
         LogicalSegmentType::ClassId,
         SegmentType::LogicalSegment,
@@ -17,9 +20,12 @@ fn test_serialize_path_segment() {
 
     let expected_bytes = vec![0x21, 0x0, 0x01, 0x0];
 
-    // need variable_int_encoding to allow enums to be encoded/decoded as u8
-    // let little_endian_option = bincode::DefaultOptions::new().with_variable_int_encoding();
-    let sample_path_bytes = bincode::serialize(&sample_path_segment).unwrap();
+    let logical_path_segment = LogicalPathSegment::from(sample_path_segment_bits);
+
+    let mut sample_path_bytes: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut sample_path_bytes);
+
+    logical_path_segment.write(&mut writer).unwrap();
 
     assert_eq!(expected_bytes, sample_path_bytes);
 }
@@ -28,21 +34,27 @@ fn test_serialize_path_segment() {
 fn test_deserialize_path_segment() {
     let raw_bytes = vec![0x21, 0x00, 0x04, 0x00];
 
-    let deserialized_path: LogicalPathSegment = bincode::deserialize(&raw_bytes).unwrap();
+    let byte_cursor = std::io::Cursor::new(raw_bytes);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    // Read from buffered reader
+    let deserialized_path = LogicalPathSegment::read(&mut buf_reader).unwrap();
+
+    let deserialized_path_bits = LogicalPathSegmentBits::from(deserialized_path);
 
     assert_eq!(
-        deserialized_path.segment_type(),
+        deserialized_path_bits.segment_type(),
         SegmentType::LogicalSegment.into()
     );
     assert_eq!(
-        deserialized_path.logical_segment_type(),
+        deserialized_path_bits.logical_segment_type(),
         LogicalSegmentType::ClassId.into()
     );
     assert_eq!(
-        deserialized_path.logical_segment_format(),
+        deserialized_path_bits.logical_segment_format(),
         LogicalSegmentFormat::FormatAsU16.into()
     );
-    assert_eq!(deserialized_path.data(), 0x04);
+    assert_eq!(deserialized_path_bits.data(), 0x04);
 }
 
 #[test]
@@ -70,10 +82,13 @@ fn test_serialize_cip_path() {
 
     let cip_path = CipPath::new(0x1, 0x1);
 
-    let path_bytes: Vec<u8> = bincode::serialize(&cip_path).unwrap();
+    let mut cip_path_bytes: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut cip_path_bytes);
+
+    cip_path.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, path_bytes);
+    assert_eq!(expected_byte_array, cip_path_bytes);
 }
 
 #[test]
@@ -99,17 +114,23 @@ fn test_deserialize_cip_path() {
     */
     let raw_bytes: Vec<CipByte> = vec![0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
-    let cip_path: CipPath = bincode::deserialize(&raw_bytes).unwrap();
+    let byte_cursor = std::io::Cursor::new(raw_bytes);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    // Read from buffered reader
+    let cip_path = CipPath::read(&mut buf_reader).unwrap();
+
+    let cip_path_bits = CipPathBits::from(cip_path);
 
     // Assert equality
-    assert_eq!(cip_path.class_id_segment.data(), 0x1);
+    assert_eq!(cip_path_bits.class_id_segment.data(), 0x1);
     assert_eq!(
-        cip_path.class_id_segment.logical_segment_type(),
+        cip_path_bits.class_id_segment.logical_segment_type(),
         LogicalSegmentType::ClassId
     );
-    assert_eq!(cip_path.instance_id_segment.data(), 0x1);
+    assert_eq!(cip_path_bits.instance_id_segment.data(), 0x1);
     assert_eq!(
-        cip_path.instance_id_segment.logical_segment_type(),
+        cip_path_bits.instance_id_segment.logical_segment_type(),
         LogicalSegmentType::InstanceId
     );
 }

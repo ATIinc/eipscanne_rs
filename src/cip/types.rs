@@ -1,7 +1,5 @@
 use binrw::{
-    binrw,    // #[binrw] attribute
-    BinRead,  // trait for reading
-    BinWrite, // trait for writing
+    binrw, // #[binrw] attribute
 };
 
 // This file contains the basic types used in the CIP protocol

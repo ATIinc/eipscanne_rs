@@ -1,9 +1,9 @@
-use bincode::serialize;
+use binrw::BinWrite;
 
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
-    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand, EncapsStatusCode,
-    PacketData, PacketDescription, PacketDescriptionHeader,
+    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
+    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, PacketData,
 };
 
 /*
@@ -31,12 +31,15 @@ fn test_cast_encaps_command() {
 fn test_serialize_encaps_command() {
     let command = EnIpCommand::RegisterSession;
 
-    let command_byte_array = serialize(&command).unwrap();
+    let mut command_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut command_byte_array);
+
+    command.write(&mut writer).unwrap();
 
     let expected_byte_array = vec![0x65, 0x00];
 
     // Assert equality
-    assert_eq!(command_byte_array, expected_byte_array);
+    assert_eq!(expected_byte_array, command_byte_array);
 }
 
 #[test]
@@ -77,8 +80,8 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = PacketDescription {
-        header: PacketDescriptionHeader {
+    let identity_request_packet = EnIpPacketDescription {
+        header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: 26,
             session_handle: 0x06,
@@ -103,7 +106,10 @@ fn test_serialize_identity_ethernet_ip_component_request() {
         }),
     };
 
-    let identity_byte_array = serialize(&identity_request_packet).unwrap();
+    let mut identity_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+
+    identity_request_packet.write(&mut writer).unwrap();
 
     assert_eq!(expected_eip_byte_array, identity_byte_array);
 }

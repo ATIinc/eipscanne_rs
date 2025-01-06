@@ -1,12 +1,14 @@
 // use std::fmt;
 use std::mem;
 
-// use serde::de::{Deserializer, VariantAccess};
-use serde::{Deserialize, Serialize, Serializer};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use binrw::{
+    binrw,    // #[binrw] attribute
+    BinRead,  // trait for reading
+    BinWrite, // trait for writing
+};
 
-use bincode::ErrorKind;
-use bincode::Result as BincodeResult;
+// use bincode::ErrorKind;
+// use bincode::Result as BincodeResult;
 
 // use crate::cip::message;
 use crate::cip::{
@@ -16,9 +18,10 @@ use crate::cip::{
 
 // TODO: Investigate replacing all deserialize calls with bincode::Decode and bincode::Encode
 
-// Enum definition with `Serialize` and `Deserialize` traits.
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u16)]
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUint)]
+#[bw(little, repr = CipUint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CommonPacketItemId {
     NullAddr = 0x0000,
     ListIdentity = 0x000C,
@@ -30,7 +33,9 @@ pub enum CommonPacketItemId {
     SequencedAddressItem = 0x8002,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
     pub packet_length: CipUint,
@@ -52,8 +57,10 @@ impl MessageRouter {
     }
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u16)]
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUint)]
+#[bw(little, repr = CipUint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum EnIpCommand {
     // Needs to be of type CipUint (u16)
     NOP = 0,
@@ -68,8 +75,10 @@ pub enum EnIpCommand {
     Cancel = 0x0073,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u32)]
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUdint)]
+#[bw(little, repr = CipUdint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum EncapsStatusCode {
     // Needs to be of type CipUdint (u32)
     Success = 0x0000,
@@ -80,7 +89,9 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct PacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
@@ -88,14 +99,17 @@ pub struct PacketData {
     pub cip_data_packets: [CommonPacketDescriptor; 2],
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct RegisterData {
     pub protocol_version: CipUint,
     pub option_flags: CipUint,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
-#[serde(untagged)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub enum CommandSpecificData {
     RegisterSession(RegisterData),
     SendRrData(PacketData),
@@ -142,23 +156,25 @@ impl CommandSpecificData {
     }
 }
 
-impl Serialize for CommandSpecificData {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            CommandSpecificData::RegisterSession(register_data) => {
-                register_data.serialize(serializer)
-            }
-            CommandSpecificData::SendRrData(packet_data) => packet_data.serialize(serializer),
-        }
-    }
-}
+// impl Serialize for CommandSpecificData {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         match self {
+//             CommandSpecificData::RegisterSession(register_data) => {
+//                 register_data.serialize(serializer)
+//             }
+//             CommandSpecificData::SendRrData(packet_data) => packet_data.serialize(serializer),
+//         }
+//     }
+// }
 
 const SENDER_CONTEXT_SIZE: usize = 8;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct EncapsulationHeader {
     pub command: EnIpCommand,
     pub length: CipUint,
@@ -172,7 +188,9 @@ pub struct EncapsulationHeader {
 //  - First read the header, then decide how to handle the remaining bytes
 // Maybe: https://stackoverflow.com/questions/63306229/how-to-pass-options-to-rusts-serde-that-can-be-accessed-in-deserializedeseria
 
-#[derive(Serialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct EnIpPacketDescription {
     pub header: EncapsulationHeader,
     pub command_data: CommandSpecificData,
@@ -234,33 +252,33 @@ impl EnIpPacketDescription {
     }
 }
 
-pub fn deserialize_packet_from<R>(mut reader: R) -> BincodeResult<EnIpPacketDescription>
-where
-    R: std::io::BufRead,
-{
-    // Deserialize the header first
-    let deserialized_header: EncapsulationHeader = bincode::deserialize_from(&mut reader).unwrap();
+// pub fn deserialize_packet_from<R>(mut reader: R) -> BincodeResult<EnIpPacketDescription>
+// where
+//     R: std::io::BufRead,
+// {
+//     // Deserialize the header first
+//     let deserialized_header: EncapsulationHeader = bincode::deserialize_from(&mut reader).unwrap();
 
-    // Deserialize the command-specific data based on the command in the header
-    let deserialize_command_data = match deserialized_header.command {
-        EnIpCommand::RegisterSession => {
-            // Deserialize the specific data related to RegisterSession
-            let deserialized_register_data: RegisterData =
-                bincode::deserialize_from(&mut reader).unwrap();
-            Ok(CommandSpecificData::RegisterSession(
-                deserialized_register_data,
-            ))
-        }
-        _ => Err(Box::new(ErrorKind::Custom(
-            "Command not supported".to_string(),
-        ))),
-    };
+//     // Deserialize the command-specific data based on the command in the header
+//     let deserialize_command_data = match deserialized_header.command {
+//         EnIpCommand::RegisterSession => {
+//             // Deserialize the specific data related to RegisterSession
+//             let deserialized_register_data: RegisterData =
+//                 bincode::deserialize_from(&mut reader).unwrap();
+//             Ok(CommandSpecificData::RegisterSession(
+//                 deserialized_register_data,
+//             ))
+//         }
+//         _ => Err(Box::new(ErrorKind::Custom(
+//             "Command not supported".to_string(),
+//         ))),
+//     };
 
-    // Assemble the EncapsulatedPacket
-    let deserialized_packet = EnIpPacketDescription {
-        header: deserialized_header,
-        command_data: deserialize_command_data?,
-    };
+//     // Assemble the EncapsulatedPacket
+//     let deserialized_packet = EnIpPacketDescription {
+//         header: deserialized_header,
+//         command_data: deserialize_command_data?,
+//     };
 
-    Ok(deserialized_packet)
-}
+//     Ok(deserialized_packet)
+// }
