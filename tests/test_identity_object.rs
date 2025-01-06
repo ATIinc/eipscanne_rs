@@ -133,7 +133,7 @@ fn test_serialize_new_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = ObjectAssembly::new_registration();
+    let identity_request_packet = ObjectAssembly::new_identity(0x6);
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);

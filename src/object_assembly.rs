@@ -36,7 +36,7 @@ impl ObjectAssembly {
             packet_description: EnIpPacketDescription::new_cip(
                 session_handle,
                 0,
-                &identity_cip_message,
+                identity_cip_message.generate_packet_descriptors(),
             ),
             cip_message: Some(identity_cip_message),
         }

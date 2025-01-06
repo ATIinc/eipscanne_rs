@@ -221,10 +221,8 @@ impl EnIpPacketDescription {
     pub fn new_cip(
         session_handle: CipUdint,
         timeout: CipUint,
-        message_router: &MessageRouter,
+        package_descriptors: [CommonPacketDescriptor; 2],
     ) -> Self {
-        let package_descriptors = message_router.generate_packet_descriptors();
-
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,
             session_handle,

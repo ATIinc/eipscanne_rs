@@ -1,5 +1,7 @@
 use binrw::BinWrite;
 
+use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
     CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
@@ -110,6 +112,32 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
 
     identity_request_packet.write(&mut writer).unwrap();
+
+    assert_eq!(expected_eip_byte_array, identity_byte_array);
+}
+
+#[test]
+fn test_serialize_message_router_generated_identity_ethernet_ip_component_request() {
+    let expected_eip_byte_array: Vec<CipByte> = vec![
+        0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00,
+    ];
+
+    // create an empty packet
+    let identity_cip_path = CipPath::new(0x1, 0x1);
+
+    let message_router_request =
+        MessageRouter::new_request(ServiceCode::GetAttributeAll, identity_cip_path);
+
+    let package_descriptors = message_router_request.generate_packet_descriptors();
+
+    let cip_request_packet = EnIpPacketDescription::new_cip(0x06, 0, package_descriptors);
+
+    let mut identity_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+
+    cip_request_packet.write(&mut writer).unwrap();
 
     assert_eq!(expected_eip_byte_array, identity_byte_array);
 }
