@@ -105,3 +105,20 @@ fn test_serialize_get_attributes_all_request() {
     // Assert equality
     assert_eq!(expected_byte_array, message_router_bytes);
 }
+
+#[test]
+fn test_deserialize_get_attributes_all_request() {
+    let raw_byte_array: Vec<CipByte> =
+        vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
+
+    let byte_cursor = std::io::Cursor::new(raw_byte_array);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    let message_router_request = MessageRouter::read(&mut buf_reader).unwrap();
+
+    let expected_message_router_request =
+        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+
+    // Assert equality
+    assert_eq!(expected_message_router_request, message_router_request);
+}

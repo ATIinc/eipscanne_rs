@@ -156,20 +156,6 @@ impl CommandSpecificData {
     }
 }
 
-// impl Serialize for CommandSpecificData {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         match self {
-//             CommandSpecificData::RegisterSession(register_data) => {
-//                 register_data.serialize(serializer)
-//             }
-//             CommandSpecificData::SendRrData(packet_data) => packet_data.serialize(serializer),
-//         }
-//     }
-// }
-
 const SENDER_CONTEXT_SIZE: usize = 8;
 
 #[binrw]
@@ -187,6 +173,22 @@ pub struct EncapsulationHeader {
 // TODO: Implement EncapsulatedPacket deserialization
 //  - First read the header, then decide how to handle the remaining bytes
 // Maybe: https://stackoverflow.com/questions/63306229/how-to-pass-options-to-rusts-serde-that-can-be-accessed-in-deserializedeseria
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct EnIpPacketRegisterDescription {
+    pub header: EncapsulationHeader,
+    pub register_description: RegisterData,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct EnIpPacketPacketDescription {
+    pub header: EncapsulationHeader,
+    pub packet_description: PacketData,
+}
 
 #[binrw]
 #[brw(little)]

@@ -1,4 +1,4 @@
-use binrw::BinWrite;
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
