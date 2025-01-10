@@ -131,7 +131,7 @@ pub struct EnIpPacketDescription {
 */
 
 // Convert from a MessageRouter to the CommonPacketDescriptors
-pub fn generate_packet_descriptors(message_router: &MessageRouter) -> [CommonPacketDescriptor; 2] {
+pub fn generate_packet_descriptors(packet_size: u16) -> [CommonPacketDescriptor; 2] {
     [
         CommonPacketDescriptor {
             type_id: CommonPacketItemId::NullAddr,
@@ -139,7 +139,7 @@ pub fn generate_packet_descriptors(message_router: &MessageRouter) -> [CommonPac
         },
         CommonPacketDescriptor {
             type_id: CommonPacketItemId::UnconnectedMessage,
-            packet_length: message_router.byte_size(),
+            packet_length: packet_size,
         },
     ]
 }
@@ -149,21 +149,6 @@ impl CommandSpecificData {
         Self::RegisterSession(RegisterData {
             protocol_version: 1,
             option_flags: 0,
-        })
-    }
-
-    pub fn new_request(
-        interface_handle: CipUdint,
-        timeout: CipUint,
-        message_router: &MessageRouter,
-    ) -> Self {
-        let package_descriptors = generate_packet_descriptors(message_router);
-
-        Self::SendRrData(PacketData {
-            interface_handle,
-            timeout,
-            item_count: message_router.byte_size(),
-            cip_data_packets: package_descriptors,
         })
     }
 
@@ -182,6 +167,18 @@ impl CommandSpecificData {
                 eip_component_size + cip_component_size
             }
         }
+    }
+
+    pub fn new_request<T>(interface_handle: CipUdint, timeout: CipUint, request_size: u16) -> Self
+    where
+        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    {
+        Self::SendRrData(PacketData {
+            interface_handle,
+            timeout,
+            item_count: request_size,
+            cip_data_packets: generate_packet_descriptors(request_size),
+        })
     }
 }
 
@@ -218,12 +215,15 @@ impl EnIpPacketDescription {
         )
     }
 
-    pub fn new_cip_description(
+    pub fn new_cip_description<T>(
         session_handle: CipUdint,
         timeout: CipUint,
-        message_router: &MessageRouter,
-    ) -> Self {
-        let package_descriptors = generate_packet_descriptors(message_router);
+        message_router: &MessageRouter<T>,
+    ) -> Self
+    where
+        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    {
+        let package_descriptors = generate_packet_descriptors(message_router.byte_size());
 
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,

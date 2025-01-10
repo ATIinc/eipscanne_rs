@@ -1,14 +1,13 @@
 use std::mem;
 
 use binrw::{
-    binrw, // #[binrw] attribute
-           // BinRead,  // trait for reading
-           // BinWrite, // trait for writing
+    binrw,    // #[binrw] attribute
+    BinRead,  // BinRead,  // trait for reading
+    BinWrite, // BinWrite, // trait for writing
 };
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
-use super::path::CipPath;
 use super::types::CipUint;
 
 #[bitsize(7)]
@@ -73,15 +72,19 @@ impl From<ServiceContainerBits> for ServiceContainer {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct MessageRouter {
+pub struct MessageRouter<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
     pub service_container: ServiceContainer,
     pub data_word_size: u8,
-
-    // TODO: Create a generic so different types of requests can be handled
-    pub data: CipPath,
+    pub data: T,
 }
 
-impl MessageRouter {
+impl<T> MessageRouter<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
     pub fn byte_size(&self) -> CipUint {
         // Creating a manual function because std::mem::size_of_val not playing nice
         let service_container_size = mem::size_of_val(&self.service_container);
@@ -92,17 +95,18 @@ impl MessageRouter {
     }
 }
 
-impl MessageRouter {
-    pub fn new_request(service_code: ServiceCode, cip_path: CipPath) -> MessageRouter {
-        let total_data_size = mem::size_of_val(&cip_path);
+impl<T> MessageRouter<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub fn new_request(service_code: ServiceCode, cip_data: T) -> MessageRouter<T> {
+        let total_data_size = mem::size_of_val(&cip_data);
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
             data_word_size: total_data_word_size.try_into().unwrap(),
-            data: cip_path,
+            data: cip_data,
         }
     }
 }
-
-// NOTE: A RouterResponse sets the first bit to 0x1
