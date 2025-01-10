@@ -62,7 +62,7 @@ pub struct Revision {
 
 #[bitsize(16)]
 #[derive(TryFromBits, PartialEq, DebugBits)]
-pub struct StatusBits {
+pub struct IdentityStatusBits {
     pub owned: bool,
     pub unused1: bool,
     pub configured: bool,
@@ -78,19 +78,19 @@ pub struct StatusBits {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct Status {
+pub struct IdentityStatus {
     status_representation: CipUint,
 }
 
-impl From<Status> for StatusBits {
-    fn from(segment: Status) -> Self {
-        StatusBits::try_from(segment.status_representation).unwrap()
+impl From<IdentityStatus> for IdentityStatusBits {
+    fn from(segment: IdentityStatus) -> Self {
+        IdentityStatusBits::try_from(segment.status_representation).unwrap()
     }
 }
 
-impl From<StatusBits> for Status {
-    fn from(segment: StatusBits) -> Self {
-        Status {
+impl From<IdentityStatusBits> for IdentityStatus {
+    fn from(segment: IdentityStatusBits) -> Self {
+        IdentityStatus {
             status_representation: segment.value,
         }
     }
@@ -104,7 +104,7 @@ pub struct IdentityResponse {
     pub device_type: DeviceType,
     pub product_code: CipUint,
     pub revision: Revision,
-    pub status: Status,
+    pub status: IdentityStatus,
     pub serial_number: u32,
     pub product_name: CipShortString,
 }

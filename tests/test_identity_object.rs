@@ -2,7 +2,9 @@ use binrw::{BinRead, BinWrite};
 
 use bilge::prelude::u4;
 
-use eipscanne_rs::cip::identity::{DeviceType, IdentityResponse, Revision, StatusBits, VendorId};
+use eipscanne_rs::cip::identity::{
+    DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
+};
 use eipscanne_rs::cip::message::{
     MessageRouter, ResponseData, RouterData, ServiceCode, ServiceContainerBits,
 };
@@ -216,7 +218,7 @@ fn test_deserialize_just_cip_identity_response() {
             major: 2,
             minor: 93,
         },
-        status: StatusBits::new(
+        status: IdentityStatusBits::new(
             false,
             false,
             false,
@@ -316,7 +318,7 @@ fn test_deserialize_cip_identity_response() {
                     major: 2,
                     minor: 93,
                 },
-                status: StatusBits::new(
+                status: IdentityStatusBits::new(
                     false,
                     false,
                     false,
@@ -476,7 +478,7 @@ fn test_deserialize_full_identity_response() {
                         major: 2,
                         minor: 93,
                     },
-                    status: StatusBits::new(
+                    status: IdentityStatusBits::new(
                         false,
                         false,
                         false,
