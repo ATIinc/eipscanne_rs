@@ -10,7 +10,7 @@ use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
 use crate::eip::packet::EncapsStatusCode;
 
-use super::types::CipUint;
+use super::types::{CipSint, CipUint};
 
 #[bitsize(7)]
 #[derive(TryFromBits, PartialEq, Debug)]
@@ -78,7 +78,7 @@ pub struct RequestData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub data_word_size: CipUint,
+    pub data_word_size: CipSint,
     pub data: T,
 }
 
@@ -89,7 +89,9 @@ pub struct ResponseData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub status: EncapsStatusCode,
+    pub _unused: u8,
+    pub status: u8,
+    pub additional_status_size: u8,
     pub data: T,
 }
 
@@ -130,8 +132,9 @@ where
         // Creating a manual function because std::mem::size_of_val not playing nice
         let service_container_size = mem::size_of_val(&self.service_container);
 
+        // TODO: Actually get the byte_size of the Request rather than adding a value on top
         let data_size = match &self.router_data {
-            RouterData::Request(request_data) => mem::size_of_val(&request_data),
+            RouterData::Request(request_data) => mem::size_of_val(&request_data) + 1,
             RouterData::Response(response_data) => mem::size_of_val(&response_data),
         };
 
@@ -143,15 +146,15 @@ impl<T> MessageRouter<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub fn new_request(service_code: ServiceCode, cip_data: T) -> MessageRouter<T> {
-        let total_data_size = mem::size_of_val(&cip_data);
+    pub fn new_request(service_code: ServiceCode, request_data: T) -> MessageRouter<T> {
+        let total_data_size = mem::size_of_val(&request_data) + mem::size_of::<CipSint>();
         let total_data_word_size = total_data_size / mem::size_of::<CipUint>();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
             router_data: RouterData::Request(RequestData {
                 data_word_size: total_data_word_size.try_into().unwrap(),
-                data: cip_data,
+                data: request_data,
             }),
         }
     }

@@ -127,7 +127,7 @@ fn test_deserialize_get_attributes_all_request() {
 
 #[test]
 fn test_deserialize_empty_response() {
-    let raw_byte_array: Vec<CipByte> = vec![0x81, 0x04];
+    let raw_byte_array: Vec<CipByte> = vec![0x81, 0x00, 0x00, 0x00, 0x04];
 
     let byte_cursor = std::io::Cursor::new(raw_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
@@ -140,7 +140,9 @@ fn test_deserialize_empty_response() {
             true,
         )),
         router_data: RouterData::Response(ResponseData {
-            status: EncapsStatusCode::Success,
+            _unused: 0x0,
+            status: 0x0,
+            additional_status_size: 0x0,
             data: 0x4,
         }),
     };

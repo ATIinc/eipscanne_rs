@@ -305,7 +305,9 @@ fn test_deserialize_cip_identity_response() {
     let expected_cip_identity_response = MessageRouter {
         service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
         router_data: RouterData::Response(ResponseData {
-            status: EncapsStatusCode::Success,
+            _unused: 0x0,
+            status: 0x0,
+            additional_status_size: 0x0,
             data: IdentityResponse {
                 vendor_id: VendorId::TeknicInc,
                 device_type: DeviceType::GenericDevice,
@@ -463,7 +465,9 @@ fn test_deserialize_full_identity_response() {
         cip_message: Some(MessageRouter {
             service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
             router_data: RouterData::Response(ResponseData {
-                status: EncapsStatusCode::Success,
+                _unused: 0x0,
+                status: 0x0,
+                additional_status_size: 0x0,
                 data: IdentityResponse {
                     vendor_id: VendorId::TeknicInc,
                     device_type: DeviceType::GenericDevice,
