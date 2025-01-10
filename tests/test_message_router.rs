@@ -1,10 +1,12 @@
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::{
-    MessageRouter, ServiceCode, ServiceContainer, ServiceContainerBits,
+    MessageRouter, RequestData, ResponseData, RouterData, ServiceCode, ServiceContainer,
+    ServiceContainerBits,
 };
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
+use eipscanne_rs::eip::packet::EncapsStatusCode;
 
 #[test]
 fn test_serialize_service_container() {
@@ -121,4 +123,28 @@ fn test_deserialize_get_attributes_all_request() {
 
     // Assert equality
     assert_eq!(expected_message_router_request, message_router_request);
+}
+
+#[test]
+fn test_deserialize_empty_response() {
+    let raw_byte_array: Vec<CipByte> = vec![0x81, 0x04];
+
+    let byte_cursor = std::io::Cursor::new(raw_byte_array);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    let message_router_response: MessageRouter<u8> = MessageRouter::read(&mut buf_reader).unwrap();
+
+    let expected_message_router_response = MessageRouter {
+        service_container: ServiceContainer::from(ServiceContainerBits::new(
+            ServiceCode::GetAttributeAll,
+            true,
+        )),
+        router_data: RouterData::Response(ResponseData {
+            status: EncapsStatusCode::Success,
+            data: 0x4,
+        }),
+    };
+
+    // Assert equality
+    assert_eq!(expected_message_router_response, message_router_response);
 }

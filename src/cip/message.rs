@@ -8,6 +8,8 @@ use binrw::{
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
+use crate::eip::packet::EncapsStatusCode;
+
 use super::types::CipUint;
 
 #[bitsize(7)]
@@ -41,7 +43,7 @@ pub enum ServiceCode {
 }
 
 #[bitsize(8)]
-#[derive(TryFromBits, PartialEq, DebugBits)]
+#[derive(TryFromBits, PartialEq, DebugBits, Clone, Copy)]
 pub struct ServiceContainerBits {
     service: ServiceCode,
     // NOTE: This bit is at the front of the byte in testing
@@ -50,7 +52,7 @@ pub struct ServiceContainerBits {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct ServiceContainer {
     service_representation: u8,
 }
@@ -72,13 +74,52 @@ impl From<ServiceContainerBits> for ServiceContainer {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
+pub struct RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub data_word_size: CipUint,
+    pub data: T,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct ResponseData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub status: EncapsStatusCode,
+    pub data: T,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+#[br(import(serviceContainer: ServiceContainerBits))]
+pub enum RouterData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    #[br(pre_assert(!serviceContainer.response()))]
+    Request(RequestData<T>),
+
+    #[br(pre_assert(serviceContainer.response()))]
+    Response(ResponseData<T>),
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct MessageRouter<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     pub service_container: ServiceContainer,
-    pub data_word_size: u8,
-    pub data: T,
+
+    // Only include this if the service code is NOT a response
+    #[br(args(ServiceContainerBits::from(service_container),))]
+    pub router_data: RouterData<T>,
 }
 
 impl<T> MessageRouter<T>
@@ -88,10 +129,13 @@ where
     pub fn byte_size(&self) -> CipUint {
         // Creating a manual function because std::mem::size_of_val not playing nice
         let service_container_size = mem::size_of_val(&self.service_container);
-        let data_word_size = mem::size_of_val(&self.data_word_size);
-        let data_size = mem::size_of_val(&self.data);
 
-        (service_container_size + data_word_size + data_size) as CipUint
+        let data_size = match &self.router_data {
+            RouterData::Request(request_data) => mem::size_of_val(&request_data),
+            RouterData::Response(response_data) => mem::size_of_val(&response_data),
+        };
+
+        (service_container_size + data_size) as CipUint
     }
 }
 
@@ -101,12 +145,14 @@ where
 {
     pub fn new_request(service_code: ServiceCode, cip_data: T) -> MessageRouter<T> {
         let total_data_size = mem::size_of_val(&cip_data);
-        let total_data_word_size = total_data_size / mem::size_of::<u16>();
+        let total_data_word_size = total_data_size / mem::size_of::<CipUint>();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
-            data_word_size: total_data_word_size.try_into().unwrap(),
-            data: cip_data,
+            router_data: RouterData::Request(RequestData {
+                data_word_size: total_data_word_size.try_into().unwrap(),
+                data: cip_data,
+            }),
         }
     }
 }
