@@ -10,7 +10,7 @@ use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, Number, TryFromBits};
 use crate::cip::message::{MessageRouter, ServiceCode};
 use crate::cip::path::CipPath;
 use crate::cip::types::{CipByte, CipShortString, CipUdint, CipUint};
-use crate::eip::packet::EnIpPacketDescription;
+use crate::eip::packet::{generate_packet_descriptors, EnIpPacketDescription};
 
 #[binrw]
 #[brw(little)]
@@ -23,7 +23,7 @@ pub struct ObjectAssembly {
 impl ObjectAssembly {
     pub fn new_registration() -> Self {
         ObjectAssembly {
-            packet_description: EnIpPacketDescription::new_registration(),
+            packet_description: EnIpPacketDescription::new_registration_description(),
             cip_message: None,
         }
     }
@@ -33,10 +33,10 @@ impl ObjectAssembly {
             MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
         ObjectAssembly {
-            packet_description: EnIpPacketDescription::new_cip(
+            packet_description: EnIpPacketDescription::new_cip_description(
                 session_handle,
                 0,
-                identity_cip_message.generate_packet_descriptors(),
+                &identity_cip_message,
             ),
             cip_message: Some(identity_cip_message),
         }

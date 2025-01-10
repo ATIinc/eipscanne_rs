@@ -56,7 +56,7 @@ fn test_serialize_full_identity_request() {
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_data: CommandSpecificData::SendRrData(PacketData {
+        command_specific_data: CommandSpecificData::SendRrData(PacketData {
             interface_handle: 0x0,
             timeout: 0,
             item_count: 2,

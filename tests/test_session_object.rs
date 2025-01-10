@@ -49,7 +49,7 @@ fn test_serialize_register_session_request() {
     ];
 
     // create an empty packet
-    let registration_packet = EnIpPacketDescription::new_registration();
+    let registration_packet = EnIpPacketDescription::new_registration_description();
 
     // Write into a byte array
     let mut registration_byte_array: Vec<u8> = Vec::new();
@@ -108,16 +108,19 @@ fn test_deserialize_register_session_response() {
     // Assert equality
     assert_eq!(expected_session_header, session_response.header);
 
-    let expected_session_command_data = CommandSpecificData::RegisterSession(RegisterData {
+    let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
         protocol_version: 0x1,
         option_flags: 0x00,
     });
 
-    assert_eq!(expected_session_command_data, session_response.command_data);
+    assert_eq!(
+        expected_packet_description,
+        session_response.command_specific_data
+    );
 
     let expected_packet = EnIpPacketDescription {
         header: expected_session_header,
-        command_data: expected_session_command_data,
+        command_specific_data: expected_packet_description,
     };
 
     assert_eq!(expected_packet, session_response);

@@ -7,10 +7,6 @@ use binrw::{
     BinWrite, // trait for writing
 };
 
-// use bincode::ErrorKind;
-// use bincode::Result as BincodeResult;
-
-// use crate::cip::message;
 use crate::cip::{
     message::MessageRouter,
     types::{CipByte, CipUdint, CipUint},
@@ -39,22 +35,6 @@ pub enum CommonPacketItemId {
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
     pub packet_length: CipUint,
-}
-
-// Convert from a MessageRouter to the CommonPacketDescriptors
-impl MessageRouter {
-    pub fn generate_packet_descriptors(&self) -> [CommonPacketDescriptor; 2] {
-        [
-            CommonPacketDescriptor {
-                type_id: CommonPacketItemId::NullAddr,
-                packet_length: 0,
-            },
-            CommonPacketDescriptor {
-                type_id: CommonPacketItemId::UnconnectedMessage,
-                packet_length: self.byte_size(),
-            },
-        ]
-    }
 }
 
 #[derive(BinRead, BinWrite)]
@@ -110,9 +90,58 @@ pub struct RegisterData {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
+#[br(import(commandType: EnIpCommand))]
 pub enum CommandSpecificData {
+    #[br(pre_assert(commandType == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),
+
+    #[br(pre_assert(commandType == EnIpCommand::SendRrData))]
     SendRrData(PacketData),
+}
+
+const SENDER_CONTEXT_SIZE: usize = 8;
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct EncapsulationHeader {
+    pub command: EnIpCommand,
+    pub length: CipUint,
+    pub session_handle: CipUdint,
+    pub status_code: EncapsStatusCode,
+    pub sender_context: [CipByte; SENDER_CONTEXT_SIZE],
+    pub options: CipUdint,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct EnIpPacketDescription {
+    pub header: EncapsulationHeader,
+
+    #[br(args(header.command,))]
+    pub command_specific_data: CommandSpecificData,
+    /* Passes the command field of the header to the command_specific_data field for binary reading/writing */
+}
+
+/*
+--------------------------------
+    Actual implementations
+--------------------------------
+*/
+
+// Convert from a MessageRouter to the CommonPacketDescriptors
+pub fn generate_packet_descriptors(message_router: &MessageRouter) -> [CommonPacketDescriptor; 2] {
+    [
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::NullAddr,
+            packet_length: 0,
+        },
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::UnconnectedMessage,
+            packet_length: message_router.byte_size(),
+        },
+    ]
 }
 
 impl CommandSpecificData {
@@ -128,7 +157,7 @@ impl CommandSpecificData {
         timeout: CipUint,
         message_router: &MessageRouter,
     ) -> Self {
-        let package_descriptors = message_router.generate_packet_descriptors();
+        let package_descriptors = generate_packet_descriptors(message_router);
 
         Self::SendRrData(PacketData {
             interface_handle,
@@ -156,48 +185,6 @@ impl CommandSpecificData {
     }
 }
 
-const SENDER_CONTEXT_SIZE: usize = 8;
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct EncapsulationHeader {
-    pub command: EnIpCommand,
-    pub length: CipUint,
-    pub session_handle: CipUdint,
-    pub status_code: EncapsStatusCode,
-    pub sender_context: [CipByte; SENDER_CONTEXT_SIZE],
-    pub options: CipUdint,
-}
-
-// TODO: Implement EncapsulatedPacket deserialization
-//  - First read the header, then decide how to handle the remaining bytes
-// Maybe: https://stackoverflow.com/questions/63306229/how-to-pass-options-to-rusts-serde-that-can-be-accessed-in-deserializedeseria
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct EnIpPacketRegisterDescription {
-    pub header: EncapsulationHeader,
-    pub register_description: RegisterData,
-}
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct EnIpPacketPacketDescription {
-    pub header: EncapsulationHeader,
-    pub packet_description: PacketData,
-}
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct EnIpPacketDescription {
-    pub header: EncapsulationHeader,
-    pub command_data: CommandSpecificData,
-}
-
 impl EnIpPacketDescription {
     pub fn new(
         command: EnIpCommand,
@@ -216,15 +203,28 @@ impl EnIpPacketDescription {
                 sender_context: [0x00; SENDER_CONTEXT_SIZE],
                 options: 0x00,
             },
-            command_data: command_specific_data,
+            command_specific_data,
         }
     }
 
-    pub fn new_cip(
+    pub fn new_registration_description() -> Self {
+        EnIpPacketDescription::new(
+            EnIpCommand::RegisterSession,
+            0,
+            CommandSpecificData::RegisterSession(RegisterData {
+                protocol_version: 1,
+                option_flags: 0,
+            }),
+        )
+    }
+
+    pub fn new_cip_description(
         session_handle: CipUdint,
         timeout: CipUint,
-        package_descriptors: [CommonPacketDescriptor; 2],
+        message_router: &MessageRouter,
     ) -> Self {
+        let package_descriptors = generate_packet_descriptors(message_router);
+
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,
             session_handle,
@@ -237,48 +237,3 @@ impl EnIpPacketDescription {
         )
     }
 }
-
-// create a default implementation for EncapsulatedPacket with CipByte
-impl EnIpPacketDescription {
-    pub fn new_registration() -> Self {
-        EnIpPacketDescription::new(
-            EnIpCommand::RegisterSession,
-            0,
-            CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0,
-            }),
-        )
-    }
-}
-
-// pub fn deserialize_packet_from<R>(mut reader: R) -> BincodeResult<EnIpPacketDescription>
-// where
-//     R: std::io::BufRead,
-// {
-//     // Deserialize the header first
-//     let deserialized_header: EncapsulationHeader = bincode::deserialize_from(&mut reader).unwrap();
-
-//     // Deserialize the command-specific data based on the command in the header
-//     let deserialize_command_data = match deserialized_header.command {
-//         EnIpCommand::RegisterSession => {
-//             // Deserialize the specific data related to RegisterSession
-//             let deserialized_register_data: RegisterData =
-//                 bincode::deserialize_from(&mut reader).unwrap();
-//             Ok(CommandSpecificData::RegisterSession(
-//                 deserialized_register_data,
-//             ))
-//         }
-//         _ => Err(Box::new(ErrorKind::Custom(
-//             "Command not supported".to_string(),
-//         ))),
-//     };
-
-//     // Assemble the EncapsulatedPacket
-//     let deserialized_packet = EnIpPacketDescription {
-//         header: deserialized_header,
-//         command_data: deserialize_command_data?,
-//     };
-
-//     Ok(deserialized_packet)
-// }
