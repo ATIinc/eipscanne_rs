@@ -1,12 +1,10 @@
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::{
-    MessageRouter, RequestData, ResponseData, RouterData, ServiceCode, ServiceContainer,
-    ServiceContainerBits,
+    MessageRouter, ResponseData, RouterData, ServiceCode, ServiceContainer, ServiceContainerBits,
 };
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::EncapsStatusCode;
 
 #[test]
 fn test_serialize_service_container() {

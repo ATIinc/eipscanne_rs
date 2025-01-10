@@ -8,8 +8,6 @@ use binrw::{
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
-use crate::eip::packet::EncapsStatusCode;
-
 use super::types::{CipSint, CipUint};
 
 #[bitsize(7)]
