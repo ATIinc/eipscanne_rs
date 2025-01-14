@@ -44,7 +44,6 @@ pub enum ServiceCode {
 #[derive(TryFromBits, PartialEq, DebugBits, Clone, Copy)]
 pub struct ServiceContainerBits {
     service: ServiceCode,
-    // NOTE: This bit is at the front of the byte in testing
     response: bool,
 }
 
@@ -53,20 +52,6 @@ pub struct ServiceContainerBits {
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct ServiceContainer {
     service_representation: u8,
-}
-
-impl From<ServiceContainer> for ServiceContainerBits {
-    fn from(container: ServiceContainer) -> Self {
-        ServiceContainerBits::try_from(container.service_representation).unwrap()
-    }
-}
-
-impl From<ServiceContainerBits> for ServiceContainer {
-    fn from(container: ServiceContainerBits) -> Self {
-        ServiceContainer {
-            service_representation: container.value,
-        }
-    }
 }
 
 #[binrw]
@@ -122,6 +107,20 @@ where
     pub router_data: RouterData<T>,
 }
 
+impl From<ServiceContainer> for ServiceContainerBits {
+    fn from(container: ServiceContainer) -> Self {
+        ServiceContainerBits::try_from(container.service_representation).unwrap()
+    }
+}
+
+impl From<ServiceContainerBits> for ServiceContainer {
+    fn from(container: ServiceContainerBits) -> Self {
+        ServiceContainer {
+            service_representation: container.value,
+        }
+    }
+}
+
 impl<T> MessageRouter<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
@@ -132,7 +131,7 @@ where
 
         // TODO: Actually get the byte_size of the Request rather than adding a value on top
         let data_size = match &self.router_data {
-            RouterData::Request(request_data) => mem::size_of_val(&request_data) + 1,
+            RouterData::Request(request_data) => mem::size_of_val(&request_data),
             RouterData::Response(response_data) => mem::size_of_val(&response_data),
         };
 
@@ -145,8 +144,8 @@ where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     pub fn new_request(service_code: ServiceCode, request_data: T) -> MessageRouter<T> {
-        let total_data_size = mem::size_of_val(&request_data) + mem::size_of::<CipSint>();
-        let total_data_word_size = total_data_size / mem::size_of::<CipUint>();
+        let total_data_size = mem::size_of::<RequestData<T>>();
+        let total_data_word_size = total_data_size / mem::size_of::<u16>();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
