@@ -57,3 +57,6 @@ _NOTES_:
 
 1. Connect to the started container using VSCode
     * This requires having the Docker extension installed
+
+1. Can validate that the two are connected with a "ping"
+    * `sudo apt update && apt installl iputils-ping`

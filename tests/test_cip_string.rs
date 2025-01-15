@@ -17,7 +17,7 @@ fn test_serialize_cip_string() {
     let expected_byte_array: Vec<CipByte> =
         vec![0x09, 0x43, 0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b];
 
-    let cip_string = CipShortString::new(String::from("ClearLink"));
+    let cip_string = CipShortString::from(String::from("ClearLink"));
 
     // Write the cip_string binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -48,7 +48,7 @@ fn test_deserialize_cip_string() {
 
     let cip_string = CipShortString::read(&mut buf_reader).unwrap();
 
-    let expected_cip_string = CipShortString::new(String::from("ClearLink"));
+    let expected_cip_string = CipShortString::from(String::from("ClearLink"));
 
     // Assert equality
     assert_eq!(expected_cip_string, cip_string);
