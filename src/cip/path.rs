@@ -31,7 +31,12 @@ pub enum LogicalSegmentFormat {
     FormatAsUWhat = 0x03,
 }
 
-// The whole CipPath is a CipUint (16 bit number)
+// NOTE: Could also investigate doing something that explicitly converts from and to a u32
+// #[bitsize(32)]
+// #[derive(DebugBits, FromBits, BinRead, BinWrite, PartialEq, Clone, Copy)]
+// #[br(map = u32::into)]
+// #[bw(map = |&x| u32::from(x))]
+
 #[bitsize(32)]
 #[derive(TryFromBits, PartialEq, DebugBits)]
 pub struct LogicalPathSegmentBits {
