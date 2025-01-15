@@ -8,7 +8,7 @@ use binrw::{
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
-use super::types::{CipSint, CipUint};
+use super::types::CipSint;
 
 #[bitsize(7)]
 #[derive(TryFromBits, PartialEq, Debug)]
@@ -63,6 +63,16 @@ where
 {
     pub data_word_size: CipSint,
     pub data: T,
+}
+
+impl<T> RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    fn byte_size(&self) -> usize
+    {
+        mem::size_of_val(&self.data_word_size) + mem::size_of_val(&self.data)
+    }
 }
 
 #[binrw]
@@ -125,17 +135,17 @@ impl<T> MessageRouter<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub fn byte_size(&self) -> CipUint {
+    pub fn byte_size(&self) -> usize {
         // Creating a manual function because std::mem::size_of_val not playing nice
         let service_container_size = mem::size_of_val(&self.service_container);
 
         // TODO: Actually get the byte_size of the Request rather than adding a value on top
         let data_size = match &self.router_data {
-            RouterData::Request(request_data) => mem::size_of_val(&request_data),
+            RouterData::Request(request_data) => request_data.byte_size(),
             RouterData::Response(response_data) => mem::size_of_val(&response_data),
         };
 
-        (service_container_size + data_size) as CipUint
+        service_container_size + data_size
     }
 }
 
@@ -143,16 +153,21 @@ impl<T> MessageRouter<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub fn new_request(service_code: ServiceCode, request_data: T) -> MessageRouter<T> {
-        let total_data_size = mem::size_of::<RequestData<T>>();
+    pub fn new_request(service_code: ServiceCode, request_data_content: T) -> MessageRouter<T> {
+        // temporarily create the request_data to calculate the byte_size
+        let mut request_data = RequestData {
+            data_word_size: 0,
+            data: request_data_content,
+        };
+
+        let total_data_size = request_data.byte_size();
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
+
+        request_data.data_word_size = total_data_word_size.try_into().unwrap();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
-            router_data: RouterData::Request(RequestData {
-                data_word_size: total_data_word_size.try_into().unwrap(),
-                data: request_data,
-            }),
+            router_data: RouterData::Request(request_data),
         }
     }
 }

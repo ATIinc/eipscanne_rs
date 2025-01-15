@@ -131,7 +131,7 @@ pub struct EnIpPacketDescription {
 */
 
 // Convert from a MessageRouter to the CommonPacketDescriptors
-pub fn generate_packet_descriptors(packet_size: u16) -> [CommonPacketDescriptor; 2] {
+pub fn generate_packet_descriptors(packet_size: usize) -> [CommonPacketDescriptor; 2] {
     [
         CommonPacketDescriptor {
             type_id: CommonPacketItemId::NullAddr,
@@ -139,7 +139,7 @@ pub fn generate_packet_descriptors(packet_size: u16) -> [CommonPacketDescriptor;
         },
         CommonPacketDescriptor {
             type_id: CommonPacketItemId::UnconnectedMessage,
-            packet_length: packet_size,
+            packet_length: packet_size.try_into().unwrap(),
         },
     ]
 }
@@ -169,14 +169,14 @@ impl CommandSpecificData {
         }
     }
 
-    pub fn new_request<T>(interface_handle: CipUdint, timeout: CipUint, request_size: u16) -> Self
+    pub fn new_request<T>(interface_handle: CipUdint, timeout: CipUint, request_size: usize) -> Self
     where
         T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
     {
         Self::SendRrData(PacketData {
             interface_handle,
             timeout,
-            item_count: request_size,
+            item_count: request_size.try_into().unwrap(),
             cip_data_packets: generate_packet_descriptors(request_size),
         })
     }

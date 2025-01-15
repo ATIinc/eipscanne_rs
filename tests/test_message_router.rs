@@ -1,7 +1,7 @@
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::{
-    MessageRouter, ResponseData, RouterData, ServiceCode, ServiceContainer, ServiceContainerBits,
+    MessageRouter, ResponseData, RouterData, RequestData, ServiceCode, ServiceContainer, ServiceContainerBits,
 };
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
@@ -148,3 +148,29 @@ fn test_deserialize_empty_response() {
     // Assert equality
     assert_eq!(expected_message_router_response, message_router_response);
 }
+
+
+#[test]
+fn test_message_cip_path_byte_size() {
+    let message_router_request =
+        MessageRouter {
+            service_container: ServiceContainer::from(ServiceContainerBits::new(ServiceCode::GetAttributeAll, false)),
+            router_data: RouterData::Request(RequestData {
+                data_word_size: 4,
+                data: CipPath::new(0x1, 0x1),
+            })          
+        };
+
+    // Assert equality
+    assert_eq!(10, message_router_request.byte_size());
+}
+
+#[test]
+fn test_message_cip_path_request_byte_size() {
+    let message_router_request =
+        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+
+    // Assert equality
+    assert_eq!(10, message_router_request.byte_size());
+}
+
