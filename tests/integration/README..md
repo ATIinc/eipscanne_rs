@@ -38,3 +38,19 @@ This follows the build instructions in the OpENer [repository](https://github.co
 _NOTES_:
 * It's critical to define an ip address so that the Ethernet/IP Adapter can be found
 * It's critical to use the defined network (or share host network) so the Ethernet/IP Adapter can be found
+
+## Opening the devcontainer on the appropriate subnet
+
+1. Close the VSCode window
+1. Find the appropriate docker image for the devcontainer
+    * Something like: `vsc-eipscanne-rs-<uuid>-features-uid`
+1. Start another container using the appropriate network
+    * i.e `docker run -it --network eip-network --name eip_scanner --ip 172.28.0.15 vsc-eipscanne-rs-<uuid>-features-uid`
+    * _NOTE_:
+        * The network must be the same
+        * The name will change to reflect the container as an Ethernet/IP Scanner
+        * The IP address must change
+        * There is no port forwarding
+
+1. Connect to the started container using VSCode
+    * This requires having the Docker extension installed
