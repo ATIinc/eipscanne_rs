@@ -82,18 +82,7 @@ pub struct IdentityStatus {
     status_representation: CipUint,
 }
 
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct IdentityResponse {
-    pub vendor_id: VendorId,
-    pub device_type: DeviceType,
-    pub product_code: CipUint,
-    pub revision: Revision,
-    pub status: IdentityStatus,
-    pub serial_number: u32,
-    pub product_name: CipShortString,
-}
+// ======= Start of IdentityStatus impl ========
 
 impl From<IdentityStatus> for IdentityStatusBits {
     fn from(segment: IdentityStatus) -> Self {
@@ -107,4 +96,20 @@ impl From<IdentityStatusBits> for IdentityStatus {
             status_representation: segment.value,
         }
     }
+}
+
+// ^^^^^^^^ End of IdentityStatus impl ^^^^^^^^
+
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct IdentityResponse {
+    pub vendor_id: VendorId,
+    pub device_type: DeviceType,
+    pub product_code: CipUint,
+    pub revision: Revision,
+    pub status: IdentityStatus,
+    pub serial_number: u32,
+    pub product_name: CipShortString,
 }

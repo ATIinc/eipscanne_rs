@@ -50,6 +50,8 @@ pub struct LogicalPathSegment {
     segment_representation: u32,
 }
 
+// ======= Start of LogicalPathSegment impl ========
+
 impl From<LogicalPathSegment> for LogicalPathSegmentBits {
     fn from(segment: LogicalPathSegment) -> Self {
         LogicalPathSegmentBits::try_from(segment.segment_representation).unwrap()
@@ -64,6 +66,14 @@ impl From<LogicalPathSegmentBits> for LogicalPathSegment {
     }
 }
 
+// ^^^^^^^^ End of LogicalPathSegment impl ^^^^^^^^
+
+#[derive(Debug, PartialEq)]
+pub struct CipPathBits {
+    pub class_id_segment: LogicalPathSegmentBits,
+    pub instance_id_segment: LogicalPathSegmentBits,
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -71,6 +81,8 @@ pub struct CipPath {
     pub class_id_segment: LogicalPathSegment,
     pub instance_id_segment: LogicalPathSegment,
 }
+
+// ======= Start of CipPath impl ========
 
 impl CipPath {
     pub fn new(class_id: u16, instance_id: u16) -> CipPath {
@@ -95,12 +107,6 @@ impl CipPath {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct CipPathBits {
-    pub class_id_segment: LogicalPathSegmentBits,
-    pub instance_id_segment: LogicalPathSegmentBits,
-}
-
 impl From<CipPath> for CipPathBits {
     fn from(segment: CipPath) -> Self {
         CipPathBits {
@@ -118,3 +124,5 @@ impl From<CipPathBits> for CipPath {
         }
     }
 }
+
+// ^^^^^^^^ End of CipPath impl ^^^^^^^^

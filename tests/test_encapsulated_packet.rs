@@ -5,7 +5,7 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
     CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
-    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, PacketData,
+    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, RRPacketData,
 };
 
 #[test]
@@ -80,7 +80,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_specific_data: CommandSpecificData::SendRrData(PacketData {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
             interface_handle: 0x0,
             timeout: 0,
             item_count: 2,
@@ -185,7 +185,7 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_specific_data: CommandSpecificData::SendRrData(PacketData {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
             interface_handle: 0x0,
             timeout: 0,
             item_count: 2,
@@ -258,7 +258,7 @@ fn test_deserialize_identity_object_response() {
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_specific_data: CommandSpecificData::SendRrData(PacketData {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
             interface_handle: 0x0,
             timeout: 0,
             item_count: 2,

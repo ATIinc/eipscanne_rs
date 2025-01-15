@@ -38,6 +38,8 @@ pub struct CipShortString {
     pub value: Vec<CipUsint>,
 }
 
+// ======= Start of CipShortString impl ========
+
 impl CipShortString {
     pub fn new(string_val: String) -> Self {
         CipShortString {
@@ -46,3 +48,5 @@ impl CipShortString {
         }
     }
 }
+
+// ======= Start of CipShortString impl ========

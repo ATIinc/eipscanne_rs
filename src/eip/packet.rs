@@ -12,7 +12,7 @@ use crate::cip::{
     types::{CipByte, CipUdint, CipUint},
 };
 
-// TODO: Investigate replacing all deserialize calls with bincode::Decode and bincode::Encode
+use crate::eip::constants as eip_constants;
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -35,6 +35,19 @@ pub enum CommonPacketItemId {
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
     pub packet_length: CipUint,
+}
+
+pub fn generate_packet_descriptors(packet_size: usize) -> [CommonPacketDescriptor; 2] {
+    [
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::NullAddr,
+            packet_length: 0,
+        },
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::UnconnectedMessage,
+            packet_length: packet_size.try_into().unwrap(),
+        },
+    ]
 }
 
 #[derive(BinRead, BinWrite)]
@@ -72,7 +85,7 @@ pub enum EncapsStatusCode {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct PacketData {
+pub struct RRPacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
     pub item_count: CipUint, // will always be 2
@@ -96,53 +109,10 @@ pub enum CommandSpecificData {
     RegisterSession(RegisterData),
 
     #[br(pre_assert(commandType == EnIpCommand::SendRrData))]
-    SendRrData(PacketData),
+    SendRrData(RRPacketData),
 }
 
-const SENDER_CONTEXT_SIZE: usize = 8;
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct EncapsulationHeader {
-    pub command: EnIpCommand,
-    pub length: CipUint,
-    pub session_handle: CipUdint,
-    pub status_code: EncapsStatusCode,
-    pub sender_context: [CipByte; SENDER_CONTEXT_SIZE],
-    pub options: CipUdint,
-}
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct EnIpPacketDescription {
-    pub header: EncapsulationHeader,
-
-    #[br(args(header.command,))]
-    pub command_specific_data: CommandSpecificData,
-    /* Passes the command field of the header to the command_specific_data field for binary reading/writing */
-}
-
-/*
---------------------------------
-    Actual implementations
---------------------------------
-*/
-
-// Convert from a MessageRouter to the CommonPacketDescriptors
-pub fn generate_packet_descriptors(packet_size: usize) -> [CommonPacketDescriptor; 2] {
-    [
-        CommonPacketDescriptor {
-            type_id: CommonPacketItemId::NullAddr,
-            packet_length: 0,
-        },
-        CommonPacketDescriptor {
-            type_id: CommonPacketItemId::UnconnectedMessage,
-            packet_length: packet_size.try_into().unwrap(),
-        },
-    ]
-}
+// ======= Start of CommandSpecificData impl ========
 
 impl CommandSpecificData {
     pub fn new_registration() -> Self {
@@ -173,7 +143,7 @@ impl CommandSpecificData {
     where
         T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
     {
-        Self::SendRrData(PacketData {
+        Self::SendRrData(RRPacketData {
             interface_handle,
             timeout,
             item_count: request_size.try_into().unwrap(),
@@ -181,6 +151,37 @@ impl CommandSpecificData {
         })
     }
 }
+
+// ======= Start of CommandSpecificData impl ========
+
+
+
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct EncapsulationHeader {
+    pub command: EnIpCommand,
+    pub length: CipUint,
+    pub session_handle: CipUdint,
+    pub status_code: EncapsStatusCode,
+    pub sender_context: [CipByte; eip_constants::SENDER_CONTEXT_SIZE],
+    pub options: CipUdint,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct EnIpPacketDescription {
+    pub header: EncapsulationHeader,
+
+    #[br(args(header.command,))]
+    pub command_specific_data: CommandSpecificData,
+    /* Passes the command field of the header to the command_specific_data field for binary reading/writing */
+}
+
+
+// ======= Start of EnIpPacketDescription impl ========
 
 impl EnIpPacketDescription {
     pub fn new(
@@ -197,7 +198,7 @@ impl EnIpPacketDescription {
                 length: data_packet_size,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; SENDER_CONTEXT_SIZE],
+                sender_context: [0x00; eip_constants::SENDER_CONTEXT_SIZE],
                 options: 0x00,
             },
             command_specific_data,
@@ -228,7 +229,7 @@ impl EnIpPacketDescription {
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::SendRrData(PacketData {
+            CommandSpecificData::SendRrData(RRPacketData {
                 interface_handle: 0,
                 timeout,
                 item_count: package_descriptors.len() as CipUint,
@@ -237,3 +238,5 @@ impl EnIpPacketDescription {
         )
     }
 }
+
+// ======= Start of EnIpPacketDescription impl ========

@@ -12,7 +12,7 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::packet::{
     CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
-    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, PacketData,
+    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, RRPacketData,
 };
 use eipscanne_rs::object_assembly::ObjectAssembly;
 
@@ -78,7 +78,7 @@ fn test_serialize_full_identity_request() {
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_specific_data: CommandSpecificData::SendRrData(PacketData {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
             interface_handle: 0x0,
             timeout: 0,
             item_count: 2,
@@ -448,7 +448,7 @@ fn test_deserialize_full_identity_response() {
                 sender_context: [0x00; 8],
                 options: 0x00,
             },
-            command_specific_data: CommandSpecificData::SendRrData(PacketData {
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
                 interface_handle: 0x0,
                 timeout: 0,
                 item_count: 2,

@@ -54,6 +54,24 @@ pub struct ServiceContainer {
     service_representation: u8,
 }
 
+// ======= Start of ServiceContainer impl ========
+
+impl From<ServiceContainer> for ServiceContainerBits {
+    fn from(container: ServiceContainer) -> Self {
+        ServiceContainerBits::try_from(container.service_representation).unwrap()
+    }
+}
+
+impl From<ServiceContainerBits> for ServiceContainer {
+    fn from(container: ServiceContainerBits) -> Self {
+        ServiceContainer {
+            service_representation: container.value,
+        }
+    }
+}
+
+// ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -129,19 +147,7 @@ where
     pub router_data: RouterData<T>,
 }
 
-impl From<ServiceContainer> for ServiceContainerBits {
-    fn from(container: ServiceContainer) -> Self {
-        ServiceContainerBits::try_from(container.service_representation).unwrap()
-    }
-}
-
-impl From<ServiceContainerBits> for ServiceContainer {
-    fn from(container: ServiceContainerBits) -> Self {
-        ServiceContainer {
-            service_representation: container.value,
-        }
-    }
-}
+// ======= Start of MessageRouter impl ========
 
 impl<T> MessageRouter<T>
 where
@@ -159,12 +165,7 @@ where
 
         service_container_size + data_size
     }
-}
 
-impl<T> MessageRouter<T>
-where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-{
     pub fn new_request(service_code: ServiceCode, request_data_content: T) -> MessageRouter<T> {
         let total_data_size = RequestData::<T>::byte_size();
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
@@ -178,3 +179,5 @@ where
         }
     }
 }
+
+// ^^^^^^^^ End of MessageRouter impl ^^^^^^^^
