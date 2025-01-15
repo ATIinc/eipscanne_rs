@@ -103,7 +103,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }.unwrap();
 
     println!("Product Name: {:?}", String::from(identity_response.data.product_name));
-    // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
+    // ^^^^^^^^^ Request the identity object ^^^^^^^^^^^^
+
+
+    // TODO: UN-Register the session
 
     Ok(())
 }
