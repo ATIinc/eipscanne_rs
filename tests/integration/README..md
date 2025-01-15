@@ -2,21 +2,11 @@
 
 This integration test draws inspiration from the EIPScanner [docker-compose.yaml configuration](https://github.com/nimbuscontrols/EIPScanner/blob/master/docker-compose.yml).
 
-Within this directory is a Dockerfile that can build an OpENer image.
-
-This follows the build instructions in the OpENer [repository](https://github.com/EIPStackGroup/OpENer).
+The Dockerfile to built the OpENer Ethernet/IP Adapter has been updated to work again. 
+* The updates follow the build instructions in the OpENer [repository](https://github.com/EIPStackGroup/OpENer).
 
 
 ## Running an Integration Test
-
-### Building the Docker image
-
-1. Use the host computer terminal
-1. Find the Dockerfile directory
-    * `cd ~/src/ati/eipscanne-rs/tests/integration`
-1. Build the image
-    * `docker build --tag eip-adapter OpENer/.`
-
 
 ### Creating an Ethernet/IP Test Network
 
@@ -29,7 +19,16 @@ This follows the build instructions in the OpENer [repository](https://github.co
 
 <!-- Look into using an "ipvlan" driver instead of the default "bridge" for more control over the IP addresses -->
 
-### Running the Ethernet/IP Adapter Docker container 
+### Building the Ethernet/IP ADAPTER Docker image
+
+1. Use the host computer terminal
+1. Find the Dockerfile directory
+    * `cd ~/src/ati/eipscanne-rs/tests/integration`
+1. Build the image
+    * `docker build --tag eip-adapter OpENer/.`
+
+
+### Running the Ethernet/IP ADAPTER Docker container 
 
 1. Run the newly built image using the newly created network
     * `docker run -it --network <network-name> --name <container-name> --ip <chosen-ip-addr> --publish <eip-port> <image-name>`
@@ -39,11 +38,15 @@ _NOTES_:
 * It's critical to define an ip address so that the Ethernet/IP Adapter can be found
 * It's critical to use the defined network (or share host network) so the Ethernet/IP Adapter can be found
 
-## Opening the devcontainer on the appropriate subnet
+## Running the Ethernet/IP SCANNER Docker container
 
-1. Close the VSCode window
+**NOTE**: This devcontainer is an Ethernet/IP Scanner
+* For the integration test, however, the container needs to be on the integration test network
+
+1. Close the active VSCode devcontainer window
 1. Find the appropriate docker image for the devcontainer
-    * Something like: `vsc-eipscanne-rs-<uuid>-features-uid`
+    * `docker image ls`
+    * Should be something like: `vsc-eipscanne-rs-<uuid>-features-uid`
 1. Start another container using the appropriate network
     * i.e:
         * `cd ~/src/ati/eipscanne-rs/`
@@ -56,7 +59,17 @@ _NOTES_:
         * There is no port forwarding
 
 1. Connect to the started container using VSCode
-    * This requires having the Docker extension installed
+    * i.e. https://code.visualstudio.com/docs/devcontainers/attach-container
 
-1. Can validate that the two are connected with a "ping"
-    * `sudo apt update && apt installl iputils-ping`
+1. Validate that the two containers can communicate with one another
+    * Install "ping"
+        * `sudo apt update && apt installl iputils-ping`
+    * ping the adapter ip-address
+        * `ping 172.28.0.10`
+
+1. Run the eipscanne_rs executable which registers a session with the Ethernet/IP adapter and then requests it's identity
+    * `cd /workspaces/eipscanne_rs`
+    * `cargo run`
+
+    * _NOTE_: The IP address of the adapter should already be hard-coded in the main.rs file
+        * Feel free to update that if necessary
