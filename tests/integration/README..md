@@ -45,10 +45,13 @@ _NOTES_:
 1. Find the appropriate docker image for the devcontainer
     * Something like: `vsc-eipscanne-rs-<uuid>-features-uid`
 1. Start another container using the appropriate network
-    * i.e `docker run -it --network eip-network --name eip_scanner --ip 172.28.0.15 vsc-eipscanne-rs-<uuid>-features-uid`
+    * i.e:
+        * `cd ~/src/ati/eipscanne-rs/`
+        * `docker run -it --network eip-network --name eip_scanner -v .:/workspaces/eipscanne_rs --ip 172.28.0.15 vsc-eipscanne-rs-<uuid>-features-uid`
     * _NOTE_:
         * The network must be the same
         * The name will change to reflect the container as an Ethernet/IP Scanner
+        * The current project workspace is mounted
         * The IP address must change
         * There is no port forwarding
 
