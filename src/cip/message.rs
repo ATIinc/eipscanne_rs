@@ -1,14 +1,14 @@
-use std::fmt;
 use std::mem;
 
-use serde::de::{Deserializer, Visitor};
-use serde::ser::Serializer;
-use serde::{Deserialize, Serialize};
+use binrw::{
+    binrw,    // #[binrw] attribute
+    BinRead,  // BinRead,  // trait for reading
+    BinWrite, // BinWrite, // trait for writing
+};
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
 
-use super::path::CipPath;
-use super::types::CipUint;
+use super::types::CipSint;
 
 #[bitsize(7)]
 #[derive(TryFromBits, PartialEq, Debug)]
@@ -41,81 +41,143 @@ pub enum ServiceCode {
 }
 
 #[bitsize(8)]
-#[derive(TryFromBits, PartialEq, DebugBits)]
-pub struct ServiceContainer {
+#[derive(TryFromBits, PartialEq, DebugBits, Clone, Copy)]
+pub struct ServiceContainerBits {
     service: ServiceCode,
-    // NOTE: This bit is at the front of the byte in testing
     response: bool,
 }
 
-impl Serialize for ServiceContainer {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize the u32 as little endian
-        serializer.serialize_u8(self.value)
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct ServiceContainer {
+    service_representation: u8,
+}
+
+// ======= Start of ServiceContainer impl ========
+
+impl From<ServiceContainer> for ServiceContainerBits {
+    fn from(container: ServiceContainer) -> Self {
+        ServiceContainerBits::try_from(container.service_representation).unwrap()
     }
 }
 
-struct ServiceContainerVisitor;
-
-impl<'de> Visitor<'de> for ServiceContainerVisitor {
-    type Value = ServiceContainer;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an integer between 0 and 2^32")
-    }
-
-    fn visit_u8<E>(self, value: u8) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let logical_segment = ServiceContainer::try_from(value).unwrap();
-        Ok(logical_segment)
-    }
-}
-
-impl<'de> Deserialize<'de> for ServiceContainer {
-    fn deserialize<D>(deserializer: D) -> Result<ServiceContainer, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_u8(ServiceContainerVisitor)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct MessageRouter {
-    pub service_container: ServiceContainer,
-    pub data_word_size: u8,
-
-    // TODO: Create a generic so different types of requests can be handled
-    pub data: CipPath,
-}
-
-impl MessageRouter {
-    pub fn byte_size(&self) -> CipUint {
-        // Creating a manual function because std::mem::size_of_val not playing nice
-        let service_container_size = mem::size_of_val(&self.service_container);
-        let data_word_size = mem::size_of_val(&self.data_word_size);
-        let data_size = mem::size_of_val(&self.data);
-
-        (service_container_size + data_word_size + data_size) as CipUint
-    }
-}
-
-impl MessageRouter {
-    pub fn new_request(service_code: ServiceCode, cip_path: CipPath) -> MessageRouter {
-        let total_data_size = mem::size_of_val(&cip_path);
-        let total_data_word_size = total_data_size / mem::size_of::<u16>();
-
-        MessageRouter {
-            service_container: ServiceContainer::new(service_code, false),
-            data_word_size: total_data_word_size.try_into().unwrap(),
-            data: cip_path,
+impl From<ServiceContainerBits> for ServiceContainer {
+    fn from(container: ServiceContainerBits) -> Self {
+        ServiceContainer {
+            service_representation: container.value,
         }
     }
 }
 
-// NOTE: A RouterResponse sets the first bit to 0x1
+// ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub data_word_size: CipSint,
+    pub data: T,
+}
+
+// TODO: Turn this into a macro
+impl<T> RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    fn byte_size() -> usize
+    {
+        mem::size_of::<CipSint>() + mem::size_of::<T>()
+    }
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct ResponseData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub _unused: u8,
+    pub status: u8,
+    pub additional_status_size: u8,
+    pub data: T,
+}
+
+// TODO: Turn this into a macro
+impl<T> ResponseData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    fn byte_size() -> usize
+    {
+        mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<T>()
+    }
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+#[br(import(serviceContainer: ServiceContainerBits))]
+pub enum RouterData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    #[br(pre_assert(!serviceContainer.response()))]
+    Request(RequestData<T>),
+
+    #[br(pre_assert(serviceContainer.response()))]
+    Response(ResponseData<T>),
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct MessageRouter<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub service_container: ServiceContainer,
+
+    // Only include this if the service code is NOT a response
+    #[br(args(ServiceContainerBits::from(service_container),))]
+    pub router_data: RouterData<T>,
+}
+
+// ======= Start of MessageRouter impl ========
+
+impl<T> MessageRouter<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub fn byte_size(&self) -> usize {
+        // Creating a manual function because std::mem::size_of_val not playing nice
+        let service_container_size = mem::size_of_val(&self.service_container);
+
+        // TODO: Actually get the byte_size of the Request rather than adding a value on top
+        let data_size = match &self.router_data {
+            RouterData::Request(_request_data) => RequestData::<T>::byte_size(),
+            RouterData::Response(_response_data) => ResponseData::<T>::byte_size(),
+        };
+
+        service_container_size + data_size
+    }
+
+    pub fn new_request(service_code: ServiceCode, request_data_content: T) -> MessageRouter<T> {
+        let total_data_size = RequestData::<T>::byte_size();
+        let total_data_word_size = total_data_size / mem::size_of::<u16>();
+
+        MessageRouter {
+            service_container: ServiceContainerBits::new(service_code, false).into(),
+            router_data: RouterData::Request(RequestData {
+                data_word_size: total_data_word_size.try_into().unwrap(),
+                data: request_data_content
+            }),
+        }
+    }
+}
+
+// ^^^^^^^^ End of MessageRouter impl ^^^^^^^^

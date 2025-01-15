@@ -1,7 +1,12 @@
-use bincode::serialize; // deserialize,
+use std::io::Cursor;
+
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::EncapsulatedPacket;
+use eipscanne_rs::eip::packet::{
+    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
+    RegisterData,
+};
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -44,17 +49,20 @@ fn test_serialize_register_session_request() {
     ];
 
     // create an empty packet
-    let registration_packet = EncapsulatedPacket::new_registration();
+    let registration_packet = EnIpPacketDescription::new_registration_description();
 
-    // Serialize the struct into a byte array
-    let registration_byte_array = serialize(&registration_packet).unwrap();
+    // Write into a byte array
+    let mut registration_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut registration_byte_array);
+
+    registration_packet.write(&mut writer).unwrap();
 
     // Assert equality
     assert_eq!(expected_byte_array, registration_byte_array);
 }
 
 #[test]
-fn test_serialize_register_session_response() {
+fn test_deserialize_register_session_response() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Register Session
     Encapsulation Header
@@ -76,8 +84,46 @@ fn test_serialize_register_session_response() {
 
     */
 
+    let raw_response: Vec<CipByte> = vec![
+        0x65, 0x00, 0x04, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ];
+
+    let byte_cursor = Cursor::new(raw_response);
+
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    // Read from buffered reader
+    let session_response = EnIpPacketDescription::read(&mut buf_reader).unwrap();
+
+    let expected_session_header = EncapsulationHeader {
+        command: EnIpCommand::RegisterSession,
+        length: 0x04,
+        session_handle: 0x006,
+        status_code: EncapsStatusCode::Success,
+        sender_context: [0x00; 8],
+        options: 0x00,
+    };
+
     // Assert equality
-    assert_eq!(0x0, 0x0);
+    assert_eq!(expected_session_header, session_response.header);
+
+    let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
+        protocol_version: 0x1,
+        option_flags: 0x00,
+    });
+
+    assert_eq!(
+        expected_packet_description,
+        session_response.command_specific_data
+    );
+
+    let expected_packet = EnIpPacketDescription {
+        header: expected_session_header,
+        command_specific_data: expected_packet_description,
+    };
+
+    assert_eq!(expected_packet, session_response);
 }
 
 #[test]

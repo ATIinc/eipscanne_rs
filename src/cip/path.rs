@@ -1,8 +1,8 @@
-use std::fmt;
-
-use serde::de::{Deserializer, Visitor};
-use serde::ser::Serializer;
-use serde::{Deserialize, Serialize};
+use binrw::{
+    binrw, // #[binrw] attribute
+           // BinRead,  // trait for reading
+           // BinWrite, // trait for writing
+};
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
 use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, Number, TryFromBits};
@@ -31,10 +31,15 @@ pub enum LogicalSegmentFormat {
     FormatAsUWhat = 0x03,
 }
 
-// The whole CipPath is a CipUint (16 bit number)
+// NOTE: Could also investigate doing something that explicitly converts from and to a u32
+// #[bitsize(32)]
+// #[derive(DebugBits, FromBits, BinRead, BinWrite, PartialEq, Clone, Copy)]
+// #[br(map = u32::into)]
+// #[bw(map = |&x| u32::from(x))]
+
 #[bitsize(32)]
 #[derive(TryFromBits, PartialEq, DebugBits)]
-pub struct LogicalPathSegment {
+pub struct LogicalPathSegmentBits {
     // For some reason, the segment sections need to be inverted... Should be u3, u3, u2
     pub logical_segment_format: LogicalSegmentFormat,
     pub logical_segment_type: LogicalSegmentType,
@@ -43,66 +48,86 @@ pub struct LogicalPathSegment {
     pub data: u16,
 }
 
-impl Serialize for LogicalPathSegment {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        // Serialize the u32 as little endian
-        serializer.serialize_u32(self.value.to_le())
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct LogicalPathSegment {
+    segment_representation: u32,
+}
+
+// ======= Start of LogicalPathSegment impl ========
+
+impl From<LogicalPathSegment> for LogicalPathSegmentBits {
+    fn from(segment: LogicalPathSegment) -> Self {
+        LogicalPathSegmentBits::try_from(segment.segment_representation).unwrap()
     }
 }
 
-struct LogicalPathSegmentVisitor;
-
-impl<'de> Visitor<'de> for LogicalPathSegmentVisitor {
-    type Value = LogicalPathSegment;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("an integer between 0 and 2^32")
-    }
-
-    fn visit_u32<E>(self, value: u32) -> Result<Self::Value, E>
-    where
-        E: serde::de::Error,
-    {
-        let logical_segment = LogicalPathSegment::try_from(value).unwrap();
-        Ok(logical_segment)
+impl From<LogicalPathSegmentBits> for LogicalPathSegment {
+    fn from(segment: LogicalPathSegmentBits) -> Self {
+        LogicalPathSegment {
+            segment_representation: segment.value,
+        }
     }
 }
 
-impl<'de> Deserialize<'de> for LogicalPathSegment {
-    fn deserialize<D>(deserializer: D) -> Result<LogicalPathSegment, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        deserializer.deserialize_u32(LogicalPathSegmentVisitor)
-    }
+// ^^^^^^^^ End of LogicalPathSegment impl ^^^^^^^^
+
+#[derive(Debug, PartialEq)]
+pub struct CipPathBits {
+    pub class_id_segment: LogicalPathSegmentBits,
+    pub instance_id_segment: LogicalPathSegmentBits,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct CipPath {
     pub class_id_segment: LogicalPathSegment,
     pub instance_id_segment: LogicalPathSegment,
 }
 
+// ======= Start of CipPath impl ========
+
 impl CipPath {
     pub fn new(class_id: u16, instance_id: u16) -> CipPath {
         CipPath {
-            class_id_segment: LogicalPathSegment::new(
+            class_id_segment: LogicalPathSegmentBits::new(
                 LogicalSegmentFormat::FormatAsU16,
                 LogicalSegmentType::ClassId,
                 SegmentType::LogicalSegment,
                 0x0,
                 class_id,
-            ),
-            instance_id_segment: LogicalPathSegment::new(
+            )
+            .into(),
+            instance_id_segment: LogicalPathSegmentBits::new(
                 LogicalSegmentFormat::FormatAsU16,
                 LogicalSegmentType::InstanceId,
                 SegmentType::LogicalSegment,
                 0x0,
                 instance_id,
-            ),
+            )
+            .into(),
         }
     }
 }
+
+impl From<CipPath> for CipPathBits {
+    fn from(segment: CipPath) -> Self {
+        CipPathBits {
+            class_id_segment: LogicalPathSegmentBits::from(segment.class_id_segment),
+            instance_id_segment: LogicalPathSegmentBits::from(segment.instance_id_segment),
+        }
+    }
+}
+
+impl From<CipPathBits> for CipPath {
+    fn from(segment: CipPathBits) -> Self {
+        CipPath {
+            class_id_segment: LogicalPathSegment::from(segment.class_id_segment),
+            instance_id_segment: LogicalPathSegment::from(segment.instance_id_segment),
+        }
+    }
+}
+
+// ^^^^^^^^ End of CipPath impl ^^^^^^^^

@@ -1,61 +1,107 @@
-use bincode::{deserialize, serialize};
-use std::error::Error;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpListener;
 
-use eipscanne_rs::eip::packet::{
-    EncapsCommand, EncapsStatusCode, EncapsulatedHeader, RegisterData,
+use binrw::{
+    // BinRead,  // trait for reading
+    BinWrite, // trait for writing
 };
 
-fn identity_object() -> Result<(), Box<dyn Error>> {
-    // auto si = std::make_shared<SessionInfo>("172.28.1.3", 0xAF12);
-    // IdentityObject identityObject(1, si);
+use std::io::BufReader;
 
-    // extract from SessionInfo
-    // let session_handle = 3;
+use eipscanne_rs::cip::types::CipUdint;
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
+use std::error::Error;
+
+fn get_registration_object_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     // create an empty packet
-    let empty_eip_packet = eipscanne_rs::eip::packet::EncapsulatedPacket {
-        header: EncapsulatedHeader {
-            command: EncapsCommand::RegisterSession,
-            length: 0x2,
-            session_handle: 0x1,
-            status_code: EncapsStatusCode::Success,
-            sender_context: [0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0],
-            options: 0x00,
-        },
-        command_data: eipscanne_rs::eip::packet::CommandSpecificData::RegisterSession(
-            RegisterData {
-                protocol_version: 0x1,
-                option_flags: 0x0,
-            },
-        ),
-    };
+    let registration_eip_packet_description = ObjectAssembly::new_registration();
 
-    // Serialize the struct into a byte array
-    let byte_array = serialize(&empty_eip_packet).unwrap();
+    // Write the object_assembly binary data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
 
-    println!("Serialized byte array: {:?}", byte_array);
+    registration_eip_packet_description
+        .write(&mut writer)
+        .unwrap();
 
-    let deserialized_struct: eipscanne_rs::eip::packet::EncapsulatedPacket =
-        deserialize(&byte_array).unwrap();
-
-    println!("Deserialized struct: {:?}", deserialized_struct);
-
-    // // read the header
-    // auto header = _socket.Receive(EncapsPacket::HEADER_SIZE);
-    // auto length = EncapsPacket::getLengthFromHeader(header);
-
-    // // read the rest of the packet
-    // auto data = _socket.Receive(length);
-    // header.insert(header.end(), data.begin(), data.end());
-
-    // // deserialize the packet
-    // EncapsPacket recvPacket;
-    // recvPacket.expand(header);
-
-    Ok(())
+    Ok(byte_array_buffer.clone())
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    identity_object()?;
+#[allow(dead_code)]
+fn get_identity_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dyn Error>> {
+    let identity_object = ObjectAssembly::new_identity(session_handle);
+
+    // Write the identity_object data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+
+    identity_object.write(&mut writer).unwrap();
+
+    Ok(byte_array_buffer.clone())
+}
+
+#[allow(dead_code)]
+fn deserialize_packet_from<T: std::io::Read>(
+    _reader: BufReader<T>,
+) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(Vec::new())
+}
+
+// #[tokio::main]
+// async fn main() -> io::Result<()> {
+//     // Connect to the server at IP address and port
+//     let address = "127.0.0.1:8080"; // Change this to the correct IP and port
+//     let mut stream = TcpStream::connect(address).await?;
+
+//     // Create a message to send
+//     let registration_request_bytes = get_registration_object_bytes().unwrap();
+//     stream.write_all(&registration_request_bytes).await?;
+
+//     // Wait for a response
+//     let mut reader = BufReader::new(&mut stream);
+//     let mut response = Vec::new();
+//     reader.read_to_end(&mut response).await?;
+
+//     let mut byte_reader = BufReader::new(response.as_slice());
+
+//     let registration_response = deserialize_packet_from(&byte_reader).unwrap();
+
+//     Ok(())
+// }
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind("127.0.0.1:8080").await?;
+
+    let (mut socket, _) = listener.accept().await?;
+
+    tokio::spawn(async move {
+        let write_buf = get_registration_object_bytes().unwrap();
+
+        // Write the data back
+        if let Err(e) = socket.write_all(&write_buf).await {
+            eprintln!("failed to write to socket; err = {:?}", e);
+            return;
+        }
+
+        let mut read_buf = vec![0; 1024];
+
+        let _n = match socket.read(&mut read_buf).await {
+            // socket closed
+            Ok(n) if n == 0 => return,
+            Ok(n) => n,
+            Err(e) => {
+                eprintln!("failed to read from socket; err = {:?}", e);
+                return;
+            }
+        };
+
+        let byte_cursor = std::io::Cursor::new(read_buf);
+        let buf_reader = BufReader::new(byte_cursor);
+
+        let _identity_response = deserialize_packet_from(buf_reader);
+    });
+
     Ok(())
 }

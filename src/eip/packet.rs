@@ -1,16 +1,23 @@
+// use std::fmt;
 use std::mem;
 
-use serde::{Deserialize, Serialize, Serializer};
-use serde_repr::{Deserialize_repr, Serialize_repr};
+use binrw::{
+    binrw,    // #[binrw] attribute
+    BinRead,  // trait for reading
+    BinWrite, // trait for writing
+};
 
 use crate::cip::{
     message::MessageRouter,
     types::{CipByte, CipUdint, CipUint},
 };
 
-// Enum definition with `Serialize` and `Deserialize` traits.
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u16)]
+use crate::eip::constants as eip_constants;
+
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUint)]
+#[bw(little, repr = CipUint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CommonPacketItemId {
     NullAddr = 0x0000,
     ListIdentity = 0x000C,
@@ -22,31 +29,32 @@ pub enum CommonPacketItemId {
     SequencedAddressItem = 0x8002,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Copy, Clone)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
     pub packet_length: CipUint,
 }
 
-// Convert from a MessageRouter to the CommonPacketDescriptors
-impl MessageRouter {
-    pub fn generate_packet_descriptors(&self) -> [CommonPacketDescriptor; 2] {
-        [
-            CommonPacketDescriptor {
-                type_id: CommonPacketItemId::NullAddr,
-                packet_length: 0,
-            },
-            CommonPacketDescriptor {
-                type_id: CommonPacketItemId::UnconnectedMessage,
-                packet_length: self.byte_size(),
-            },
-        ]
-    }
+pub fn generate_packet_descriptors(packet_size: usize) -> [CommonPacketDescriptor; 2] {
+    [
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::NullAddr,
+            packet_length: 0,
+        },
+        CommonPacketDescriptor {
+            type_id: CommonPacketItemId::UnconnectedMessage,
+            packet_length: packet_size.try_into().unwrap(),
+        },
+    ]
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u16)]
-pub enum EncapsCommand {
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUint)]
+#[bw(little, repr = CipUint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum EnIpCommand {
     // Needs to be of type CipUint (u16)
     NOP = 0,
     ListServices = 0x0004,
@@ -60,8 +68,10 @@ pub enum EncapsCommand {
     Cancel = 0x0073,
 }
 
-#[derive(Serialize_repr, Deserialize_repr, Debug, PartialEq, Copy, Clone)]
-#[repr(u32)]
+#[derive(BinRead, BinWrite)]
+#[br(little, repr = CipUdint)]
+#[bw(little, repr = CipUdint)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum EncapsStatusCode {
     // Needs to be of type CipUdint (u32)
     Success = 0x0000,
@@ -72,27 +82,46 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct PacketData {
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct RRPacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
-    pub item_count: CipUint,
+    pub item_count: CipUint, // will always be 2
     pub cip_data_packets: [CommonPacketDescriptor; 2],
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
 pub struct RegisterData {
     pub protocol_version: CipUint,
     pub option_flags: CipUint,
 }
 
-#[derive(Deserialize, Debug, PartialEq)]
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+#[br(import(commandType: EnIpCommand))]
 pub enum CommandSpecificData {
+    #[br(pre_assert(commandType == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),
-    SendRrData(PacketData),
+
+    #[br(pre_assert(commandType == EnIpCommand::SendRrData))]
+    SendRrData(RRPacketData),
 }
 
+// ======= Start of CommandSpecificData impl ========
+
 impl CommandSpecificData {
+    pub fn new_registration() -> Self {
+        Self::RegisterSession(RegisterData {
+            protocol_version: 1,
+            option_flags: 0,
+        })
+    }
+
     pub fn byte_size(&self) -> CipUint {
         match self {
             CommandSpecificData::RegisterSession(register_data) => {
@@ -109,75 +138,98 @@ impl CommandSpecificData {
             }
         }
     }
-}
 
-impl Serialize for CommandSpecificData {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    pub fn new_request<T>(interface_handle: CipUdint, timeout: CipUint, request_size: usize) -> Self
     where
-        S: Serializer,
+        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
     {
-        match self {
-            CommandSpecificData::RegisterSession(register_data) => {
-                register_data.serialize(serializer)
-            }
-            CommandSpecificData::SendRrData(packet_data) => packet_data.serialize(serializer),
-        }
+        Self::SendRrData(RRPacketData {
+            interface_handle,
+            timeout,
+            item_count: request_size.try_into().unwrap(),
+            cip_data_packets: generate_packet_descriptors(request_size),
+        })
     }
 }
 
-const SENDER_CONTEXT_SIZE: usize = 8;
+// ======= Start of CommandSpecificData impl ========
 
-// These should be equal
-// const ENCAPSULATED_HEADER_SIZE: usize = 24;
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct EncapsulatedHeader {
-    pub command: EncapsCommand,
+
+
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct EncapsulationHeader {
+    pub command: EnIpCommand,
     pub length: CipUint,
     pub session_handle: CipUdint,
     pub status_code: EncapsStatusCode,
-    pub sender_context: [CipByte; SENDER_CONTEXT_SIZE],
+    pub sender_context: [CipByte; eip_constants::SENDER_CONTEXT_SIZE],
     pub options: CipUdint,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct EncapsulatedPacket {
-    pub header: EncapsulatedHeader,
-    pub command_data: CommandSpecificData,
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct EnIpPacketDescription {
+    pub header: EncapsulationHeader,
+
+    #[br(args(header.command,))]
+    pub command_specific_data: CommandSpecificData,
+    /* Passes the command field of the header to the command_specific_data field for binary reading/writing */
 }
 
-impl EncapsulatedPacket {
+
+// ======= Start of EnIpPacketDescription impl ========
+
+impl EnIpPacketDescription {
     pub fn new(
-        command: EncapsCommand,
+        command: EnIpCommand,
         session_handle: CipUdint,
         command_specific_data: CommandSpecificData,
     ) -> Self {
         // with explicit messaging, there is no interface handle
         let data_packet_size = command_specific_data.byte_size();
 
-        EncapsulatedPacket {
-            header: EncapsulatedHeader {
+        EnIpPacketDescription {
+            header: EncapsulationHeader {
                 command,
                 length: data_packet_size,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; SENDER_CONTEXT_SIZE],
+                sender_context: [0x00; eip_constants::SENDER_CONTEXT_SIZE],
                 options: 0x00,
             },
-            command_data: command_specific_data,
+            command_specific_data,
         }
     }
 
-    pub fn new_cip(
+    pub fn new_registration_description() -> Self {
+        EnIpPacketDescription::new(
+            EnIpCommand::RegisterSession,
+            0,
+            CommandSpecificData::RegisterSession(RegisterData {
+                protocol_version: 1,
+                option_flags: 0,
+            }),
+        )
+    }
+
+    pub fn new_cip_description<T>(
         session_handle: CipUdint,
         timeout: CipUint,
-        message_router: &MessageRouter,
-    ) -> Self {
-        let package_descriptors = message_router.generate_packet_descriptors();
+        message_router: &MessageRouter<T>,
+    ) -> Self
+    where
+        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    {
+        let package_descriptors = generate_packet_descriptors(message_router.byte_size());
 
-        EncapsulatedPacket::new(
-            EncapsCommand::SendRrData,
+        EnIpPacketDescription::new(
+            EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::SendRrData(PacketData {
+            CommandSpecificData::SendRrData(RRPacketData {
                 interface_handle: 0,
                 timeout,
                 item_count: package_descriptors.len() as CipUint,
@@ -187,16 +239,4 @@ impl EncapsulatedPacket {
     }
 }
 
-// create a default implementation for EncapsulatedPacket with CipByte
-impl EncapsulatedPacket {
-    pub fn new_registration() -> Self {
-        EncapsulatedPacket::new(
-            EncapsCommand::RegisterSession,
-            0,
-            CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0,
-            }),
-        )
-    }
-}
+// ======= Start of EnIpPacketDescription impl ========

@@ -5,6 +5,8 @@
     * `ms-vscode.hexeditor`
 
 ## Using git lfs
+1. Update the apt packages
+    * `sudo apt update`
 1. Install git-lfs package
     * `sudo apt-get install git-lfs`
 1. Install git-lfs into the repo
