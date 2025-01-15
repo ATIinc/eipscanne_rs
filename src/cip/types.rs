@@ -40,12 +40,19 @@ pub struct CipShortString {
 
 // ======= Start of CipShortString impl ========
 
-impl CipShortString {
-    pub fn new(string_val: String) -> Self {
+impl From<String> for CipShortString {
+    fn from(string_val: String) -> Self {
         CipShortString {
             length: string_val.len() as CipUsint,
             value: string_val.as_bytes().to_vec(),
         }
+    }
+}
+
+impl From<CipShortString> for String {
+    fn from(short_string_val: CipShortString) -> Self {
+        // TODO: Determine whether the converted string matches the length of the short_string
+        String::from_utf8_lossy(&short_string_val.value).to_string()
     }
 }
 

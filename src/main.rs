@@ -1,9 +1,11 @@
+use eipscanne_rs::cip::identity::IdentityResponse;
+use eipscanne_rs::cip::message::{MessageRouter, RouterData};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpListener;
+use tokio::net::TcpStream;
 
 use binrw::{
     // BinRead,  // trait for reading
-    BinWrite, // trait for writing
+    BinRead, BinWrite // trait for writing
 };
 
 use std::io::BufReader;
@@ -41,67 +43,70 @@ fn get_identity_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dy
     Ok(byte_array_buffer.clone())
 }
 
-#[allow(dead_code)]
-fn deserialize_packet_from<T: std::io::Read>(
-    _reader: BufReader<T>,
-) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(Vec::new())
-}
-
-// #[tokio::main]
-// async fn main() -> io::Result<()> {
-//     // Connect to the server at IP address and port
-//     let address = "127.0.0.1:8080"; // Change this to the correct IP and port
-//     let mut stream = TcpStream::connect(address).await?;
-
-//     // Create a message to send
-//     let registration_request_bytes = get_registration_object_bytes().unwrap();
-//     stream.write_all(&registration_request_bytes).await?;
-
-//     // Wait for a response
-//     let mut reader = BufReader::new(&mut stream);
-//     let mut response = Vec::new();
-//     reader.read_to_end(&mut response).await?;
-
-//     let mut byte_reader = BufReader::new(response.as_slice());
-
-//     let registration_response = deserialize_packet_from(&byte_reader).unwrap();
-
-//     Ok(())
-// }
+const ETHERNET_IP_PORT: u16 = 0xAF12;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind("127.0.0.1:8080").await?;
 
-    let (mut socket, _) = listener.accept().await?;
+    // Connect to the server at IP address and port
+    let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
+    let mut stream = TcpStream::connect(address).await?;
 
-    tokio::spawn(async move {
-        let write_buf = get_registration_object_bytes().unwrap();
+    
+    // ========= Register the session ============
+    let registration_request_bytes = get_registration_object_bytes().unwrap();
+    stream.write_all(&registration_request_bytes).await?;
 
-        // Write the data back
-        if let Err(e) = socket.write_all(&write_buf).await {
-            eprintln!("failed to write to socket; err = {:?}", e);
-            return;
-        }
+    // Wait for a response
+    let mut registration_response_buffer = vec![0; 100];
+    let registration_bytes_read = stream.read(&mut registration_response_buffer).await?;
 
-        let mut read_buf = vec![0; 1024];
+    registration_response_buffer.truncate(registration_bytes_read);
 
-        let _n = match socket.read(&mut read_buf).await {
-            // socket closed
-            Ok(n) if n == 0 => return,
-            Ok(n) => n,
-            Err(e) => {
-                eprintln!("failed to read from socket; err = {:?}", e);
-                return;
-            }
-        };
+    let registration_response_byte_cursor = std::io::Cursor::new(registration_response_buffer);
+    let mut registration_response_reader = BufReader::new(registration_response_byte_cursor);
 
-        let byte_cursor = std::io::Cursor::new(read_buf);
-        let buf_reader = BufReader::new(byte_cursor);
+    // there is no full object assembly for an identity response
+    let registration_response = ObjectAssembly::<u8>::read(&mut registration_response_reader).unwrap();
 
-        let _identity_response = deserialize_packet_from(buf_reader);
-    });
+    println!("REGISTRATION RESPONSE: {} bytes", registration_bytes_read);
+    // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
+    println!("{:?}\n", registration_response); 
+    // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
+
+    let provided_session_handle = registration_response.packet_description.header.session_handle;
+
+
+    // ========= Request the identity object ============
+    let identity_request_bytes = get_identity_object_bytes(provided_session_handle).unwrap();
+    stream.write_all(&identity_request_bytes).await?;
+ 
+    // Wait for a response
+    let mut identity_response_buffer = vec![0; 100];
+    let identity_bytes_read = stream.read(&mut identity_response_buffer).await?;
+
+    identity_response_buffer.truncate(identity_bytes_read);
+
+    let identity_response_byte_cursor = std::io::Cursor::new(identity_response_buffer);
+    let mut identity_response_reader = BufReader::new(identity_response_byte_cursor);
+
+    let identity_response = ObjectAssembly::<IdentityResponse>::read(&mut identity_response_reader).unwrap();
+ 
+    println!("IDENTITY RESPONSE: {} bytes", identity_bytes_read);
+    // println!("{:#?}\n", identity_response);      // NOTE: the :#? triggers a pretty-print
+    println!("{:?}\n", identity_response);
+
+    let message_router_response: MessageRouter<IdentityResponse> = identity_response.cip_message.unwrap();
+    let identity_response = match message_router_response.router_data {
+        RouterData::Request(_request) => Err(()),
+        RouterData::Response(response) => Ok(response)
+    }.unwrap();
+
+    println!("Product Name: {:?}", String::from(identity_response.data.product_name));
+    // ^^^^^^^^^ Request the identity object ^^^^^^^^^^^^
+
+
+    // TODO: UN-Register the session
 
     Ok(())
 }

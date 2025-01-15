@@ -232,7 +232,7 @@ fn test_deserialize_just_cip_identity_response() {
         )
         .into(),
         serial_number: 0x01ff3d32,
-        product_name: CipShortString::new("ClearLink".to_string()),
+        product_name: CipShortString::from("ClearLink".to_string()),
     };
 
     // Assert equality
@@ -332,7 +332,7 @@ fn test_deserialize_cip_identity_response() {
                 )
                 .into(),
                 serial_number: 0x01ff3d32,
-                product_name: CipShortString::new("ClearLink".to_string()),
+                product_name: CipShortString::from("ClearLink".to_string()),
             },
         }),
     };
@@ -492,7 +492,7 @@ fn test_deserialize_full_identity_response() {
                     )
                     .into(),
                     serial_number: 0x01ff3d32,
-                    product_name: CipShortString::new("ClearLink".to_string()),
+                    product_name: CipShortString::from("ClearLink".to_string()),
                 },
             }),
         }),
