@@ -58,18 +58,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     stream.write_all(&registration_request_bytes).await?;
 
     // Wait for a response
-    let mut registration_response_buffer = vec![0; 1024];
-    let _registration_bytes_read = stream.read(&mut registration_response_buffer).await?;
+    let mut registration_response_buffer = vec![0; 100];
+    let registration_bytes_read = stream.read(&mut registration_response_buffer).await?;
 
-    // registration_response_buffer.truncate(registration_bytes_read);
+    registration_response_buffer.truncate(registration_bytes_read);
 
     let registration_response_byte_cursor = std::io::Cursor::new(registration_response_buffer);
     let mut registration_response_reader = BufReader::new(registration_response_byte_cursor);
 
+    // there is no full object assembly for an identity response
     let registration_response = ObjectAssembly::<u8>::read(&mut registration_response_reader).unwrap();
 
-    println!("REGISTRATION RESPONSE:");
-    println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
+    println!("REGISTRATION RESPONSE: {} bytes", registration_bytes_read);
+    // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
+    println!("{:?}\n", registration_response); 
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
     let provided_session_handle = registration_response.packet_description.header.session_handle;
@@ -80,18 +82,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     stream.write_all(&identity_request_bytes).await?;
  
     // Wait for a response
-    let mut identity_response_buffer = vec![0; 1024];
-    let _identity_bytes_read = stream.read(&mut identity_response_buffer).await?;
+    let mut identity_response_buffer = vec![0; 100];
+    let identity_bytes_read = stream.read(&mut identity_response_buffer).await?;
 
-    // identity_response_buffer.truncate(identity_bytes_read);
+    identity_response_buffer.truncate(identity_bytes_read);
 
     let identity_response_byte_cursor = std::io::Cursor::new(identity_response_buffer);
     let mut identity_response_reader = BufReader::new(identity_response_byte_cursor);
 
     let identity_response = ObjectAssembly::<IdentityResponse>::read(&mut identity_response_reader).unwrap();
  
-    println!("IDENTITY RESPONSE:");
-    println!("{:#?}\n", identity_response);
+    println!("IDENTITY RESPONSE: {} bytes", identity_bytes_read);
+    // println!("{:#?}\n", identity_response);      // NOTE: the :#? triggers a pretty-print
+    println!("{:?}\n", identity_response);
 
     let message_router_response: MessageRouter<IdentityResponse> = identity_response.cip_message.unwrap();
     let identity_response = match message_router_response.router_data {

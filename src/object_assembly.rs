@@ -17,6 +17,9 @@ where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     pub packet_description: EnIpPacketDescription,
+
+    // TODO: Only return a None option if there are no remaining bytes to be read
+    #[br(try)]
     pub cip_message: Option<MessageRouter<T>>,
 }
 

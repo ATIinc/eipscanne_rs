@@ -7,6 +7,7 @@ use eipscanne_rs::eip::packet::{
     CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
     RegisterData,
 };
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -62,7 +63,7 @@ fn test_serialize_register_session_request() {
 }
 
 #[test]
-fn test_deserialize_register_session_response() {
+fn test_deserialize_register_session_response_packet_description() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Register Session
     Encapsulation Header
@@ -124,6 +125,71 @@ fn test_deserialize_register_session_response() {
     };
 
     assert_eq!(expected_packet, session_response);
+}
+
+#[test]
+fn test_deserialize_register_session_response() {
+    /*
+    EtherNet/IP (Industrial Protocol), Session: 0x00000006, Register Session
+    Encapsulation Header
+        Command: Register Session (0x0065)
+        Length: 4
+        Session Handle: 0x00000006
+        Status: Success (0x00000000)
+        Sender Context: 0000000000000000
+        Options: 0x00000000
+    Command Specific Data
+        Protocol Version: 1
+        Option Flags: 0x0000
+
+    -------------------------------------
+    Hex Dump:
+
+    0000   65 00 04 00 06 00 00 00 00 00 00 00 00 00 00 00
+    0010   00 00 00 00 00 00 00 00 01 00 00 00
+
+    */
+
+    let raw_response: Vec<CipByte> = vec![
+        0x65, 0x00, 0x04, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+    ];
+
+    let byte_cursor = Cursor::new(raw_response);
+
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    // Read from buffered reader
+    let session_response_object = ObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+
+    let expected_session_header = EncapsulationHeader {
+        command: EnIpCommand::RegisterSession,
+        length: 0x04,
+        session_handle: 0x006,
+        status_code: EncapsStatusCode::Success,
+        sender_context: [0x00; 8],
+        options: 0x00,
+    };
+
+    // Assert equality
+    assert_eq!(expected_session_header, session_response_object.packet_description.header);
+
+    let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
+        protocol_version: 0x1,
+        option_flags: 0x00,
+    });
+
+    assert_eq!(
+        expected_packet_description,
+        session_response_object.packet_description.command_specific_data
+    );
+
+    let expected_packet = EnIpPacketDescription {
+        header: expected_session_header,
+        command_specific_data: expected_packet_description,
+    };
+
+    assert_eq!(expected_packet, session_response_object.packet_description);
 }
 
 #[test]
