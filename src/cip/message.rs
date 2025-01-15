@@ -65,13 +65,14 @@ where
     pub data: T,
 }
 
+// TODO: Turn this into a macro
 impl<T> RequestData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    fn byte_size(&self) -> usize
+    fn byte_size() -> usize
     {
-        mem::size_of_val(&self.data_word_size) + mem::size_of_val(&self.data)
+        mem::size_of::<CipSint>() + mem::size_of::<T>()
     }
 }
 
@@ -86,6 +87,17 @@ where
     pub status: u8,
     pub additional_status_size: u8,
     pub data: T,
+}
+
+// TODO: Turn this into a macro
+impl<T> ResponseData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    fn byte_size() -> usize
+    {
+        mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<T>()
+    }
 }
 
 #[binrw]
@@ -141,8 +153,8 @@ where
 
         // TODO: Actually get the byte_size of the Request rather than adding a value on top
         let data_size = match &self.router_data {
-            RouterData::Request(request_data) => request_data.byte_size(),
-            RouterData::Response(response_data) => mem::size_of_val(&response_data),
+            RouterData::Request(_request_data) => RequestData::<T>::byte_size(),
+            RouterData::Response(_response_data) => ResponseData::<T>::byte_size(),
         };
 
         service_container_size + data_size
@@ -154,20 +166,15 @@ where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     pub fn new_request(service_code: ServiceCode, request_data_content: T) -> MessageRouter<T> {
-        // temporarily create the request_data to calculate the byte_size
-        let mut request_data = RequestData {
-            data_word_size: 0,
-            data: request_data_content,
-        };
-
-        let total_data_size = request_data.byte_size();
+        let total_data_size = RequestData::<T>::byte_size();
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
-
-        request_data.data_word_size = total_data_word_size.try_into().unwrap();
 
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
-            router_data: RouterData::Request(request_data),
+            router_data: RouterData::Request(RequestData {
+                data_word_size: total_data_word_size.try_into().unwrap(),
+                data: request_data_content
+            }),
         }
     }
 }
