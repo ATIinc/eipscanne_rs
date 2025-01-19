@@ -11,7 +11,7 @@ use binrw::{
 use std::io::BufReader;
 
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::object_assembly::ObjectAssembly;
+use eipscanne_rs::eip::object_assembly::ObjectAssembly;
 
 use std::error::Error;
 
@@ -30,7 +30,6 @@ fn get_registration_object_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(byte_array_buffer.clone())
 }
 
-#[allow(dead_code)]
 fn get_identity_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dyn Error>> {
     let identity_object = ObjectAssembly::new_identity(session_handle);
 
