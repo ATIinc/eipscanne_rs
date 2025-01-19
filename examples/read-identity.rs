@@ -42,6 +42,21 @@ fn get_identity_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dy
     Ok(byte_array_buffer.clone())
 }
 
+fn get_unregistration_object_bytes(session_handle: CipUdint) -> Result<Vec<u8>, Box<dyn Error>> {
+    // create an empty packet
+    let unregistration_eip_packet_description = ObjectAssembly::new_unregistration(session_handle);
+
+    // Write the object_assembly binary data to the buffer
+    let mut byte_array_buffer: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+
+    unregistration_eip_packet_description
+        .write(&mut writer)
+        .unwrap();
+
+    Ok(byte_array_buffer.clone())
+}
+
 const ETHERNET_IP_PORT: u16 = 0xAF12;
 
 #[tokio::main]
@@ -107,7 +122,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ^^^^^^^^^ Request the identity object ^^^^^^^^^^^^
 
 
-    // TODO: UN-Register the session
+    // ========= UnRegister the sesion ============
+    let unregistration_request_bytes = get_unregistration_object_bytes(provided_session_handle).unwrap();
+    stream.write_all(&unregistration_request_bytes).await?;
+
+    // ^^^^^^^^^ UnRegister the session ^^^^^^^^^^^^
 
     Ok(())
 }

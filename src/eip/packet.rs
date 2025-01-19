@@ -105,6 +105,9 @@ pub struct RegisterData {
 #[derive(Debug, PartialEq)]
 #[br(import(commandType: EnIpCommand))]
 pub enum CommandSpecificData {
+    #[br(pre_assert(commandType == EnIpCommand::UnRegisterSession))]
+    UnregisterSession,
+
     #[br(pre_assert(commandType == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),
 
@@ -124,6 +127,7 @@ impl CommandSpecificData {
 
     pub fn byte_size(&self) -> CipUint {
         match self {
+            CommandSpecificData::UnregisterSession => 0,
             CommandSpecificData::RegisterSession(register_data) => {
                 mem::size_of_val(register_data) as CipUint
             }
@@ -213,6 +217,14 @@ impl EnIpPacketDescription {
                 protocol_version: 1,
                 option_flags: 0,
             }),
+        )
+    }
+    
+    pub fn new_unregistration_description(session_handle: CipUdint) -> Self {
+        EnIpPacketDescription::new(
+            EnIpCommand::UnRegisterSession,
+            session_handle,
+            CommandSpecificData::UnregisterSession
         )
     }
 

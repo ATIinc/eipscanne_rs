@@ -30,6 +30,13 @@ impl ObjectAssembly<CipByte> {
             cip_message: None,
         }
     }
+
+    pub fn new_unregistration(session_handle: CipUdint) -> Self {
+        ObjectAssembly {
+            packet_description: EnIpPacketDescription::new_unregistration_description(session_handle),
+            cip_message: None
+        }
+    }
 }
 
 impl ObjectAssembly<CipPath> {

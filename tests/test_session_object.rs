@@ -212,6 +212,19 @@ fn test_serialize_unregister_session_request() {
 
     */
 
+    let expected_byte_array: Vec<CipByte> = vec![
+       0x66, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+    ];
+
+    // create an empty packet
+    let unregistration_packet = EnIpPacketDescription::new_unregistration_description(0x6);
+
+    // Write into a byte array
+    let mut unregistration_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut unregistration_byte_array);
+
+    unregistration_packet.write(&mut writer).unwrap();
+
     // Assert equality
-    assert_eq!(0x0, 0x0);
+    assert_eq!(expected_byte_array, unregistration_byte_array);
 }
