@@ -11,7 +11,7 @@ use binrw::{
 use std::io::BufReader;
 
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
 use std::error::Error;
 

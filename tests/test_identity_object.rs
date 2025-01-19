@@ -14,7 +14,7 @@ use eipscanne_rs::eip::packet::{
     CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
     EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, RRPacketData,
 };
-use eipscanne_rs::eip::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
 #[test]
 fn test_deserialize_device_type() {

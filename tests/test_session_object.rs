@@ -7,7 +7,7 @@ use eipscanne_rs::eip::packet::{
     CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
     RegisterData,
 };
-use eipscanne_rs::eip::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::ObjectAssembly;
 
 #[test]
 fn test_serialize_register_session_request() {
