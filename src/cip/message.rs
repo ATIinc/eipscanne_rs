@@ -1,7 +1,9 @@
 use std::mem;
 
 use binrw::{
-    binrw,    // #[binrw] attribute
+    binread,
+    binrw, // #[binrw] attribute
+    binwrite,
     BinRead,  // BinRead,  // trait for reading
     BinWrite, // BinWrite, // trait for writing
 };
@@ -104,54 +106,38 @@ pub struct ResponseData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub _unused: u8,
+    #[br(pad_before = 1)]
     pub status: u8,
     pub additional_status_size: u8,
     pub data: T,
 }
 
-// TODO: Turn this into a macro
-impl<T> ResponseData<T>
-where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-{
-    fn byte_size() -> usize {
-        mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<T>()
-    }
-}
-
-#[binrw]
+#[binwrite]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-#[br(import(serviceContainer: ServiceContainerBits))]
-pub enum RouterData<T>
-where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-{
-    #[br(pre_assert(!serviceContainer.response()))]
-    Request(RequestData<T>),
-
-    #[br(pre_assert(serviceContainer.response()))]
-    Response(ResponseData<T>),
-}
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq)]
-pub struct MessageRouter<T>
+pub struct MessageRouterRequest<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     pub service_container: ServiceContainer,
+    pub router_data: RequestData<T>,
+}
 
-    // Only include this if the service code is NOT a response
-    #[br(args(ServiceContainerBits::from(service_container),))]
-    pub router_data: RouterData<T>,
+#[binread]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct MessageRouterResponse<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    #[br(assert(ServiceContainerBits::from(service_container).response()))]
+    pub service_container: ServiceContainer,
+    pub router_data: ResponseData<T>,
 }
 
 // ======= Start of MessageRouter impl ========
 
-impl<T> MessageRouter<T>
+impl<T> MessageRouterRequest<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
@@ -160,26 +146,56 @@ where
         let service_container_size = mem::size_of_val(&self.service_container);
 
         // TODO: Actually get the byte_size of the Request rather than adding a value on top
-        let data_size = match &self.router_data {
-            RouterData::Request(_request_data) => RequestData::<T>::byte_size(),
-            RouterData::Response(_response_data) => ResponseData::<T>::byte_size(),
-        };
+        let data_size = RequestData::<T>::byte_size();
 
         service_container_size + data_size
     }
 
-    pub fn new_request(service_code: ServiceCode, request_data_content: T) -> MessageRouter<T> {
+    pub fn new(service_code: ServiceCode, request_data_content: T) -> MessageRouterRequest<T> {
         let total_data_size = RequestData::<T>::byte_size();
         let total_data_word_size = total_data_size / mem::size_of::<u16>();
 
-        MessageRouter {
+        MessageRouterRequest {
             service_container: ServiceContainerBits::new(service_code, false).into(),
-            router_data: RouterData::Request(RequestData {
+            router_data: RequestData {
                 data_word_size: total_data_word_size as u8,
                 data: request_data_content,
-            }),
+            },
         }
     }
 }
 
 // ^^^^^^^^ End of MessageRouter impl ^^^^^^^^
+
+// NOTE:
+//  - Keeping a generic MessageRouter struct here for future reference
+//  - It is cleaner to minimize duplicated code but having the Request and Response split up makes the interface simpler
+
+// #[binrw]
+// #[brw(little)]
+// #[derive(Debug, PartialEq)]
+// #[br(import(serviceContainer: ServiceContainerBits))]
+// pub enum RouterData<T>
+// where
+//     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+// {
+//     #[br(pre_assert(!serviceContainer.response()))]
+//     Request(RequestData<T>),
+
+//     #[br(pre_assert(serviceContainer.response()))]
+//     Response(ResponseData<T>),
+// }
+
+// #[binrw]
+// #[brw(little)]
+// #[derive(Debug, PartialEq)]
+// pub struct MessageRouter<T>
+// where
+//     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+// {
+//     pub service_container: ServiceContainer,
+
+//     // Only include this if the service code is NOT a response
+//     #[br(args(ServiceContainerBits::from(service_container),))]
+//     pub router_data: RouterData<T>,
+// }

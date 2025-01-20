@@ -7,7 +7,7 @@ use eipscanne_rs::eip::packet::{
     CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
     RegisterData,
 };
-use eipscanne_rs::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -160,7 +160,7 @@ fn test_deserialize_register_session_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response_object = ObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+    let session_response_object = ResponseObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,

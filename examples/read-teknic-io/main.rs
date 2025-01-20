@@ -8,11 +8,11 @@ use std::io::BufReader;
 
 extern crate eipscanne_rs;
 
-use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
+use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
-async fn write_object_assembly<T>(stream: &mut TcpStream, object_assembly: ObjectAssembly<T>)
+async fn write_object_assembly<T>(stream: &mut TcpStream, object_assembly: RequestObjectAssembly<T>)
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
@@ -25,7 +25,9 @@ where
     let _ = stream.write_all(&byte_array_buffer).await;
 }
 
-async fn read_object_assembly<T>(stream: &mut TcpStream) -> Result<ObjectAssembly<T>, binrw::Error>
+async fn read_object_assembly<T>(
+    stream: &mut TcpStream,
+) -> Result<ResponseObjectAssembly<T>, binrw::Error>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
@@ -39,7 +41,7 @@ where
     let response_byte_cursor = std::io::Cursor::new(response_buffer);
     let mut response_reader = BufReader::new(response_byte_cursor);
 
-    ObjectAssembly::<T>::read(&mut response_reader)
+    ResponseObjectAssembly::<T>::read(&mut response_reader)
 }
 
 const ETHERNET_IP_PORT: u16 = 0xAF12;
@@ -54,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING registration");
-    write_object_assembly(&mut stream, ObjectAssembly::new_registration()).await;
+    write_object_assembly(&mut stream, RequestObjectAssembly::new_registration()).await;
     let registration_response = read_object_assembly::<u8>(&mut stream).await?;
 
     // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
@@ -71,9 +73,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // TODO: Create the request for the SetDigitalIO message in the teknic_cip
     let set_digital_output_message =
-        MessageRouter::new_request(ServiceCode::SetAttributeSingle, CipPath::new(0x1, 0x1));
+        MessageRouterRequest::new(ServiceCode::SetAttributeSingle, CipPath::new(0x1, 0x1));
 
-    let set_digital_output_object = ObjectAssembly {
+    let set_digital_output_object = RequestObjectAssembly {
         packet_description: EnIpPacketDescription::new_cip_description(
             provided_session_handle,
             0,
@@ -95,7 +97,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING un-registration");
     write_object_assembly(
         &mut stream,
-        ObjectAssembly::new_unregistration(provided_session_handle),
+        RequestObjectAssembly::new_unregistration(provided_session_handle),
     )
     .await;
 

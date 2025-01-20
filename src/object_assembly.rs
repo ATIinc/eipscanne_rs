@@ -1,18 +1,31 @@
 use binrw::{
-    binrw,    // #[binrw] attribute
-    BinRead,  // trait for reading
+    binread,
+    binrw,
+    binwrite,
+    BinRead,
     BinWrite, // trait for writing
 };
 
-use crate::cip::message::{MessageRouter, ServiceCode};
+use crate::cip::message::{MessageRouterRequest, MessageRouterResponse, ServiceCode};
 use crate::cip::path::CipPath;
 use crate::cip::types::{CipByte, CipUdint};
 use crate::eip::packet::EnIpPacketDescription;
 
-#[binrw]
+#[binwrite]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct ObjectAssembly<T>
+pub struct RequestObjectAssembly<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub packet_description: EnIpPacketDescription,
+    pub cip_message: Option<MessageRouterRequest<T>>,
+}
+
+#[binread]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct ResponseObjectAssembly<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
@@ -20,19 +33,19 @@ where
 
     // TODO: Only return a None option if there are no remaining bytes to be read
     #[br(try)]
-    pub cip_message: Option<MessageRouter<T>>,
+    pub cip_message: Option<MessageRouterResponse<T>>,
 }
 
-impl ObjectAssembly<CipByte> {
+impl RequestObjectAssembly<CipByte> {
     pub fn new_registration() -> Self {
-        ObjectAssembly {
+        RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_registration_description(),
             cip_message: None,
         }
     }
 
     pub fn new_unregistration(session_handle: CipUdint) -> Self {
-        ObjectAssembly {
+        RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_unregistration_description(
                 session_handle,
             ),
@@ -41,12 +54,12 @@ impl ObjectAssembly<CipByte> {
     }
 }
 
-impl ObjectAssembly<CipPath> {
+impl RequestObjectAssembly<CipPath> {
     pub fn new_identity(session_handle: CipUdint) -> Self {
         let identity_cip_message =
-            MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+            MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
-        ObjectAssembly {
+        RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_cip_description(
                 session_handle,
                 0,

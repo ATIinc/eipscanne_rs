@@ -6,7 +6,7 @@ use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
 use eipscanne_rs::cip::message::{
-    MessageRouter, ResponseData, RouterData, ServiceCode, ServiceContainerBits,
+    MessageRouterRequest, MessageRouterResponse, ResponseData, ServiceCode, ServiceContainerBits,
 };
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
@@ -14,7 +14,7 @@ use eipscanne_rs::eip::packet::{
     CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
     EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, RRPacketData,
 };
-use eipscanne_rs::object_assembly::ObjectAssembly;
+use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 #[test]
 fn test_deserialize_device_type() {
@@ -130,7 +130,7 @@ fn test_serialize_full_identity_request() {
         vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
     let message_router_request =
-        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
     // Serialize the struct into a byte array
     let mut message_router_bytes: Vec<u8> = Vec::new();
@@ -155,7 +155,7 @@ fn test_serialize_new_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = ObjectAssembly::new_identity(0x6);
+    let identity_request_packet = RequestObjectAssembly::new_identity(0x6);
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
@@ -302,12 +302,12 @@ fn test_deserialize_cip_identity_response() {
     let byte_cursor = std::io::Cursor::new(identity_response_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let cip_identity_response = MessageRouter::<IdentityResponse>::read(&mut buf_reader).unwrap();
+    let cip_identity_response =
+        MessageRouterResponse::<IdentityResponse>::read(&mut buf_reader).unwrap();
 
-    let expected_cip_identity_response = MessageRouter {
+    let expected_cip_identity_response = MessageRouterResponse {
         service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
-        router_data: RouterData::Response(ResponseData {
-            _unused: 0x0,
+        router_data: ResponseData {
             status: 0x0,
             additional_status_size: 0x0,
             data: IdentityResponse {
@@ -334,7 +334,7 @@ fn test_deserialize_cip_identity_response() {
                 serial_number: 0x01ff3d32,
                 product_name: CipShortString::from("ClearLink".to_string()),
             },
-        }),
+        },
     };
 
     // Assert equality
@@ -436,9 +436,10 @@ fn test_deserialize_full_identity_response() {
     let byte_cursor = std::io::Cursor::new(identity_response_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let identity_response = ObjectAssembly::<IdentityResponse>::read(&mut buf_reader).unwrap();
+    let identity_response =
+        ResponseObjectAssembly::<IdentityResponse>::read(&mut buf_reader).unwrap();
 
-    let expected_identity_response = ObjectAssembly {
+    let expected_identity_response = ResponseObjectAssembly {
         packet_description: EnIpPacketDescription {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
@@ -464,10 +465,9 @@ fn test_deserialize_full_identity_response() {
                 ],
             }),
         },
-        cip_message: Some(MessageRouter {
+        cip_message: Some(MessageRouterResponse {
             service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
-            router_data: RouterData::Response(ResponseData {
-                _unused: 0x0,
+            router_data: ResponseData {
                 status: 0x0,
                 additional_status_size: 0x0,
                 data: IdentityResponse {
@@ -494,7 +494,7 @@ fn test_deserialize_full_identity_response() {
                     serial_number: 0x01ff3d32,
                     product_name: CipShortString::from("ClearLink".to_string()),
                 },
-            }),
+            },
         }),
     };
 

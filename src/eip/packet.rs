@@ -7,10 +7,8 @@ use binrw::{
     BinWrite, // trait for writing
 };
 
-use crate::cip::{
-    message::MessageRouter,
-    types::{CipByte, CipUdint, CipUint},
-};
+use crate::cip::message::MessageRouterRequest;
+use crate::cip::types::{CipByte, CipUdint, CipUint};
 
 use crate::eip::constants as eip_constants;
 
@@ -227,12 +225,12 @@ impl EnIpPacketDescription {
     pub fn new_cip_description<T>(
         session_handle: CipUdint,
         timeout: CipUint,
-        message_router: &MessageRouter<T>,
+        message_router_request: &MessageRouterRequest<T>,
     ) -> Self
     where
         T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
     {
-        let package_descriptors = generate_packet_descriptors(message_router.byte_size());
+        let package_descriptors = generate_packet_descriptors(message_router_request.byte_size());
 
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,

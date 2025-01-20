@@ -1,6 +1,6 @@
 use binrw::{BinRead, BinWrite};
 
-use eipscanne_rs::cip::message::{MessageRouter, ServiceCode};
+use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
@@ -117,7 +117,7 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
     let identity_cip_path = CipPath::new(0x1, 0x1);
 
     let message_router_request =
-        MessageRouter::new_request(ServiceCode::GetAttributeAll, identity_cip_path);
+        MessageRouterRequest::new(ServiceCode::GetAttributeAll, identity_cip_path);
 
     let cip_request_packet =
         EnIpPacketDescription::new_cip_description(0x06, 0, &message_router_request);

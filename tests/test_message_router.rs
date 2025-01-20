@@ -1,8 +1,8 @@
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::{
-    MessageRouter, RequestData, ResponseData, RouterData, ServiceCode, ServiceContainer,
-    ServiceContainerBits,
+    MessageRouterRequest, MessageRouterResponse, RequestData, ResponseData, ServiceCode,
+    ServiceContainer, ServiceContainerBits,
 };
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
@@ -96,7 +96,7 @@ fn test_serialize_get_attributes_all_request() {
         vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
     let message_router_request =
-        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
     let mut message_router_bytes: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut message_router_bytes);
@@ -108,20 +108,29 @@ fn test_serialize_get_attributes_all_request() {
 }
 
 #[test]
-fn test_deserialize_get_attributes_all_request() {
+fn test_deserialize_get_attributes_all_response() {
     let raw_byte_array: Vec<CipByte> =
         vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
     let byte_cursor = std::io::Cursor::new(raw_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let message_router_request = MessageRouter::read(&mut buf_reader).unwrap();
+    let message_router_response = MessageRouterResponse::read(&mut buf_reader).unwrap();
 
-    let expected_message_router_request =
-        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+    let expected_message_router_response = MessageRouterResponse {
+        service_container: ServiceContainer::from(ServiceContainerBits::new(
+            ServiceCode::GetAttributeAll,
+            true,
+        )),
+        router_data: ResponseData {
+            status: 0x0,
+            additional_status_size: 0x0,
+            data: CipPath::new(0x1, 0x1),
+        },
+    };
 
     // Assert equality
-    assert_eq!(expected_message_router_request, message_router_request);
+    assert_eq!(expected_message_router_response, message_router_response);
 }
 
 #[test]
@@ -131,19 +140,18 @@ fn test_deserialize_empty_response() {
     let byte_cursor = std::io::Cursor::new(raw_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let message_router_response: MessageRouter<u8> = MessageRouter::read(&mut buf_reader).unwrap();
+    let message_router_response = MessageRouterResponse::<u8>::read(&mut buf_reader).unwrap();
 
-    let expected_message_router_response = MessageRouter {
+    let expected_message_router_response = MessageRouterResponse {
         service_container: ServiceContainer::from(ServiceContainerBits::new(
             ServiceCode::GetAttributeAll,
             true,
         )),
-        router_data: RouterData::Response(ResponseData {
-            _unused: 0x0,
+        router_data: ResponseData {
             status: 0x0,
             additional_status_size: 0x0,
             data: 0x4,
-        }),
+        },
     };
 
     // Assert equality
@@ -152,15 +160,15 @@ fn test_deserialize_empty_response() {
 
 #[test]
 fn test_message_cip_path_byte_size() {
-    let message_router_request = MessageRouter {
+    let message_router_request = MessageRouterRequest {
         service_container: ServiceContainer::from(ServiceContainerBits::new(
             ServiceCode::GetAttributeAll,
             false,
         )),
-        router_data: RouterData::Request(RequestData {
+        router_data: RequestData {
             data_word_size: 4,
             data: CipPath::new(0x1, 0x1),
-        }),
+        },
     };
 
     // Assert equality
@@ -170,7 +178,7 @@ fn test_message_cip_path_byte_size() {
 #[test]
 fn test_message_cip_path_request_byte_size() {
     let message_router_request =
-        MessageRouter::new_request(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
     // Assert equality
     assert_eq!(10, message_router_request.byte_size());
