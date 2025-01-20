@@ -1,6 +1,5 @@
 use binrw::{
     binread,
-    binrw,
     binwrite,
     BinRead,
     BinWrite, // trait for writing

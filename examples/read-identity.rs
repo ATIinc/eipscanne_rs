@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -10,7 +8,6 @@ use std::io::BufReader;
 extern crate eipscanne_rs;
 
 use eipscanne_rs::cip::identity::IdentityResponse;
-use eipscanne_rs::cip::message::ResponseData;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 async fn write_object_assembly<T>(stream: &mut TcpStream, object_assembly: RequestObjectAssembly<T>)
