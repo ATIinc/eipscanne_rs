@@ -158,9 +158,6 @@ impl CommandSpecificData {
 
 // ======= Start of CommandSpecificData impl ========
 
-
-
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
@@ -183,7 +180,6 @@ pub struct EnIpPacketDescription {
     pub command_specific_data: CommandSpecificData,
     /* Passes the command field of the header to the command_specific_data field for binary reading/writing */
 }
-
 
 // ======= Start of EnIpPacketDescription impl ========
 
@@ -219,12 +215,12 @@ impl EnIpPacketDescription {
             }),
         )
     }
-    
+
     pub fn new_unregistration_description(session_handle: CipUdint) -> Self {
         EnIpPacketDescription::new(
             EnIpCommand::UnRegisterSession,
             session_handle,
-            CommandSpecificData::UnregisterSession
+            CommandSpecificData::UnregisterSession,
         )
     }
 

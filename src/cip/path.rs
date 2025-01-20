@@ -1,11 +1,11 @@
 use binrw::{
     binrw, // #[binrw] attribute
-    // BinRead,  // trait for reading
-    // BinWrite, // trait for writing
+           // BinRead,  // trait for reading
+           // BinWrite, // trait for writing
 };
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
-use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, Number, FromBits};
+use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, FromBits, Number};
 
 #[bitsize(3)]
 #[derive(Debug, Clone, FromBits, PartialEq)]
@@ -14,7 +14,7 @@ pub enum SegmentType {
     LogicalSegment = 0x01,
 
     #[fallback]
-    Unknown(u3)
+    Unknown(u3),
 }
 
 #[bitsize(3)]
@@ -26,7 +26,7 @@ pub enum LogicalSegmentType {
     Sample = 0x05,
 
     #[fallback]
-    Unknown(u3)
+    Unknown(u3),
 }
 
 #[bitsize(2)]
@@ -37,7 +37,7 @@ pub enum LogicalSegmentFormat {
     FormatAsUWhat = 0x03,
 
     #[fallback]
-    Unknown(u2)
+    Unknown(u2),
 }
 
 // NOTE: Could also investigate doing something that explicitly converts from and to a u32

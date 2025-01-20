@@ -172,7 +172,10 @@ fn test_deserialize_register_session_response() {
     };
 
     // Assert equality
-    assert_eq!(expected_session_header, session_response_object.packet_description.header);
+    assert_eq!(
+        expected_session_header,
+        session_response_object.packet_description.header
+    );
 
     let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
         protocol_version: 0x1,
@@ -181,7 +184,9 @@ fn test_deserialize_register_session_response() {
 
     assert_eq!(
         expected_packet_description,
-        session_response_object.packet_description.command_specific_data
+        session_response_object
+            .packet_description
+            .command_specific_data
     );
 
     let expected_packet = EnIpPacketDescription {
@@ -213,7 +218,8 @@ fn test_serialize_unregister_session_request() {
     */
 
     let expected_byte_array: Vec<CipByte> = vec![
-       0x66, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+        0x66, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
     // create an empty packet

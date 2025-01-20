@@ -1,4 +1,4 @@
-use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, Number, FromBits};
+use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, FromBits, Number};
 
 use binrw::{
     binrw, // #[binrw] attribute
@@ -99,7 +99,6 @@ impl From<IdentityStatusBits> for IdentityStatus {
 }
 
 // ^^^^^^^^ End of IdentityStatus impl ^^^^^^^^
-
 
 #[binrw]
 #[brw(little)]

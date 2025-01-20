@@ -137,7 +137,6 @@ fn test_deserialize_cip_path() {
     );
 }
 
-
 #[test]
 fn test_deserialize_unknown_cip_path() {
     /*
@@ -170,7 +169,10 @@ fn test_deserialize_unknown_cip_path() {
     let cip_path_bits = CipPathBits::from(cip_path);
 
     // Assert equality
-    assert_eq!(cip_path_bits.class_id_segment.segment_type(), SegmentType::Unknown(u3::new(0x4)));
+    assert_eq!(
+        cip_path_bits.class_id_segment.segment_type(),
+        SegmentType::Unknown(u3::new(0x4))
+    );
 
     assert_eq!(cip_path_bits.class_id_segment.data(), 0x1);
     assert_eq!(

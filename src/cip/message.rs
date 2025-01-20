@@ -41,7 +41,7 @@ pub enum ServiceCode {
     GroupSync = 0x1C, /* End CIP common services */
 
     #[fallback]
-    Unknown(u7)
+    Unknown(u7),
 }
 
 #[bitsize(8)]
@@ -92,8 +92,7 @@ impl<T> RequestData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    fn byte_size() -> usize
-    {
+    fn byte_size() -> usize {
         mem::size_of::<CipUsint>() + mem::size_of::<T>()
     }
 }
@@ -116,8 +115,7 @@ impl<T> ResponseData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    fn byte_size() -> usize
-    {
+    fn byte_size() -> usize {
         mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<u8>() + mem::size_of::<T>()
     }
 }
@@ -178,7 +176,7 @@ where
             service_container: ServiceContainerBits::new(service_code, false).into(),
             router_data: RouterData::Request(RequestData {
                 data_word_size: total_data_word_size as u8,
-                data: request_data_content
+                data: request_data_content,
             }),
         }
     }
