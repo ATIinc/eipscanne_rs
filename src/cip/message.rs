@@ -6,12 +6,13 @@ use binrw::{
     BinWrite, // BinWrite, // trait for writing
 };
 
-use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, Number, TryFromBits};
+use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, FromBits, Number};
 
-use super::types::CipSint;
+use super::types::CipUsint;
 
 #[bitsize(7)]
-#[derive(TryFromBits, PartialEq, Debug)]
+#[derive(FromBits, PartialEq, Debug)]
+#[repr(u8)]
 pub enum ServiceCode {
     None = 0x00,
     /* Start CIP common services */
@@ -38,10 +39,13 @@ pub enum ServiceCode {
     InsertMember = 0x1A,
     RemoveMember = 0x1B,
     GroupSync = 0x1C, /* End CIP common services */
+
+    #[fallback]
+    Unknown(u7)
 }
 
 #[bitsize(8)]
-#[derive(TryFromBits, PartialEq, DebugBits, Clone, Copy)]
+#[derive(FromBits, PartialEq, DebugBits, Clone, Copy)]
 pub struct ServiceContainerBits {
     service: ServiceCode,
     response: bool,
@@ -58,7 +62,7 @@ pub struct ServiceContainer {
 
 impl From<ServiceContainer> for ServiceContainerBits {
     fn from(container: ServiceContainer) -> Self {
-        ServiceContainerBits::try_from(container.service_representation).unwrap()
+        ServiceContainerBits::from(container.service_representation)
     }
 }
 
@@ -79,7 +83,7 @@ pub struct RequestData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub data_word_size: CipSint,
+    pub data_word_size: CipUsint,
     pub data: T,
 }
 
@@ -90,7 +94,7 @@ where
 {
     fn byte_size() -> usize
     {
-        mem::size_of::<CipSint>() + mem::size_of::<T>()
+        mem::size_of::<CipUsint>() + mem::size_of::<T>()
     }
 }
 
@@ -173,7 +177,7 @@ where
         MessageRouter {
             service_container: ServiceContainerBits::new(service_code, false).into(),
             router_data: RouterData::Request(RequestData {
-                data_word_size: total_data_word_size.try_into().unwrap(),
+                data_word_size: total_data_word_size as u8,
                 data: request_data_content
             }),
         }

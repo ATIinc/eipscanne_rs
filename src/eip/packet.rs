@@ -45,7 +45,7 @@ pub fn generate_packet_descriptors(packet_size: usize) -> [CommonPacketDescripto
         },
         CommonPacketDescriptor {
             type_id: CommonPacketItemId::UnconnectedMessage,
-            packet_length: packet_size.try_into().unwrap(),
+            packet_length: packet_size as u16,
         },
     ]
 }
@@ -150,7 +150,7 @@ impl CommandSpecificData {
         Self::SendRrData(RRPacketData {
             interface_handle,
             timeout,
-            item_count: request_size.try_into().unwrap(),
+            item_count: request_size as u16,
             cip_data_packets: generate_packet_descriptors(request_size),
         })
     }

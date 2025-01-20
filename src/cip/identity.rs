@@ -1,4 +1,4 @@
-use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, Number, TryFromBits};
+use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, Number, FromBits};
 
 use binrw::{
     binrw, // #[binrw] attribute
@@ -61,7 +61,7 @@ pub struct Revision {
 }
 
 #[bitsize(16)]
-#[derive(TryFromBits, PartialEq, DebugBits)]
+#[derive(FromBits, PartialEq, DebugBits)]
 pub struct IdentityStatusBits {
     pub owned: bool,
     pub unused1: bool,
@@ -86,7 +86,7 @@ pub struct IdentityStatus {
 
 impl From<IdentityStatus> for IdentityStatusBits {
     fn from(segment: IdentityStatus) -> Self {
-        IdentityStatusBits::try_from(segment.status_representation).unwrap()
+        IdentityStatusBits::from(segment.status_representation)
     }
 }
 

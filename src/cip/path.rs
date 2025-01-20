@@ -1,34 +1,43 @@
 use binrw::{
     binrw, // #[binrw] attribute
-           // BinRead,  // trait for reading
-           // BinWrite, // trait for writing
+    // BinRead,  // trait for reading
+    // BinWrite, // trait for writing
 };
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
-use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, Number, TryFromBits};
+use bilge::prelude::{bitsize, u2, u3, Bitsized, DebugBits, Number, FromBits};
 
 #[bitsize(3)]
-#[derive(Debug, Clone, TryFromBits, PartialEq)]
-#[non_exhaustive]
+#[derive(Debug, Clone, FromBits, PartialEq)]
+#[repr(u8)]
 pub enum SegmentType {
     LogicalSegment = 0x01,
+
+    #[fallback]
+    Unknown(u3)
 }
 
 #[bitsize(3)]
-#[derive(Debug, Clone, TryFromBits, PartialEq)]
-#[non_exhaustive]
+#[derive(Debug, Clone, FromBits, PartialEq)]
+#[repr(u8)]
 pub enum LogicalSegmentType {
     ClassId = 0x00,
     InstanceId = 0x01,
     Sample = 0x05,
+
+    #[fallback]
+    Unknown(u3)
 }
 
 #[bitsize(2)]
-#[derive(Debug, Clone, TryFromBits, PartialEq)]
-#[non_exhaustive]
+#[derive(Debug, FromBits, PartialEq, Clone, Copy)]
+#[repr(u8)]
 pub enum LogicalSegmentFormat {
     FormatAsU16 = 0x01,
     FormatAsUWhat = 0x03,
+
+    #[fallback]
+    Unknown(u2)
 }
 
 // NOTE: Could also investigate doing something that explicitly converts from and to a u32
@@ -38,7 +47,7 @@ pub enum LogicalSegmentFormat {
 // #[bw(map = |&x| u32::from(x))]
 
 #[bitsize(32)]
-#[derive(TryFromBits, PartialEq, DebugBits)]
+#[derive(FromBits, PartialEq, DebugBits)]
 pub struct LogicalPathSegmentBits {
     // For some reason, the segment sections need to be inverted... Should be u3, u3, u2
     pub logical_segment_format: LogicalSegmentFormat,
@@ -59,7 +68,7 @@ pub struct LogicalPathSegment {
 
 impl From<LogicalPathSegment> for LogicalPathSegmentBits {
     fn from(segment: LogicalPathSegment) -> Self {
-        LogicalPathSegmentBits::try_from(segment.segment_representation).unwrap()
+        LogicalPathSegmentBits::from(segment.segment_representation)
     }
 }
 

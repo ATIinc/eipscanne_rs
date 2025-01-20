@@ -2,6 +2,8 @@ use std::vec;
 
 use binrw::{BinRead, BinWrite};
 
+use bilge::prelude::u3;
+
 use eipscanne_rs::cip::path::{
     CipPath, CipPathBits, LogicalPathSegment, LogicalPathSegmentBits, LogicalSegmentFormat,
     LogicalSegmentType, SegmentType,
@@ -127,6 +129,53 @@ fn test_deserialize_cip_path() {
     assert_eq!(
         cip_path_bits.class_id_segment.logical_segment_type(),
         LogicalSegmentType::ClassId
+    );
+    assert_eq!(cip_path_bits.instance_id_segment.data(), 0x1);
+    assert_eq!(
+        cip_path_bits.instance_id_segment.logical_segment_type(),
+        LogicalSegmentType::InstanceId
+    );
+}
+
+
+#[test]
+fn test_deserialize_unknown_cip_path() {
+    /*
+    Request Path: Identity, Instance: 0x0001
+    Path Segment: 0x21 (16-Bit Class Segment)
+        001. .... = Path Segment Type: Logical Segment (1)
+        ...0 00.. = Logical Segment Type: Class ID (0)
+        .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
+        Class: Identity (0x0001)
+    Path Segment: 0x25 (16-Bit Instance Segment)
+        001. .... = Path Segment Type: Logical Segment (1)
+        ...0 01.. = Logical Segment Type: Instance ID (1)
+        .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
+        Instance: 0x0001
+
+    -------------------------------------
+    Hex Dump:
+
+    0000   21 00 01 00 25 00 01 00
+
+    */
+    let raw_bytes: Vec<CipByte> = vec![0b10011001, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
+
+    let byte_cursor = std::io::Cursor::new(raw_bytes);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+    // Read from buffered reader
+    let cip_path = CipPath::read(&mut buf_reader).unwrap();
+
+    let cip_path_bits = CipPathBits::from(cip_path);
+
+    // Assert equality
+    assert_eq!(cip_path_bits.class_id_segment.segment_type(), SegmentType::Unknown(u3::new(0x4)));
+
+    assert_eq!(cip_path_bits.class_id_segment.data(), 0x1);
+    assert_eq!(
+        cip_path_bits.class_id_segment.logical_segment_type(),
+        LogicalSegmentType::Unknown(u3::new(0x6))
     );
     assert_eq!(cip_path_bits.instance_id_segment.data(), 0x1);
     assert_eq!(
