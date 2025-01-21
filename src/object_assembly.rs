@@ -30,7 +30,8 @@ where
 {
     pub packet_description: EnIpPacketDescription,
 
-    // TODO: Only return a None option if there are no remaining bytes to be read
+    // TODO: Validate that the size of the EnIpPacketDescription correctly matches the remaining bytes
+    //  * If the remaining bytes are 0, don't serialize the next step (otherwise do)
     #[br(try)]
     pub cip_message: Option<MessageRouterResponse<T>>,
 }

@@ -23,7 +23,7 @@ pub enum SegmentType {
 pub enum LogicalSegmentType {
     ClassId = 0x00,
     InstanceId = 0x01,
-    Sample = 0x05,
+    AttributeId = 0x02,
 
     #[fallback]
     Unknown(u3),
@@ -135,6 +135,79 @@ impl From<CipPathBits> for CipPath {
         CipPath {
             class_id_segment: LogicalPathSegment::from(segment.class_id_segment),
             instance_id_segment: LogicalPathSegment::from(segment.instance_id_segment),
+        }
+    }
+}
+
+// ^^^^^^^^ End of CipPath impl ^^^^^^^^
+
+// Duplicate to make binary reading and writing more explicit
+
+#[derive(Debug, PartialEq)]
+pub struct CipFullPathBits {
+    pub class_id_segment: LogicalPathSegmentBits,
+    pub instance_id_segment: LogicalPathSegmentBits,
+    pub attribute_id_segment: LogicalPathSegmentBits,
+}
+
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq)]
+pub struct CipFullPath {
+    pub class_id_segment: LogicalPathSegment,
+    pub instance_id_segment: LogicalPathSegment,
+    pub attribute_id_segment: LogicalPathSegment,
+}
+
+// ======= Start of CipFullPath impl ========
+
+impl CipFullPath {
+    pub fn new(class_id: u16, instance_id: u16, attribute_id: u16) -> CipFullPath {
+        CipFullPath {
+            class_id_segment: LogicalPathSegmentBits::new(
+                LogicalSegmentFormat::FormatAsU16,
+                LogicalSegmentType::ClassId,
+                SegmentType::LogicalSegment,
+                0x0,
+                class_id,
+            )
+            .into(),
+            instance_id_segment: LogicalPathSegmentBits::new(
+                LogicalSegmentFormat::FormatAsU16,
+                LogicalSegmentType::InstanceId,
+                SegmentType::LogicalSegment,
+                0x0,
+                instance_id,
+            )
+            .into(),
+            attribute_id_segment: LogicalPathSegmentBits::new(
+                LogicalSegmentFormat::FormatAsU16,
+                LogicalSegmentType::AttributeId,
+                SegmentType::LogicalSegment,
+                0x0,
+                attribute_id,
+            )
+            .into(),
+        }
+    }
+}
+
+impl From<CipFullPath> for CipFullPathBits {
+    fn from(segment: CipFullPath) -> Self {
+        CipFullPathBits {
+            class_id_segment: LogicalPathSegmentBits::from(segment.class_id_segment),
+            instance_id_segment: LogicalPathSegmentBits::from(segment.instance_id_segment),
+            attribute_id_segment: LogicalPathSegmentBits::from(segment.attribute_id_segment),
+        }
+    }
+}
+
+impl From<CipFullPathBits> for CipFullPath {
+    fn from(segment: CipFullPathBits) -> Self {
+        CipFullPath {
+            class_id_segment: LogicalPathSegment::from(segment.class_id_segment),
+            instance_id_segment: LogicalPathSegment::from(segment.instance_id_segment),
+            attribute_id_segment: LogicalPathSegment::from(segment.attribute_id_segment),
         }
     }
 }
