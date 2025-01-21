@@ -1,4 +1,3 @@
-use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -9,8 +8,12 @@ use std::io::BufReader;
 extern crate eipscanne_rs;
 
 use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
-use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::cip::path::CipFullPath;
+use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
+
+// Reference the example file
+mod clearlink_output;
 
 async fn write_object_assembly<T>(stream: &mut TcpStream, object_assembly: RequestObjectAssembly<T>)
 where
@@ -72,8 +75,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING digital output");
 
     // TODO: Create the request for the SetDigitalIO message in the teknic_cip
-    let set_digital_output_message =
-        MessageRouterRequest::new(ServiceCode::SetAttributeSingle, CipPath::new(0x1, 0x1));
+    let set_digital_output_message = MessageRouterRequest::new(
+        ServiceCode::SetAttributeSingle,
+        CipFullPath::new(0x4, 0x70, 0x3),
+    );
 
     let set_digital_output_object = RequestObjectAssembly {
         packet_description: EnIpPacketDescription::new_cip_description(
