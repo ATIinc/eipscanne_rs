@@ -5,8 +5,8 @@ use binrw::{BinRead, BinWrite};
 use bilge::prelude::u3;
 
 use eipscanne_rs::cip::path::{
-    CipPath, CipPathBits, LogicalPathSegment, LogicalPathSegmentBits, LogicalSegmentFormat,
-    LogicalSegmentType, SegmentType,
+    CipFullPath, CipPath, CipPathBits, LogicalPathSegment, LogicalPathSegmentBits,
+    LogicalSegmentFormat, LogicalSegmentType, SegmentType,
 };
 use eipscanne_rs::cip::types::CipByte;
 
@@ -91,6 +91,45 @@ fn test_serialize_cip_path() {
 
     // Assert equality
     assert_eq!(expected_byte_array, cip_path_bytes);
+}
+
+#[test]
+fn test_serialize_cip_full_path() {
+    /*
+    Request Path: Assembly, Instance: 0x96, Attribute: 0x03
+    Path Segment: 0x20 (8-Bit Class Segment)
+        001. .... = Path Segment Type: Logical Segment (1)
+        ...0 00.. = Logical Segment Type: Class ID (0)
+        .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+        Class: Assembly (0x04)
+    Path Segment: 0x24 (8-Bit Instance Segment)
+        001. .... = Path Segment Type: Logical Segment (1)
+        ...0 01.. = Logical Segment Type: Instance ID (1)
+        .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+        Instance: 0x96
+    Path Segment: 0x30 (8-Bit Attribute Segment)
+        001. .... = Path Segment Type: Logical Segment (1)
+        ...1 00.. = Logical Segment Type: Attribute ID (4)
+        .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+        Attribute: 3
+
+    -------------------------------------
+    Hex Dump:
+
+    0000   20 04 24 96 30 03
+
+    */
+    let expected_byte_array: Vec<CipByte> = vec![0x20, 0x04, 0x24, 0x96, 0x30, 0x03];
+
+    let cip_full_path = CipFullPath::new(0x4, 0x96, 0x3);
+
+    let mut cip_full_path_bytes: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut cip_full_path_bytes);
+
+    cip_full_path.write(&mut writer).unwrap();
+
+    // Assert equality
+    assert_eq!(expected_byte_array, cip_full_path_bytes);
 }
 
 #[test]
