@@ -8,7 +8,7 @@ use std::io::BufReader;
 extern crate eipscanne_rs;
 
 use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
-use eipscanne_rs::cip::path::CipFullPath;
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: Create the request for the SetDigitalIO message in the teknic_cip
     let set_digital_output_message = MessageRouterRequest::new(
         ServiceCode::SetAttributeSingle,
-        CipFullPath::new(0x4, 0x70, 0x3),
+        CipPath::new_full(0x4, 0x70, 0x3),
     );
 
     let set_digital_output_object = RequestObjectAssembly {

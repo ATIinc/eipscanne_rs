@@ -101,15 +101,15 @@ pub struct RegisterData {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-#[br(import(commandType: EnIpCommand))]
+#[br(import(command_type: EnIpCommand))]
 pub enum CommandSpecificData {
-    #[br(pre_assert(commandType == EnIpCommand::UnRegisterSession))]
+    #[br(pre_assert(command_type == EnIpCommand::UnRegisterSession))]
     UnregisterSession,
 
-    #[br(pre_assert(commandType == EnIpCommand::RegisterSession))]
+    #[br(pre_assert(command_type == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),
 
-    #[br(pre_assert(commandType == EnIpCommand::SendRrData))]
+    #[br(pre_assert(command_type == EnIpCommand::SendRrData))]
     SendRrData(RRPacketData),
 }
 

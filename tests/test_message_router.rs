@@ -139,10 +139,7 @@ fn test_message_cip_path_byte_size() {
             ServiceCode::GetAttributeAll,
             false,
         )),
-        router_data: RequestData {
-            data_word_size: 4,
-            data: CipPath::new(0x1, 0x1),
-        },
+        request_data: RequestData::new(CipPath::new(0x1, 0x1)),
     };
 
     // Assert equality

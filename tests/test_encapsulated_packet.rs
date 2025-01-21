@@ -106,6 +106,47 @@ fn test_serialize_identity_ethernet_ip_component_request() {
 }
 
 #[test]
+fn test_new_cip_description() {
+    // create an empty packet
+    let identity_cip_path = CipPath::new(0x1, 0x1);
+
+    let message_router_request =
+        MessageRouterRequest::new(ServiceCode::GetAttributeAll, identity_cip_path);
+
+    let cip_request_packet =
+        EnIpPacketDescription::new_cip_description(0x06, 0, &message_router_request);
+
+    // create an empty packet
+    let expected_identity_description = EnIpPacketDescription {
+        header: EncapsulationHeader {
+            command: EnIpCommand::SendRrData,
+            length: 26,
+            session_handle: 0x06,
+            status_code: EncapsStatusCode::Success,
+            sender_context: [0x00; 8],
+            options: 0x00,
+        },
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: 0x0,
+            timeout: 0,
+            item_count: 2,
+            cip_data_packets: [
+                CommonPacketDescriptor {
+                    type_id: CommonPacketItemId::NullAddr,
+                    packet_length: 0,
+                },
+                CommonPacketDescriptor {
+                    type_id: CommonPacketItemId::UnconnectedMessage,
+                    packet_length: 10,
+                },
+            ],
+        }),
+    };
+
+    assert_eq!(expected_identity_description, cip_request_packet);
+}
+
+#[test]
 fn test_serialize_message_router_generated_identity_ethernet_ip_component_request() {
     let expected_eip_byte_array: Vec<CipByte> = vec![
         0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

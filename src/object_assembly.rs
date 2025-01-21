@@ -7,7 +7,7 @@ use binrw::{
 
 use crate::cip::message::{MessageRouterRequest, MessageRouterResponse, ServiceCode};
 use crate::cip::path::CipPath;
-use crate::cip::types::{CipByte, CipUdint};
+use crate::cip::types::CipUdint;
 use crate::eip::packet::EnIpPacketDescription;
 
 #[binwrite]
@@ -36,7 +36,7 @@ where
     pub cip_message: Option<MessageRouterResponse<T>>,
 }
 
-impl RequestObjectAssembly<CipByte> {
+impl RequestObjectAssembly<u8> {
     pub fn new_registration() -> Self {
         RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_registration_description(),
@@ -52,9 +52,7 @@ impl RequestObjectAssembly<CipByte> {
             cip_message: None,
         }
     }
-}
 
-impl RequestObjectAssembly<CipPath> {
     pub fn new_identity(session_handle: CipUdint) -> Self {
         let identity_cip_message =
             MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
