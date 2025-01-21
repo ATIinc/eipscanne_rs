@@ -72,7 +72,7 @@ fn test_serialize_full_identity_request() {
     let identity_request_packet = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: 26,
+            length: Some(26),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
@@ -443,7 +443,7 @@ fn test_deserialize_full_identity_response() {
         packet_description: EnIpPacketDescription {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
-                length: 44,
+                length: Some(44),
                 session_handle: 0x06,
                 status_code: EncapsStatusCode::Success,
                 sender_context: [0x00; 8],

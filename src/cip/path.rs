@@ -110,24 +110,6 @@ impl LogicalPathSegment {
             data: PathData::FormatAsU16(data),
         }
     }
-
-    pub fn byte_size(&self) -> usize {
-        let definition_size = mem::size_of::<LogicalPathDefinition>();
-
-        // only has padding if formatted as a u16
-        let padding_size = match self.path_definition.logical_segment_format() {
-            LogicalSegmentFormat::FormatAsU16 => 1,
-            _ => 0,
-        };
-
-        let data_size = match self.path_definition.logical_segment_format() {
-            LogicalSegmentFormat::FormatAsU16 => mem::size_of::<u16>(),
-            LogicalSegmentFormat::FormatAsU8 => mem::size_of::<u8>(),
-            LogicalSegmentFormat::Unknown(_) => 0,
-        };
-
-        definition_size + padding_size + data_size
-    }
 }
 
 // ^^^^^^^^ End of CipPath impl ^^^^^^^^
@@ -171,18 +153,6 @@ impl CipPath {
                 attribute_id,
             )),
         }
-    }
-
-    pub fn byte_size(&self) -> usize {
-        let fixed_byte_size =
-            self.class_id_segment.byte_size() + self.instance_id_segment.byte_size();
-
-        let variable_byte_size = match &self.attribute_id_segment {
-            Some(attribute_id) => attribute_id.byte_size(),
-            None => 0,
-        };
-
-        fixed_byte_size + variable_byte_size
     }
 }
 

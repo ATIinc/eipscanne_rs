@@ -74,7 +74,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     let identity_request_packet = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: 26,
+            length: Some(26),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
@@ -113,14 +113,20 @@ fn test_new_cip_description() {
     let message_router_request =
         MessageRouterRequest::new(ServiceCode::GetAttributeAll, identity_cip_path);
 
+    // TODO: Figure out how to get the correct size
+    let mut message_request_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut message_request_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
     let cip_request_packet =
-        EnIpPacketDescription::new_cip_description(0x06, 0, &message_router_request);
+        EnIpPacketDescription::new_cip_description(0x06, 0, message_request_buffer.len());
 
     // create an empty packet
     let expected_identity_description = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: 26,
+            // Length is not initialized when created by default
+            length: None,
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
@@ -160,8 +166,12 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
     let message_router_request =
         MessageRouterRequest::new(ServiceCode::GetAttributeAll, identity_cip_path);
 
+    let mut message_request_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut message_request_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
     let cip_request_packet =
-        EnIpPacketDescription::new_cip_description(0x06, 0, &message_router_request);
+        EnIpPacketDescription::new_cip_description(0x06, 0, message_request_buffer.len());
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
@@ -220,7 +230,7 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
     let expected_packaet_description = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: 44,
+            length: Some(44),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
@@ -293,7 +303,7 @@ fn test_deserialize_identity_object_response() {
     let expected_packaet_description = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: 44,
+            length: Some(44),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],

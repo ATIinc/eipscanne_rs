@@ -1,5 +1,6 @@
 use std::mem;
 
+use binrw::meta::WriteEndian;
 use binrw::{
     binread,
     binrw, // #[binrw] attribute
@@ -79,22 +80,72 @@ impl From<ServiceContainerBits> for ServiceContainer {
 
 // ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
 
-#[binrw]
-#[brw(little)]
 #[derive(Debug, PartialEq)]
 pub struct RequestData<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub data_word_size: CipUsint,
+    // pub total_word_size: CipUsint,
     pub cip_path: CipPath,
-    pub data: Option<T>,
+    pub additional_data: Option<T>,
 }
 
-// TODO: Turn this into a macro
-impl RequestData<u8> {
-    pub fn new(path: CipPath) -> Self {
-        RequestData::new_data(path, None)
+impl<T> WriteEndian for RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
+}
+
+impl<T> BinWrite for RequestData<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+{
+    type Args<'a> = ();
+
+    fn write_options<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
+    ) -> binrw::BinResult<()> {
+        // Step 1: Serialize the `cip_path` field
+        let mut temp_buffer = Vec::new();
+        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+
+        let cip_path_write_result = self.cip_path.write_options(&mut temp_writer, endian, args);
+
+        if let Err(write_err) = cip_path_write_result {
+            return Err(write_err);
+        }
+
+        // Step 2: Serialize the `additional_data` field
+        if let Some(data_ref) = &self.additional_data {
+            let data_write_result = data_ref.write_options(&mut temp_writer, endian, args);
+
+            if let Err(write_err) = data_write_result {
+                return Err(write_err);
+            }
+        }
+
+        // Step 3: Calculate the total packet size
+        let header_byte_size = mem::size_of::<CipUsint>();
+        let data_byte_size = temp_buffer.len();
+
+        let total_packet_word_size = (header_byte_size + data_byte_size) / mem::size_of::<u16>();
+
+        let total_packet_word_size_array = [total_packet_word_size as CipUsint];
+
+        // Write the full struct to the actual writer
+        if let Err(write_err) = writer.write(&total_packet_word_size_array) {
+            return Err(binrw::Error::Io(write_err));
+        }
+
+        if let Err(write_err) = writer.write(&temp_buffer) {
+            return Err(binrw::Error::Io(write_err));
+        }
+
+        Ok(())
     }
 }
 
@@ -103,31 +154,10 @@ where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
     fn new_data(path: CipPath, request_data_content: Option<T>) -> Self {
-        let path_size = path.byte_size();
-
-        let content_size = match &request_data_content {
-            Some(content) => std::mem::size_of_val(&content),
-            None => 0,
-        };
-
-        let content_word_size = (path_size + content_size) / mem::size_of::<u16>();
-
         RequestData {
-            data_word_size: content_word_size as u8,
             cip_path: path,
-            data: request_data_content,
+            additional_data: request_data_content,
         }
-    }
-
-    fn byte_size(&self) -> usize {
-        let known_byte_size = mem::size_of_val(&self.data_word_size) + self.cip_path.byte_size();
-
-        let variable_byte_size = match &self.data {
-            Some(data) => std::mem::size_of_val(data),
-            None => 0,
-        };
-
-        known_byte_size + variable_byte_size
     }
 }
 
@@ -154,20 +184,16 @@ impl<T> MessageRouterRequest<T>
 where
     T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub fn byte_size(&self) -> usize {
-        // // Creating a manual function because std::mem::size_of_val not playing nice
-        let service_container_size = mem::size_of_val(&self.service_container);
-
-        service_container_size + self.request_data.byte_size()
-    }
-
     pub fn new_data(
         service_code: ServiceCode,
         path: CipPath,
         request_data_content: Option<T>,
     ) -> Self {
         MessageRouterRequest {
-            service_container: ServiceContainerBits::new(service_code, false).into(),
+            service_container: ServiceContainer::from(ServiceContainerBits::new(
+                service_code,
+                false,
+            )),
             request_data: RequestData::new_data(path, request_data_content),
         }
     }

@@ -1,13 +1,11 @@
-// use std::fmt;
-use std::mem;
-
+use binrw::meta::WriteEndian;
 use binrw::{
+    binread,
     binrw,    // #[binrw] attribute
     BinRead,  // trait for reading
     BinWrite, // trait for writing
 };
 
-use crate::cip::message::MessageRouterRequest;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
 use crate::eip::constants as eip_constants;
@@ -123,32 +121,11 @@ impl CommandSpecificData {
         })
     }
 
-    pub fn byte_size(&self) -> CipUint {
-        match self {
-            CommandSpecificData::UnregisterSession => 0,
-            CommandSpecificData::RegisterSession(register_data) => {
-                mem::size_of_val(register_data) as CipUint
-            }
-            CommandSpecificData::SendRrData(packet_data) => {
-                let eip_component_size = mem::size_of_val(packet_data) as CipUint;
-                let mut cip_component_size = 0;
-                for descriptor in packet_data.cip_data_packets {
-                    cip_component_size += descriptor.packet_length;
-                }
-
-                eip_component_size + cip_component_size
-            }
-        }
-    }
-
-    pub fn new_request<T>(interface_handle: CipUdint, timeout: CipUint, request_size: usize) -> Self
-    where
-        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-    {
+    pub fn new_request(interface_handle: CipUdint, timeout: CipUint, request_size: usize) -> Self {
         Self::SendRrData(RRPacketData {
             interface_handle,
             timeout,
-            item_count: request_size as u16,
+            item_count: 2, // is always 2 because of the CipPacketDescriptor field
             cip_data_packets: generate_packet_descriptors(request_size),
         })
     }
@@ -158,17 +135,17 @@ impl CommandSpecificData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct EncapsulationHeader {
     pub command: EnIpCommand,
-    pub length: CipUint,
+    pub length: Option<CipUint>,
     pub session_handle: CipUdint,
     pub status_code: EncapsStatusCode,
     pub sender_context: [CipByte; eip_constants::SENDER_CONTEXT_SIZE],
     pub options: CipUdint,
 }
 
-#[binrw]
+#[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 pub struct EnIpPacketDescription {
@@ -181,19 +158,74 @@ pub struct EnIpPacketDescription {
 
 // ======= Start of EnIpPacketDescription impl ========
 
+impl WriteEndian for EnIpPacketDescription {
+    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
+}
+
+impl BinWrite for EnIpPacketDescription {
+    type Args<'a> = ();
+
+    fn write_options<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
+    ) -> binrw::BinResult<()> {
+        // Step 1: Serialize the `command_specific_data` field
+        let mut temp_buffer = Vec::new();
+        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+
+        let data_write_result =
+            self.command_specific_data
+                .write_options(&mut temp_writer, endian, args);
+
+        if let Err(write_err) = data_write_result {
+            return Err(write_err);
+        };
+
+        // Step 3: Calculate the data packet size
+        let data_packet_byte_size: u16 = match &self.command_specific_data {
+            CommandSpecificData::SendRrData(rr_data_ref) => {
+                let mut running_total = 0;
+                for descriptor in rr_data_ref.cip_data_packets {
+                    running_total += descriptor.packet_length;
+                }
+
+                running_total
+            }
+            _ => 0,
+        };
+
+        // Step 4: Calculate the total data size after header
+        let command_data_byte_size = temp_buffer.len();
+
+        let mut updated_header = self.header.clone();
+        updated_header.length = Some((command_data_byte_size as CipUint) + data_packet_byte_size);
+
+        // Write the full struct to the actual writer
+        if let Err(write_err) = updated_header.write_options(writer, endian, args) {
+            return Err(write_err);
+        }
+
+        if let Err(write_err) = writer.write(&temp_buffer) {
+            return Err(binrw::Error::Io(write_err));
+        }
+
+        Ok(())
+    }
+}
+
 impl EnIpPacketDescription {
     pub fn new(
         command: EnIpCommand,
         session_handle: CipUdint,
         command_specific_data: CommandSpecificData,
     ) -> Self {
-        // with explicit messaging, there is no interface handle
-        let data_packet_size = command_specific_data.byte_size();
-
         EnIpPacketDescription {
             header: EncapsulationHeader {
                 command,
-                length: data_packet_size,
+                // length variable is calculated when the full packet is written to bytes
+                length: None,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
                 sender_context: [0x00; eip_constants::SENDER_CONTEXT_SIZE],
@@ -222,25 +254,15 @@ impl EnIpPacketDescription {
         )
     }
 
-    pub fn new_cip_description<T>(
+    pub fn new_cip_description(
         session_handle: CipUdint,
         timeout: CipUint,
-        message_router_request: &MessageRouterRequest<T>,
-    ) -> Self
-    where
-        T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
-    {
-        let package_descriptors = generate_packet_descriptors(message_router_request.byte_size());
-
+        request_size: usize,
+    ) -> Self {
         EnIpPacketDescription::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::SendRrData(RRPacketData {
-                interface_handle: 0,
-                timeout,
-                item_count: package_descriptors.len() as CipUint,
-                cip_data_packets: package_descriptors,
-            }),
+            CommandSpecificData::new_request(0, timeout, request_size),
         )
     }
 }

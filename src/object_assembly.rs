@@ -57,11 +57,17 @@ impl RequestObjectAssembly<u8> {
         let identity_cip_message =
             MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
+        // TODO: Remove this so the message isn't serialized twice
+        let mut temp_buffer = Vec::new();
+        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+
+        let _ = identity_cip_message.write(&mut temp_writer);
+
         RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_cip_description(
                 session_handle,
                 0,
-                &identity_cip_message,
+                temp_buffer.len(),
             ),
             cip_message: Some(identity_cip_message),
         }

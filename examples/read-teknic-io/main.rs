@@ -80,11 +80,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         CipPath::new_full(0x4, 0x70, 0x3),
     );
 
+    let mut tmp_output_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let _ = set_digital_output_message.write(&mut temp_writer);
+
     let set_digital_output_object = RequestObjectAssembly {
         packet_description: EnIpPacketDescription::new_cip_description(
             provided_session_handle,
             0,
-            &set_digital_output_message,
+            tmp_output_buffer.len(),
         ),
         cip_message: Some(set_digital_output_message),
     };

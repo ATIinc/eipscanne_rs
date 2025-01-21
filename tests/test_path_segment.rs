@@ -234,14 +234,24 @@ fn test_deserialize_unknown_cip_path() {
 fn test_path_byte_size() {
     let cip_path = CipPath::new(0x1, 0x1);
 
+    let mut cip_path_buffer = Vec::new();
+    let mut cip_path_writer = std::io::Cursor::new(&mut cip_path_buffer);
+
+    let _ = cip_path.write(&mut cip_path_writer);
+
     // Assert equality
-    assert_eq!(8, cip_path.byte_size());
+    assert_eq!(8, cip_path_buffer.len());
 }
 
 #[test]
 fn test_full_path_byte_size() {
     let full_cip_path = CipPath::new_full(0x1, 0x1, 0x5);
 
+    let mut full_cip_path_buffer = Vec::new();
+    let mut full_cip_path_writer = std::io::Cursor::new(&mut full_cip_path_buffer);
+
+    let _ = full_cip_path.write(&mut full_cip_path_writer);
+
     // Assert equality
-    assert_eq!(6, full_cip_path.byte_size());
+    assert_eq!(6, full_cip_path_buffer.len());
 }

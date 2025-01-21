@@ -134,16 +134,23 @@ fn test_deserialize_empty_response() {
 
 #[test]
 fn test_message_cip_path_byte_size() {
-    let message_router_request = MessageRouterRequest {
+    let message_router_request = MessageRouterRequest::<u8> {
         service_container: ServiceContainer::from(ServiceContainerBits::new(
             ServiceCode::GetAttributeAll,
             false,
         )),
-        request_data: RequestData::new(CipPath::new(0x1, 0x1)),
+        request_data: RequestData {
+            cip_path: CipPath::new(0x1, 0x1),
+            additional_data: None,
+        },
     };
 
+    let mut tmp_output_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
     // Assert equality
-    assert_eq!(10, message_router_request.byte_size());
+    assert_eq!(10, tmp_output_buffer.len());
 }
 
 #[test]
@@ -152,5 +159,9 @@ fn test_message_cip_path_request_byte_size() {
         MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
 
     // Assert equality
-    assert_eq!(10, message_router_request.byte_size());
+    let mut tmp_output_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
+    assert_eq!(10, tmp_output_buffer.len());
 }
