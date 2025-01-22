@@ -3,10 +3,10 @@ use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::{
-    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
-    RegisterData,
+use eipscanne_rs::eip::command::{
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData,
 };
+use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 #[test]

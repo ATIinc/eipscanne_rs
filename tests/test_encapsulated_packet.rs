@@ -3,10 +3,10 @@ use binrw::{BinRead, BinWrite};
 use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
-use eipscanne_rs::eip::packet::{
-    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
-    RRPacketData,
+use eipscanne_rs::eip::command::{
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 
 #[test]
 fn test_cast_encaps_command() {

@@ -8,10 +8,10 @@ use eipscanne_rs::cip::identity::{
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainerBits};
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
-use eipscanne_rs::eip::packet::{
-    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
-    RRPacketData,
+use eipscanne_rs::eip::command::{
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 #[test]
