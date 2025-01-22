@@ -9,7 +9,10 @@ use eipscanne_rs::object_assembly::RequestObjectAssembly;
 // Assert dependency on the different modules in this directory
 mod clearlink_config;
 mod clearlink_output;
-mod stream_utils;
+mod duplicated_stream_utils;
+
+// Make sure the code itself looks the same
+use duplicated_stream_utils as stream_utils;
 
 const ETHERNET_IP_PORT: u16 = 0xAF12;
 
