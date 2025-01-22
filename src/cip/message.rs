@@ -83,23 +83,25 @@ impl From<ServiceContainerBits> for ServiceContainer {
 #[derive(Debug, PartialEq)]
 pub struct RequestData<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     // pub total_word_size: CipUsint,
     pub cip_path: CipPath,
     pub additional_data: Option<T>,
 }
 
+// ======= Start of RequestData impl ========
+
 impl<T> WriteEndian for RequestData<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
 }
 
 impl<T> BinWrite for RequestData<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     type Args<'a> = ();
 
@@ -151,7 +153,7 @@ where
 
 impl<T> RequestData<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     fn new_data(path: CipPath, request_data_content: Option<T>) -> Self {
         RequestData {
@@ -161,12 +163,14 @@ where
     }
 }
 
+// ^^^^^^^^ End of RequestData impl ^^^^^^^^
+
 #[binwrite]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 pub struct MessageRouterRequest<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     pub service_container: ServiceContainer,
     pub request_data: RequestData<T>,
@@ -182,7 +186,7 @@ impl MessageRouterRequest<u8> {
 
 impl<T> MessageRouterRequest<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     pub fn new_data(
         service_code: ServiceCode,
@@ -201,12 +205,12 @@ where
 
 // ^^^^^^^^ End of MessageRouterRequest impl ^^^^^^^^
 
-#[binrw]
+#[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 pub struct ResponseData<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()>,
 {
     #[br(pad_before = 1)]
     pub status: u8,
@@ -219,7 +223,7 @@ where
 #[derive(Debug, PartialEq)]
 pub struct MessageRouterResponse<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()>,
 {
     #[br(assert(ServiceContainerBits::from(service_container).response()))]
     pub service_container: ServiceContainer,

@@ -6,13 +6,12 @@ use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
 use eipscanne_rs::cip::message::{
-    MessageRouterRequest, MessageRouterResponse, ResponseData, ServiceCode, ServiceContainerBits,
+    MessageRouterResponse, ResponseData, ServiceCode, ServiceContainerBits,
 };
-use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::packet::{
-    CommandSpecificData, CommonPacketDescriptor, CommonPacketItemId, EnIpCommand,
-    EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader, RRPacketData,
+    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
+    RRPacketData,
 };
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
@@ -32,7 +31,7 @@ fn test_deserialize_device_type() {
 }
 
 #[test]
-fn test_serialize_full_identity_request() {
+fn test_serialize_new_identity_request() {
     /*
     EtherNet/IP (Industrial Protocol), Session: 0x00000006, Send RR Data
     Encapsulation Header
@@ -62,44 +61,6 @@ fn test_serialize_full_identity_request() {
 
     */
 
-    let expected_eip_byte_array: Vec<CipByte> = vec![
-        0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00,
-    ];
-
-    // create an empty packet
-    let identity_request_packet = EnIpPacketDescription {
-        header: EncapsulationHeader {
-            command: EnIpCommand::SendRrData,
-            length: Some(26),
-            session_handle: 0x06,
-            status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
-        },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-            interface_handle: 0x0,
-            timeout: 0,
-            item_count: 2,
-            cip_data_packets: [
-                CommonPacketDescriptor {
-                    type_id: CommonPacketItemId::NullAddr,
-                    packet_length: 0,
-                },
-                CommonPacketDescriptor {
-                    type_id: CommonPacketItemId::UnconnectedMessage,
-                    packet_length: 10,
-                },
-            ],
-        }),
-    };
-
-    let mut identity_byte_array: Vec<u8> = Vec::new();
-    let mut identity_writer = std::io::Cursor::new(&mut identity_byte_array);
-
-    identity_request_packet.write(&mut identity_writer).unwrap();
-
     /*
     Common Industrial Protocol
     Service: Get Attributes All (Request)
@@ -125,28 +86,6 @@ fn test_serialize_full_identity_request() {
     0000   01 04 21 00 01 00 25 00 01 00
 
     */
-
-    let expected_byte_array: Vec<CipByte> =
-        vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
-
-    let message_router_request =
-        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
-
-    // Serialize the struct into a byte array
-    let mut message_router_bytes: Vec<u8> = Vec::new();
-    let mut message_writer = std::io::Cursor::new(&mut message_router_bytes);
-
-    message_router_request.write(&mut message_writer).unwrap();
-
-    // Assert equality
-    let full_expected_identity_request = [expected_eip_byte_array, expected_byte_array].concat();
-    let full_identity_request = [identity_byte_array, message_router_bytes].concat();
-
-    assert_eq!(full_expected_identity_request, full_identity_request);
-}
-
-#[test]
-fn test_serialize_new_identity_request() {
     let expected_identity_byte_array: Vec<CipByte> = vec![
         0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -443,27 +382,14 @@ fn test_deserialize_full_identity_response() {
         packet_description: EnIpPacketDescription {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
-                length: Some(44),
+                // length: 44,
                 session_handle: 0x06,
                 status_code: EncapsStatusCode::Success,
                 sender_context: [0x00; 8],
                 options: 0x00,
             },
-            command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                interface_handle: 0x0,
-                timeout: 0,
-                item_count: 2,
-                cip_data_packets: [
-                    CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::NullAddr,
-                        packet_length: 0,
-                    },
-                    CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::UnconnectedMessage,
-                        packet_length: 28,
-                    },
-                ],
-            }),
+            // packet_length = 28
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(0x0, 0x0)),
         },
         cip_message: Some(MessageRouterResponse {
             service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),

@@ -1,5 +1,3 @@
-use std::mem;
-
 use binrw::{
     binrw,
     BinRead,
@@ -77,6 +75,7 @@ pub enum PathData {
 #[derive(Debug, PartialEq)]
 pub struct LogicalPathSegment {
     pub path_definition: LogicalPathDefinition,
+
     #[br(if (path_definition.logical_segment_format() == LogicalSegmentFormat::FormatAsU16))]
     pub u16_padding: Option<u8>,
 
