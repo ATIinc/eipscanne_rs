@@ -1,5 +1,7 @@
 use binrw::{BinRead, BinWrite};
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
@@ -30,7 +32,7 @@ fn test_serialize_encaps_command() {
     let expected_byte_array = vec![0x65, 0x00];
 
     // Assert equality
-    assert_eq!(expected_byte_array, command_byte_array);
+    assert_eq_hex!(expected_byte_array, command_byte_array);
 }
 
 #[test]

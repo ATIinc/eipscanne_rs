@@ -1,5 +1,7 @@
 use binrw::{BinRead, BinWrite};
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer, ServiceContainerBits};
@@ -19,7 +21,7 @@ fn test_serialize_service_container() {
 
     service_container.write(&mut writer).unwrap();
 
-    assert_eq!(expected_byte_array, service_container_bytes);
+    assert_eq_hex!(expected_byte_array, service_container_bytes);
 }
 
 #[test]
@@ -104,7 +106,7 @@ fn test_serialize_get_attributes_all_request() {
     message_router_request.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, message_router_bytes);
+    assert_eq_hex!(expected_byte_array, message_router_bytes);
 }
 
 #[test]

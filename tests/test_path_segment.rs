@@ -4,6 +4,8 @@ use binrw::{BinRead, BinWrite};
 
 use bilge::prelude::u3;
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::path::{
     CipPath, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType, PathData, SegmentType,
 };
@@ -81,7 +83,7 @@ fn test_serialize_cip_path() {
     cip_path.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, cip_path_bytes);
+    assert_eq_hex!(expected_byte_array, cip_path_bytes);
 }
 
 #[test]
@@ -120,7 +122,7 @@ fn test_serialize_cip_full_path() {
     cip_full_path.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, cip_full_path_bytes);
+    assert_eq_hex!(expected_byte_array, cip_full_path_bytes);
 }
 
 #[test]

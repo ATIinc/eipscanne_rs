@@ -1,5 +1,7 @@
 use binrw::{BinRead, BinWrite};
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 
 #[test]
@@ -26,7 +28,7 @@ fn test_serialize_cip_string() {
     cip_string.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, byte_array_buffer);
+    assert_eq_hex!(expected_byte_array, byte_array_buffer);
 }
 
 #[test]

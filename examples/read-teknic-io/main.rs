@@ -14,6 +14,7 @@ use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 // Reference the example file
+mod clearlink_config;
 mod clearlink_output;
 
 async fn write_object_assembly<T>(stream: &mut TcpStream, object_assembly: RequestObjectAssembly<T>)

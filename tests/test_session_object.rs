@@ -2,6 +2,8 @@ use std::io::Cursor;
 
 use binrw::{BinRead, BinWrite};
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData,
@@ -59,7 +61,7 @@ fn test_serialize_register_session_request() {
     registration_packet.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, registration_byte_array);
+    assert_eq_hex!(expected_byte_array, registration_byte_array);
 }
 
 #[test]
@@ -232,5 +234,5 @@ fn test_serialize_unregister_session_request() {
     unregistration_packet.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, unregistration_byte_array);
+    assert_eq_hex!(expected_byte_array, unregistration_byte_array);
 }
