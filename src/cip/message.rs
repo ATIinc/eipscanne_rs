@@ -85,13 +85,27 @@ pub struct RequestData<T>
 where
     T: for<'a> BinWrite<Args<'a> = ()>,
 {
-    // pub total_word_size: CipUsint,
+    pub total_word_size: CipUsint,
     pub cip_path: CipPath,
     pub additional_data: Option<T>,
 }
 
 // ======= Start of RequestData impl ========
 
+impl<T> RequestData<T>
+where
+    T: for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub fn new(path: CipPath, request_data_content: Option<T>) -> Self {
+        RequestData {
+            total_word_size: 0,
+            cip_path: path,
+            additional_data: request_data_content,
+        }
+    }
+}
+
+// TODO: Figure out how to create a macro for Writing a later variable first
 impl<T> WriteEndian for RequestData<T>
 where
     T: for<'a> BinWrite<Args<'a> = ()>,
@@ -131,7 +145,7 @@ where
         }
 
         // Step 3: Calculate the total packet size
-        let header_byte_size = mem::size_of::<CipUsint>();
+        let header_byte_size = mem::size_of_val(&self.total_word_size);
         let data_byte_size = temp_buffer.len();
 
         let total_packet_word_size = (header_byte_size + data_byte_size) / mem::size_of::<u16>();
@@ -148,18 +162,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-impl<T> RequestData<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
-    fn new_data(path: CipPath, request_data_content: Option<T>) -> Self {
-        RequestData {
-            cip_path: path,
-            additional_data: request_data_content,
-        }
     }
 }
 
@@ -198,7 +200,7 @@ where
                 service_code,
                 false,
             )),
-            request_data: RequestData::new_data(path, request_data_content),
+            request_data: RequestData::new(path, request_data_content),
         }
     }
 }

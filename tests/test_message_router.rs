@@ -139,10 +139,7 @@ fn test_message_cip_path_byte_size() {
             ServiceCode::GetAttributeAll,
             false,
         )),
-        request_data: RequestData {
-            cip_path: CipPath::new(0x1, 0x1),
-            additional_data: None,
-        },
+        request_data: RequestData::new(CipPath::new(0x1, 0x1), None),
     };
 
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
