@@ -1,9 +1,9 @@
 use binrw::{BinRead, BinWrite};
 
-use eipscanne_rs::cip::message::{
-    MessageRouterRequest, MessageRouterResponse, RequestData, ResponseData, ServiceCode,
-    ServiceContainer, ServiceContainerBits,
-};
+use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
+use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer, ServiceContainerBits};
+
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 

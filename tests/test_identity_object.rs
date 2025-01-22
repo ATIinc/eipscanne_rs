@@ -5,9 +5,8 @@ use bilge::prelude::u4;
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
-use eipscanne_rs::cip::message::{
-    MessageRouterResponse, ResponseData, ServiceCode, ServiceContainerBits,
-};
+use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainerBits};
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::packet::{
     CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,

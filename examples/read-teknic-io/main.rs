@@ -7,7 +7,8 @@ use std::io::BufReader;
 
 extern crate eipscanne_rs;
 
-use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
+use eipscanne_rs::cip::message::request::MessageRouterRequest;
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};

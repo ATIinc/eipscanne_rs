@@ -5,7 +5,9 @@ use binrw::{
     BinWrite, // trait for writing
 };
 
-use crate::cip::message::{MessageRouterRequest, MessageRouterResponse, ServiceCode};
+use crate::cip::message::{
+    request::MessageRouterRequest, response::MessageRouterResponse, shared::ServiceCode,
+};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
 use crate::eip::packet::EnIpPacketDescription;
@@ -18,6 +20,8 @@ where
     pub packet_description: EnIpPacketDescription,
     pub cip_message: Option<MessageRouterRequest<T>>,
 }
+
+// ======= Start of RequestObjectAssembly impl ========
 
 impl<T> WriteEndian for RequestObjectAssembly<T>
 where
@@ -68,6 +72,8 @@ where
         Ok(())
     }
 }
+
+// ^^^^^^^^ End of RequestObjectAssembly impl ^^^^^^^^
 
 #[binread]
 #[brw(little)]

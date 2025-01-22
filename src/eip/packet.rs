@@ -103,7 +103,7 @@ pub struct RRPacketData {
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    /// WARNING: Only used for testing. All normal declarations should be made with Self::new(...)
+    /// WARNING: Exposed only for testing. All normal declarations should be made with Self::new(...)
     pub fn test_with_size(
         interface_handle: CipUdint,
         timeout: CipUint,
@@ -210,51 +210,6 @@ pub struct EnIpPacketDescription {
 
 // ======= Start of EnIpPacketDescription impl ========
 
-impl WriteEndian for EnIpPacketDescription {
-    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
-}
-
-impl BinWrite for EnIpPacketDescription {
-    // The EnIpPacketDescription is passed the packet_length
-    type Args<'a> = (u16,);
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `command_specific_data` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
-
-        let data_write_result =
-            self.command_specific_data
-                .write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = data_write_result {
-            return Err(write_err);
-        };
-
-        // Step 4: Calculate the total data size after header
-        let full_proceeding_data_length = (temp_buffer.len() as u16) + args.0;
-
-        // Step 5: Write the full struct to the actual writer
-        if let Err(write_err) =
-            self.header
-                .write_options(writer, endian, (full_proceeding_data_length,))
-        {
-            return Err(write_err);
-        }
-
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
-
-        Ok(())
-    }
-}
-
 impl EnIpPacketDescription {
     pub fn new(
         command: EnIpCommand,
@@ -300,6 +255,51 @@ impl EnIpPacketDescription {
             session_handle,
             CommandSpecificData::new_request(0, timeout),
         )
+    }
+}
+
+impl WriteEndian for EnIpPacketDescription {
+    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
+}
+
+impl BinWrite for EnIpPacketDescription {
+    // The EnIpPacketDescription is passed the packet_length
+    type Args<'a> = (u16,);
+
+    fn write_options<W: std::io::Write + std::io::Seek>(
+        &self,
+        writer: &mut W,
+        endian: binrw::Endian,
+        args: Self::Args<'_>,
+    ) -> binrw::BinResult<()> {
+        // Step 1: Serialize the `command_specific_data` field
+        let mut temp_buffer = Vec::new();
+        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+
+        let data_write_result =
+            self.command_specific_data
+                .write_options(&mut temp_writer, endian, args);
+
+        if let Err(write_err) = data_write_result {
+            return Err(write_err);
+        };
+
+        // Step 2: Calculate the total data size after header
+        let full_proceeding_data_length = (temp_buffer.len() as u16) + args.0;
+
+        // Step 3: Write the full struct to the actual writer
+        if let Err(write_err) =
+            self.header
+                .write_options(writer, endian, (full_proceeding_data_length,))
+        {
+            return Err(write_err);
+        }
+
+        if let Err(write_err) = writer.write(&temp_buffer) {
+            return Err(binrw::Error::Io(write_err));
+        }
+
+        Ok(())
     }
 }
 

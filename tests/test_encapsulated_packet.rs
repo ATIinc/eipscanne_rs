@@ -1,6 +1,6 @@
 use binrw::{BinRead, BinWrite};
 
-use eipscanne_rs::cip::message::{MessageRouterRequest, ServiceCode};
+use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::packet::{
