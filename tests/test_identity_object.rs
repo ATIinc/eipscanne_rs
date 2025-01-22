@@ -382,14 +382,17 @@ fn test_deserialize_full_identity_response() {
         packet_description: EnIpPacketDescription {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
-                // length: 44,
+                length: Some(44),
                 session_handle: 0x06,
                 status_code: EncapsStatusCode::Success,
                 sender_context: [0x00; 8],
                 options: 0x00,
             },
-            // packet_length = 28
-            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(0x0, 0x0)),
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_with_size(
+                0x0,
+                0x0,
+                Some(28),
+            )),
         },
         cip_message: Some(MessageRouterResponse {
             service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),

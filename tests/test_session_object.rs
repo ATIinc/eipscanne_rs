@@ -99,7 +99,7 @@ fn test_deserialize_register_session_response_packet_description() {
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
-        // length: 0x04),
+        length: Some(0x04),
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
         sender_context: [0x00; 8],
@@ -164,7 +164,7 @@ fn test_deserialize_register_session_response() {
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
-        // length: 0x04,
+        length: Some(0x04),
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
         sender_context: [0x00; 8],

@@ -74,6 +74,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     let identity_request_packet = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
+            length: None,
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
@@ -176,12 +177,17 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
     let expected_packet_description = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
+            length: Some(44),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(0x0, 0)),
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_with_size(
+            0x0,
+            0,
+            Some(28),
+        )),
     };
 
     assert_eq!(expected_packet_description, packet_description);
@@ -232,14 +238,17 @@ fn test_deserialize_identity_object_response() {
     let expected_packaet_description = EnIpPacketDescription {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            // length: 44,
+            length: Some(44),
             session_handle: 0x06,
             status_code: EncapsStatusCode::Success,
             sender_context: [0x00; 8],
             options: 0x00,
         },
-        // packet_length = 28
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(0x0, 0)),
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_with_size(
+            0x0,
+            0,
+            Some(28),
+        )),
     };
 
     assert_eq!(expected_packaet_description, packet_description);

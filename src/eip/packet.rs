@@ -1,7 +1,8 @@
 use binrw::meta::WriteEndian;
 use binrw::{
     binread,
-    binrw,    // #[binrw] attribute
+    binrw, // #[binrw] attribute
+    binwrite,
     BinRead,  // trait for reading
     BinWrite, // trait for writing
 };
@@ -25,6 +26,17 @@ pub enum CommonPacketItemId {
     SequencedAddressItem = 0x8002,
 }
 
+#[binrw::writer(writer: writer, endian)]
+fn descripter_length_writer(_obj: &Option<CipUint>, arg0: Option<u16>) -> binrw::BinResult<()> {
+    // If there isn't an input argument size, then just write 0
+    let write_value = match arg0 {
+        Some(value) => value,
+        None => 0,
+    };
+
+    write_value.write_options(writer, endian, ())
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -32,8 +44,8 @@ pub enum CommonPacketItemId {
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
 
-    #[bw(calc = match provided_packet_length { Some(length) => length, None => 0})]
-    pub _packet_length: CipUint,
+    #[bw(args(provided_packet_length), write_with = descripter_length_writer)]
+    pub packet_length: Option<CipUint>,
 }
 
 #[derive(BinRead, BinWrite)]
@@ -87,17 +99,27 @@ pub struct RRPacketData {
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    pub fn new(interface_handle: CipUdint, timeout: CipUint) -> Self {
+    pub fn new_with_size(
+        interface_handle: CipUdint,
+        timeout: CipUint,
+        unconnected_length: Option<u16>,
+    ) -> Self {
         RRPacketData {
             interface_handle,
             timeout,
             empty_data_packet: CommonPacketDescriptor {
                 type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
             },
             unconnected_data_packet: CommonPacketDescriptor {
                 type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: unconnected_length,
             },
         }
+    }
+
+    pub fn new(interface_handle: CipUdint, timeout: CipUint) -> Self {
+        Self::new_with_size(interface_handle, timeout, None)
     }
 }
 
@@ -140,29 +162,26 @@ impl CommandSpecificData {
     }
 
     pub fn new_request(interface_handle: CipUdint, timeout: CipUint) -> Self {
-        Self::SendRrData(RRPacketData {
-            interface_handle,
-            timeout,
-            empty_data_packet: CommonPacketDescriptor {
-                type_id: CommonPacketItemId::NullAddr,
-            },
-            unconnected_data_packet: CommonPacketDescriptor {
-                type_id: CommonPacketItemId::UnconnectedMessage,
-            },
-        })
+        Self::SendRrData(RRPacketData::new(interface_handle, timeout))
     }
 }
 
 // ^^^^^^^^ End of CommandSpecificData impl ^^^^^^^^
 
-#[binrw]
+#[binrw::writer(writer: writer, endian)]
+fn header_length_writer(_obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
+    arg0.write_options(writer, endian, ())
+}
+
+#[binwrite]
+#[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 #[bw(import(packet_length: CipUint))]
 pub struct EncapsulationHeader {
     pub command: EnIpCommand,
-    #[bw(calc = packet_length)]
-    pub _length: CipUint,
+    #[bw(args(packet_length), write_with = header_length_writer)]
+    pub length: Option<CipUint>,
     pub session_handle: CipUdint,
     pub status_code: EncapsStatusCode,
     pub sender_context: [CipByte; eip_constants::SENDER_CONTEXT_SIZE],
@@ -236,6 +255,8 @@ impl EnIpPacketDescription {
         EnIpPacketDescription {
             header: EncapsulationHeader {
                 command,
+                // will be calculated when serialized
+                length: None,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
                 sender_context: [0x00; eip_constants::SENDER_CONTEXT_SIZE],
