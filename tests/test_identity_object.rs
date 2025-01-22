@@ -388,7 +388,7 @@ fn test_deserialize_full_identity_response() {
                 sender_context: [0x00; 8],
                 options: 0x00,
             },
-            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_with_size(
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::test_with_size(
                 0x0,
                 0x0,
                 Some(28),

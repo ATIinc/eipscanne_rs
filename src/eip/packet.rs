@@ -26,6 +26,19 @@ pub enum CommonPacketItemId {
     SequencedAddressItem = 0x8002,
 }
 
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[bw(import(provided_packet_length: Option<u16>))]
+pub struct CommonPacketDescriptor {
+    pub type_id: CommonPacketItemId,
+
+    #[bw(args(provided_packet_length), write_with = descripter_length_writer)]
+    pub packet_length: Option<CipUint>,
+}
+
+// ======= Start of CommonPacketDescriptor impl ========
+
 #[binrw::writer(writer: writer, endian)]
 fn descripter_length_writer(_obj: &Option<CipUint>, arg0: Option<u16>) -> binrw::BinResult<()> {
     // If there isn't an input argument size, then just write 0
@@ -37,16 +50,7 @@ fn descripter_length_writer(_obj: &Option<CipUint>, arg0: Option<u16>) -> binrw:
     write_value.write_options(writer, endian, ())
 }
 
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Copy, Clone)]
-#[bw(import(provided_packet_length: Option<u16>))]
-pub struct CommonPacketDescriptor {
-    pub type_id: CommonPacketItemId,
-
-    #[bw(args(provided_packet_length), write_with = descripter_length_writer)]
-    pub packet_length: Option<CipUint>,
-}
+// ^^^^^^^^ End of CommonPacketDescriptor impl ^^^^^^^^
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -99,7 +103,8 @@ pub struct RRPacketData {
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    pub fn new_with_size(
+    /// WARNING: Only used for testing. All normal declarations should be made with Self::new(...)
+    pub fn test_with_size(
         interface_handle: CipUdint,
         timeout: CipUint,
         unconnected_length: Option<u16>,
@@ -119,7 +124,7 @@ impl RRPacketData {
     }
 
     pub fn new(interface_handle: CipUdint, timeout: CipUint) -> Self {
-        Self::new_with_size(interface_handle, timeout, None)
+        Self::test_with_size(interface_handle, timeout, None)
     }
 }
 
@@ -168,11 +173,6 @@ impl CommandSpecificData {
 
 // ^^^^^^^^ End of CommandSpecificData impl ^^^^^^^^
 
-#[binrw::writer(writer: writer, endian)]
-fn header_length_writer(_obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
-    arg0.write_options(writer, endian, ())
-}
-
 #[binwrite]
 #[binread]
 #[brw(little)]
@@ -187,6 +187,15 @@ pub struct EncapsulationHeader {
     pub sender_context: [CipByte; eip_constants::SENDER_CONTEXT_SIZE],
     pub options: CipUdint,
 }
+
+// ======= Start of EncapsulationHeader impl ========
+
+#[binrw::writer(writer: writer, endian)]
+fn header_length_writer(_obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
+    arg0.write_options(writer, endian, ())
+}
+
+// ^^^^^^^^ End of EncapsulationHeader impl ^^^^^^^^
 
 #[binread]
 #[brw(little)]
