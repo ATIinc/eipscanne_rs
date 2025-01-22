@@ -13,7 +13,7 @@ use crate::eip::packet::EnIpPacketDescription;
 #[derive(Debug, PartialEq)]
 pub struct RequestObjectAssembly<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     pub packet_description: EnIpPacketDescription,
     pub cip_message: Option<MessageRouterRequest<T>>,
@@ -21,14 +21,14 @@ where
 
 impl<T> WriteEndian for RequestObjectAssembly<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
 }
 
 impl<T> BinWrite for RequestObjectAssembly<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     type Args<'a> = ();
 
@@ -74,7 +74,7 @@ where
 #[derive(Debug, PartialEq)]
 pub struct ResponseObjectAssembly<T>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()>,
 {
     pub packet_description: EnIpPacketDescription,
 

@@ -161,7 +161,6 @@ impl CommandSpecificData {
 #[bw(import(packet_length: CipUint))]
 pub struct EncapsulationHeader {
     pub command: EnIpCommand,
-    // #[br(pad_before = 2)]
     #[bw(calc = packet_length)]
     pub _length: CipUint,
     pub session_handle: CipUdint,
