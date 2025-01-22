@@ -37,11 +37,7 @@ pub struct CommonPacketDescriptor {
 #[binrw::writer(writer: writer, endian)]
 fn descripter_length_writer(_obj: &Option<CipUint>, arg0: Option<u16>) -> binrw::BinResult<()> {
     // If there isn't an input argument size, then just write 0
-    let write_value = match arg0 {
-        Some(value) => value,
-        None => 0,
-    };
-
+    let write_value = arg0.unwrap_or(0);
     write_value.write_options(writer, endian, ())
 }
 
