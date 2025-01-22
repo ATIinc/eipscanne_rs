@@ -2,8 +2,6 @@ use binrw::{binrw, BinRead, BinWrite};
 
 use bilge::prelude::{bitsize, u10, Bitsized, DebugBits, FromBits, Number};
 
-extern crate eipscanne_rs;
-
 use eipscanne_rs::cip::types::{CipDint, CipDword, CipInt, CipUdint, CipUlint, CipUsint};
 
 // https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
