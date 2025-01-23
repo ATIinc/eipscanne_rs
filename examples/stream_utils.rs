@@ -40,3 +40,8 @@ where
 
     ResponseObjectAssembly::<T>::read(&mut response_reader)
 }
+
+#[allow(dead_code)]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    Ok(())
+}

@@ -164,3 +164,66 @@ fn test_message_cip_path_request_byte_size() {
 
     assert_eq!(10, tmp_output_buffer.len());
 }
+
+#[test]
+fn test_message_cip_full_path_request_bytes() {
+    /*
+    Common Industrial Protocol
+    Service: Get Attribute Single (Request)
+        0... .... = Request/Response: Request (0x0)
+        .000 1110 = Service: Get Attribute Single (0x0e)
+    Request Path Size: 3 words
+    Request Path: Assembly, Instance: 0x70, Attribute: 0x03
+        Path Segment: 0x20 (8-Bit Class Segment)
+            001. .... = Path Segment Type: Logical Segment (1)
+            ...0 00.. = Logical Segment Type: Class ID (0)
+            .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+            Class: Assembly (0x04)
+        Path Segment: 0x24 (8-Bit Instance Segment)
+            001. .... = Path Segment Type: Logical Segment (1)
+            ...0 01.. = Logical Segment Type: Instance ID (1)
+            .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+            Instance: 0x70
+        Path Segment: 0x30 (8-Bit Attribute Segment)
+            001. .... = Path Segment Type: Logical Segment (1)
+            ...1 00.. = Logical Segment Type: Attribute ID (4)
+            .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+            Attribute: 3
+    Get Attribute Single (Request)
+
+    -------------------------------------
+    Hex Dump:
+
+    0000   0e 03 20 04 24 70 30 03
+
+    */
+
+    let expected_byte_array = vec![0x0e, 0x03, 0x20, 0x04, 0x24, 0x70, 0x30, 0x03];
+
+    let message_router_request = MessageRouterRequest::new(
+        ServiceCode::GetAttributeSingle,
+        CipPath::new_full(0x4, 0x70, 0x3),
+    );
+
+    // Assert equality
+    let mut tmp_output_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
+    assert_eq!(expected_byte_array, tmp_output_buffer);
+}
+
+#[test]
+fn test_message_cip_full_path_request_byte_size() {
+    let message_router_request = MessageRouterRequest::new(
+        ServiceCode::GetAttributeSingle,
+        CipPath::new_full(0x1, 0x2, 0x3),
+    );
+
+    // Assert equality
+    let mut tmp_output_buffer: Vec<u8> = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let _ = message_router_request.write(&mut temp_writer);
+
+    assert_eq!(8, tmp_output_buffer.len());
+}
