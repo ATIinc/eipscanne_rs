@@ -1,6 +1,4 @@
-use binrw::{
-    binrw, // #[binrw] attribute
-};
+use binrw::{BinRead, BinWrite};
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, FromBits, Number};
 
@@ -39,36 +37,13 @@ pub enum ServiceCode {
 }
 
 #[bitsize(8)]
-#[derive(FromBits, PartialEq, DebugBits, Clone, Copy)]
-pub struct ServiceContainerBits {
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[br(map = u8::into)]
+#[bw(map = |&x| u8::from(x))]
+pub struct ServiceContainer {
     pub service: ServiceCode,
     pub response: bool,
 }
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct ServiceContainer {
-    pub service_representation: u8,
-}
-
-// ======= Start of ServiceContainer impl ========
-
-impl From<ServiceContainer> for ServiceContainerBits {
-    fn from(container: ServiceContainer) -> Self {
-        ServiceContainerBits::from(container.service_representation)
-    }
-}
-
-impl From<ServiceContainerBits> for ServiceContainer {
-    fn from(container: ServiceContainerBits) -> Self {
-        ServiceContainer {
-            service_representation: container.value,
-        }
-    }
-}
-
-// ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
 
 // NOTE:
 //  - Keeping a generic MessageRouter struct here for future reference

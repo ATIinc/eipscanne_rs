@@ -4,7 +4,7 @@ use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
-use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer, ServiceContainerBits};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
@@ -13,7 +13,7 @@ use eipscanne_rs::cip::types::CipByte;
 fn test_serialize_service_container() {
     let expected_byte_array: Vec<CipByte> = vec![0x01];
 
-    let service_container_bits = ServiceContainerBits::new(ServiceCode::GetAttributeAll, false);
+    let service_container_bits = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
     let service_container = ServiceContainer::from(service_container_bits);
 
     let mut service_container_bytes: Vec<u8> = Vec::new();
@@ -26,7 +26,7 @@ fn test_serialize_service_container() {
 
 #[test]
 fn test_deserialize_request_service_container() {
-    let expected_service_container = ServiceContainerBits::new(ServiceCode::GetAttributeAll, false);
+    let expected_service_container = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
 
     let raw_byte_array: Vec<CipByte> = vec![0x1];
 
@@ -36,18 +36,12 @@ fn test_deserialize_request_service_container() {
     // Read from buffered reader
     let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
 
-    let deserialized_service_container_bits =
-        ServiceContainerBits::from(deserialized_service_container);
-
-    assert_eq!(
-        expected_service_container,
-        deserialized_service_container_bits
-    );
+    assert_eq!(expected_service_container, deserialized_service_container);
 }
 
 #[test]
 fn test_deserialize_response_service_container() {
-    let expected_service_container = ServiceContainerBits::new(ServiceCode::Reset, true);
+    let expected_service_container = ServiceContainer::new(ServiceCode::Reset, true);
 
     let raw_byte_array: Vec<CipByte> = vec![0b10000101];
 
@@ -57,13 +51,7 @@ fn test_deserialize_response_service_container() {
     // Read from buffered reader
     let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
 
-    let deserialized_service_container_bits =
-        ServiceContainerBits::from(deserialized_service_container);
-
-    assert_eq!(
-        expected_service_container,
-        deserialized_service_container_bits
-    );
+    assert_eq!(expected_service_container, deserialized_service_container);
 }
 
 #[test]
@@ -119,7 +107,7 @@ fn test_deserialize_empty_response() {
     let message_router_response = MessageRouterResponse::<u8>::read(&mut buf_reader).unwrap();
 
     let expected_message_router_response = MessageRouterResponse {
-        service_container: ServiceContainer::from(ServiceContainerBits::new(
+        service_container: ServiceContainer::from(ServiceContainer::new(
             ServiceCode::GetAttributeAll,
             true,
         )),
@@ -137,7 +125,7 @@ fn test_deserialize_empty_response() {
 #[test]
 fn test_message_cip_path_byte_size() {
     let message_router_request = MessageRouterRequest::<u8> {
-        service_container: ServiceContainer::from(ServiceContainerBits::new(
+        service_container: ServiceContainer::from(ServiceContainer::new(
             ServiceCode::GetAttributeAll,
             false,
         )),

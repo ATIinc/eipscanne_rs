@@ -6,7 +6,7 @@ use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
-use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainerBits};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
@@ -244,7 +244,7 @@ fn test_deserialize_cip_identity_response() {
         MessageRouterResponse::<IdentityResponse>::read(&mut buf_reader).unwrap();
 
     let expected_cip_identity_response = MessageRouterResponse {
-        service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
+        service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true),
         router_data: ResponseData {
             status: 0x0,
             additional_status_size: 0x0,
@@ -377,54 +377,53 @@ fn test_deserialize_full_identity_response() {
     let identity_response =
         ResponseObjectAssembly::<IdentityResponse>::read(&mut buf_reader).unwrap();
 
-    let expected_identity_response = ResponseObjectAssembly {
-        packet_description: EnIpPacketDescription {
-            header: EncapsulationHeader {
-                command: EnIpCommand::SendRrData,
-                length: Some(44),
-                session_handle: 0x06,
-                status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; 8],
-                options: 0x00,
-            },
-            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::test_with_size(
-                0x0,
-                0x0,
-                Some(28),
-            )),
-        },
-        cip_message: Some(MessageRouterResponse {
-            service_container: ServiceContainerBits::new(ServiceCode::GetAttributeAll, true).into(),
-            router_data: ResponseData {
-                status: 0x0,
-                additional_status_size: 0x0,
-                data: IdentityResponse {
-                    vendor_id: VendorId::TeknicInc,
-                    device_type: DeviceType::GenericDevice,
-                    product_code: 0x1,
-                    revision: Revision {
-                        major: 2,
-                        minor: 93,
-                    },
-                    status: IdentityStatusBits::new(
-                        false,
-                        false,
-                        false,
-                        false,
-                        u4::new(0x0),
-                        false,
-                        false,
-                        false,
-                        false,
-                        u4::new(0x0),
-                    )
-                    .into(),
-                    serial_number: 0x01ff3d32,
-                    product_name: CipShortString::from("ClearLink".to_string()),
+    let expected_identity_response =
+        ResponseObjectAssembly {
+            packet_description: EnIpPacketDescription {
+                header: EncapsulationHeader {
+                    command: EnIpCommand::SendRrData,
+                    length: Some(44),
+                    session_handle: 0x06,
+                    status_code: EncapsStatusCode::Success,
+                    sender_context: [0x00; 8],
+                    options: 0x00,
                 },
+                command_specific_data: CommandSpecificData::SendRrData(
+                    RRPacketData::test_with_size(0x0, 0x0, Some(28)),
+                ),
             },
-        }),
-    };
+            cip_message: Some(MessageRouterResponse {
+                service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true).into(),
+                router_data: ResponseData {
+                    status: 0x0,
+                    additional_status_size: 0x0,
+                    data: IdentityResponse {
+                        vendor_id: VendorId::TeknicInc,
+                        device_type: DeviceType::GenericDevice,
+                        product_code: 0x1,
+                        revision: Revision {
+                            major: 2,
+                            minor: 93,
+                        },
+                        status: IdentityStatusBits::new(
+                            false,
+                            false,
+                            false,
+                            false,
+                            u4::new(0x0),
+                            false,
+                            false,
+                            false,
+                            false,
+                            u4::new(0x0),
+                        )
+                        .into(),
+                        serial_number: 0x01ff3d32,
+                        product_name: CipShortString::from("ClearLink".to_string()),
+                    },
+                },
+            }),
+        };
 
     // Assert equality
     assert_eq!(expected_identity_response, identity_response);

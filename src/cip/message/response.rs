@@ -3,7 +3,7 @@ use binrw::{
     BinRead, // BinRead,  // trait for reading
 };
 
-use super::shared::{ServiceContainer, ServiceContainerBits};
+use super::shared::ServiceContainer;
 
 #[binread]
 #[brw(little)]
@@ -25,7 +25,7 @@ pub struct MessageRouterResponse<T>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
-    #[br(assert(ServiceContainerBits::from(service_container).response()))]
+    #[br(assert(service_container.response()))]
     pub service_container: ServiceContainer,
     pub router_data: ResponseData<T>,
 }

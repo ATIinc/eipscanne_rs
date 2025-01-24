@@ -56,4 +56,4 @@ impl From<CipShortString> for String {
     }
 }
 
-// ======= Start of CipShortString impl ========
+// ^^^^^^^ End of CipShortString impl ^^^^^^^^

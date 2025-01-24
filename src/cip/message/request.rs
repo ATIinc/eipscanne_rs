@@ -6,7 +6,7 @@ use binrw::{
     BinWrite, // BinWrite, // trait for writing
 };
 
-use super::shared::{ServiceCode, ServiceContainer, ServiceContainerBits};
+use super::shared::{ServiceCode, ServiceContainer};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUsint;
 
@@ -65,30 +65,31 @@ where
             return Err(write_err);
         }
 
-        // Step 2: Serialize the `additional_data` field
-        if let Some(data_ref) = &self.additional_data {
-            let data_write_result = data_ref.write_options(&mut temp_writer, endian, args);
-
-            if let Err(write_err) = data_write_result {
-                return Err(write_err);
-            }
-        }
-
-        // Step 3: Calculate the total packet size
+        // Step 2: Calculate the total packet size
         let header_byte_size = mem::size_of_val(&self.total_word_size);
-        let data_byte_size = temp_buffer.len();
+        let cip_path_size = temp_buffer.len();
 
-        let total_packet_word_size = (header_byte_size + data_byte_size) / mem::size_of::<u16>();
+        let total_packet_word_size = (header_byte_size + cip_path_size) / mem::size_of::<u16>();
 
         let total_packet_word_size_array = [total_packet_word_size as CipUsint];
 
-        // Write the full struct to the actual writer
+        // Step 3: Write the full struct to the actual writer
         if let Err(write_err) = writer.write(&total_packet_word_size_array) {
             return Err(binrw::Error::Io(write_err));
         }
 
+        // Step 4: Write the `cip_path` field to the actual writer
         if let Err(write_err) = writer.write(&temp_buffer) {
             return Err(binrw::Error::Io(write_err));
+        }
+
+        // Step 5: Write the `additional_data` field
+        if let Some(data_ref) = &self.additional_data {
+            let data_write_result = data_ref.write_options(writer, endian, args);
+
+            if let Err(write_err) = data_write_result {
+                return Err(write_err);
+            }
         }
 
         Ok(())
@@ -126,10 +127,7 @@ where
         request_data_content: Option<T>,
     ) -> Self {
         MessageRouterRequest {
-            service_container: ServiceContainer::from(ServiceContainerBits::new(
-                service_code,
-                false,
-            )),
+            service_container: ServiceContainer::new(service_code, false),
             request_data: RequestData::new(path, request_data_content),
         }
     }
