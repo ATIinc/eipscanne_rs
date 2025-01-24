@@ -38,7 +38,34 @@ _NOTES_:
 * It's critical to define an ip address so that the Ethernet/IP Adapter can be found
 * It's critical to use the defined network (or share host network) so the Ethernet/IP Adapter can be found
 
+
 ## Running the Ethernet/IP SCANNER Docker container
+
+### Option 1 (easier):
+
+**NOTE**: This devcontainer is an Ethernet/IP Scanner
+* For the integration test, however, the container needs to be on the integration test network
+
+1. Update the runArgs in the `eipscanne-rs/devcontainer/devcontainer.json` file to use the correct network
+
+* This uses the host network (to test real connected devices)
+```json
+"runArgs": [
+		"--network=host"
+		// "--network=eip-scanner"
+	]
+```
+
+* This uses the eip-testing network (to test with the OpENer mocked device)
+```json
+"runArgs": [
+		// "--network=host"
+		"--network=eip-scanner"
+	]
+```
+
+
+### OPTION 2 (harder and usually not necessary):
 
 **NOTE**: This devcontainer is an Ethernet/IP Scanner
 * For the integration test, however, the container needs to be on the integration test network

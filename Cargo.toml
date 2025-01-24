@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-bincode = "1.3"
-serde_repr = "0.1"
 bilge = "0.2.0"
-tokio = { version = "1.42.0", features = ["full"] }
-serde_bytes = "0.11.15"
 binrw = "0.14.1"
+clap = { version = "4.5.27", features = ["derive"] }
+hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
+# TOKIO: Not actually a dependency of the package, just used for testing
+# CLAP: Not actually a depencency of the package, just used for testing
+tokio = { version = "1.42.0", features = ["full"] }

@@ -2,12 +2,14 @@ use std::io::Cursor;
 
 use binrw::{BinRead, BinWrite};
 
+use hex_test_macros::prelude::*;
+
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::{
-    CommandSpecificData, EnIpCommand, EnIpPacketDescription, EncapsStatusCode, EncapsulationHeader,
-    RegisterData,
+use eipscanne_rs::eip::command::{
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData,
 };
-use eipscanne_rs::object_assembly::ObjectAssembly;
+use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -59,7 +61,7 @@ fn test_serialize_register_session_request() {
     registration_packet.write(&mut writer).unwrap();
 
     // Assert equality
-    assert_eq!(expected_byte_array, registration_byte_array);
+    assert_eq_hex!(expected_byte_array, registration_byte_array);
 }
 
 #[test]
@@ -99,7 +101,7 @@ fn test_deserialize_register_session_response_packet_description() {
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
-        length: 0x04,
+        length: Some(0x04),
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
         sender_context: [0x00; 8],
@@ -160,11 +162,11 @@ fn test_deserialize_register_session_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response_object = ObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+    let session_response_object = ResponseObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
-        length: 0x04,
+        length: Some(0x04),
         session_handle: 0x006,
         status_code: EncapsStatusCode::Success,
         sender_context: [0x00; 8],
@@ -172,7 +174,10 @@ fn test_deserialize_register_session_response() {
     };
 
     // Assert equality
-    assert_eq!(expected_session_header, session_response_object.packet_description.header);
+    assert_eq!(
+        expected_session_header,
+        session_response_object.packet_description.header
+    );
 
     let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
         protocol_version: 0x1,
@@ -181,7 +186,9 @@ fn test_deserialize_register_session_response() {
 
     assert_eq!(
         expected_packet_description,
-        session_response_object.packet_description.command_specific_data
+        session_response_object
+            .packet_description
+            .command_specific_data
     );
 
     let expected_packet = EnIpPacketDescription {
@@ -212,6 +219,20 @@ fn test_serialize_unregister_session_request() {
 
     */
 
+    let expected_byte_array: Vec<CipByte> = vec![
+        0x66, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+
+    // create an empty packet
+    let unregistration_packet = EnIpPacketDescription::new_unregistration_description(0x6);
+
+    // Write into a byte array
+    let mut unregistration_byte_array: Vec<u8> = Vec::new();
+    let mut writer = std::io::Cursor::new(&mut unregistration_byte_array);
+
+    unregistration_packet.write(&mut writer).unwrap();
+
     // Assert equality
-    assert_eq!(0x0, 0x0);
+    assert_eq_hex!(expected_byte_array, unregistration_byte_array);
 }

@@ -1,6 +1,9 @@
-# eipScanneRS
+# eipScanne-RS (Ethernet/IP Scanner - rust)
 
-This code will make more sense if one:
-* Downloads WireShark
-* Opens the [capture.pcapng](./captures/identity-capture.pcapng) file
-* Looks at the Ethernet/IP Section of the TCP Packet
+This repository is an implementation of the Ethernet/IP **Explicit Messaging** protocol.
+
+This was created by using the [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) library to communicate with an Ethernet/IP Adapter while monitoring the network traffic with Wireshark.
+
+The struct definitions/names heavily correlate to their Wireshark counterparts. See the [captures](./captures/) directory for some examples of Ethernet/IP traffic. 
+
+See the [examples](./examples/) directory for ideas on how to implement an Ethernet/IP Explicit Messaging Scanner
