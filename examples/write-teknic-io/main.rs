@@ -1,5 +1,4 @@
-use clearlink_config::ConfigAssemblyObject;
-use clearlink_output::OutputAssemblyObject;
+use clap::Parser;
 use tokio::net::TcpStream;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -9,15 +8,21 @@ use eipscanne_rs::object_assembly::RequestObjectAssembly;
 // Assert dependency on the different modules in this directory
 mod clearlink_config;
 mod clearlink_output;
+mod cli_config;
 mod duplicated_stream_utils;
 
 // Make sure the code itself looks the same
+use clearlink_config::ConfigAssemblyObject;
+use clearlink_output::OutputAssemblyObject;
+use cli_config::{set_io_data, CliArgs};
 use duplicated_stream_utils as stream_utils;
 
 const ETHERNET_IP_PORT: u16 = 0xAF12;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli_args = CliArgs::parse();
+
     // Connect to the server at IP address and port
     // let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
     let address = format!("172.31.19.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
@@ -90,10 +95,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // let mut output_assembly_data = OutputAssemblyObject::test_default();
 
-    output_assembly_data
-        .io_output_data
-        .dop_value
-        .set_output1(true);
+    // |||||||||||||||||||||||||||||||||
+    // |||| Actually set the output ||||
+    // |||||||||||||||||||||||||||||||||
+    set_io_data(
+        &mut output_assembly_data.io_output_data,
+        cli_args.index as usize,
+        cli_args.output_value,
+    );
 
     println!("REQUESTING - SET digital output");
 

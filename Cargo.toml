@@ -5,6 +5,9 @@ edition = "2021"
 
 [dependencies]
 bilge = "0.2.0"
-tokio = { version = "1.42.0", features = ["full"] }
 binrw = "0.14.1"
+clap = { version = "4.5.27", features = ["derive"] }
 hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
+# TOKIO: Not actually a dependency of the package, just used for testing
+# CLAP: Not actually a depencency of the package, just used for testing
+tokio = { version = "1.42.0", features = ["full"] }

@@ -20,6 +20,28 @@ pub struct DigitalOutputs {
     extra_padding: u10,
 }
 
+// ======= Start of private IOOutputData impl ========
+
+impl DigitalOutputs {
+    pub fn default() -> Self {
+        DigitalOutputs::new(false, false, false, false, false, false, u10::new(0x0))
+    }
+
+    fn set_digital_output(&mut self, index: usize, value: bool) {
+        match index {
+            0 => &self.set_output0(value),
+            1 => &self.set_output1(value),
+            2 => &self.set_output2(value),
+            3 => &self.set_output3(value),
+            4 => &self.set_output4(value),
+            5 => &self.set_output5(value),
+            _ => &(),
+        };
+    }
+}
+
+// ^^^^^^^^ End of private IOOutputData impl ^^^^^^^^
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -35,20 +57,13 @@ pub struct IOOutputData {
 // ======= Start of private IOOutputData impl ========
 
 impl IOOutputData {
-    #[allow(dead_code)]
-    fn new() -> Self {
-        IOOutputData::new_digital_outputs(DigitalOutputs::new(
-            false,
-            false,
-            false,
-            false,
-            false,
-            false,
-            u10::new(0x0),
-        ))
-    }
+    const DEFAULT_PWM_VALUE: u8 = 0;
 
     #[allow(dead_code)]
+    fn default() -> Self {
+        IOOutputData::new_digital_outputs(DigitalOutputs::default())
+    }
+
     fn new_digital_outputs(digital_outputs: DigitalOutputs) -> Self {
         IOOutputData {
             aop_value: 0x0,
@@ -56,6 +71,20 @@ impl IOOutputData {
             dop_pwm: [0x0; 6],
             ccio_output_data: 0x0,
             encoder_add_to_position: 0x0,
+        }
+    }
+
+    pub fn set_digital_output(&mut self, index: usize, turn_on: bool) {
+        if let Some(existing_pwm_value) = self.dop_pwm.get_mut(index) {
+            *existing_pwm_value = Self::DEFAULT_PWM_VALUE;
+        }
+
+        self.dop_value.set_digital_output(index, turn_on);
+    }
+
+    pub fn set_digital_pwm(&mut self, index: usize, pwm_value: u8) {
+        if let Some(existing_pwm_value) = self.dop_pwm.get_mut(index) {
+            *existing_pwm_value = pwm_value;
         }
     }
 }
