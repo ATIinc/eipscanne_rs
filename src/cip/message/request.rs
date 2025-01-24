@@ -1,8 +1,9 @@
+use std::io::SeekFrom;
 use std::mem;
 
-use binrw::meta::WriteEndian;
 use binrw::{
     binwrite,
+    BinResult,
     BinWrite, // BinWrite, // trait for writing
 };
 
@@ -10,12 +11,39 @@ use super::shared::{ServiceCode, ServiceContainer};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUsint;
 
+#[binrw::writer(writer, endian)]
+fn write_cip_path_with_size(cip_path: &CipPath) -> BinResult<()> {
+    // Step 1: Write the `cip_path` field
+    let mut temp_buffer = Vec::new();
+    let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+
+    cip_path.write_options(&mut temp_writer, endian, ())?;
+
+    // Step 2: Calculate the `cip_path` byte size
+    let cip_path_word_size = (temp_buffer.len()) / mem::size_of::<u16>();
+
+    // Step 3: Write the full struct
+    if let Err(write_err) = writer.write(&[cip_path_word_size as CipUsint]) {
+        return Err(binrw::Error::Io(write_err));
+    }
+
+    if let Err(write_err) = writer.write(&temp_buffer) {
+        return Err(binrw::Error::Io(write_err));
+    }
+
+    Ok(())
+}
+
+#[binwrite]
 #[derive(Debug, PartialEq)]
+#[bw(little)]
 pub struct RequestData<T>
 where
     T: for<'a> BinWrite<Args<'a> = ()>,
 {
     pub total_word_size: CipUsint,
+    // override the total_word_size by seeking back before it
+    #[bw(seek_before = SeekFrom::Current(-1 * (mem::size_of::<CipUsint>() as i64)), write_with = write_cip_path_with_size)]
     pub cip_path: CipPath,
     pub additional_data: Option<T>,
 }
@@ -34,69 +62,6 @@ where
         }
     }
 }
-
-// TODO: Figure out how to create a macro for Writing a later variable first
-impl<T> WriteEndian for RequestData<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
-    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
-}
-
-impl<T> BinWrite for RequestData<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
-    type Args<'a> = ();
-
-    fn write_options<W: std::io::Write + std::io::Seek>(
-        &self,
-        writer: &mut W,
-        endian: binrw::Endian,
-        args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `cip_path` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
-
-        let cip_path_write_result = self.cip_path.write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = cip_path_write_result {
-            return Err(write_err);
-        }
-
-        // Step 2: Calculate the total packet size
-        let header_byte_size = mem::size_of_val(&self.total_word_size);
-        let cip_path_size = temp_buffer.len();
-
-        let total_packet_word_size = (header_byte_size + cip_path_size) / mem::size_of::<u16>();
-
-        let total_packet_word_size_array = [total_packet_word_size as CipUsint];
-
-        // Step 3: Write the full struct to the actual writer
-        if let Err(write_err) = writer.write(&total_packet_word_size_array) {
-            return Err(binrw::Error::Io(write_err));
-        }
-
-        // Step 4: Write the `cip_path` field to the actual writer
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
-
-        // Step 5: Write the `additional_data` field
-        if let Some(data_ref) = &self.additional_data {
-            let data_write_result = data_ref.write_options(writer, endian, args);
-
-            if let Err(write_err) = data_write_result {
-                return Err(write_err);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-// ^^^^^^^^ End of RequestData impl ^^^^^^^^
 
 #[binwrite]
 #[brw(little)]
