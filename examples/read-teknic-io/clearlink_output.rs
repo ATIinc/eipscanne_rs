@@ -25,7 +25,7 @@ pub struct DigitalOutputs {
 #[derive(Debug, PartialEq)]
 pub struct IOOutputData {
     aop_value: CipInt,
-    dop_value: DigitalOutputs,
+    pub dop_value: DigitalOutputs,
     dop_pwm: [CipUsint; 6],
     #[brw(pad_before = 2)]
     ccio_output_data: CipUlint,
@@ -126,7 +126,7 @@ impl SerialAsciiOutputData {
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 pub struct OutputAssemblyObject {
-    io_output_data: IOOutputData,
+    pub io_output_data: IOOutputData,
     motor0_output_data: MotorOutputData,
     motor1_output_data: MotorOutputData,
     motor2_output_data: MotorOutputData,

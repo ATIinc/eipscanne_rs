@@ -13,7 +13,7 @@ pub async fn write_object_assembly<T>(
     stream: &mut TcpStream,
     object_assembly: RequestObjectAssembly<T>,
 ) where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinWrite<Args<'a> = ()>,
 {
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -28,10 +28,10 @@ pub async fn read_object_assembly<T>(
     stream: &mut TcpStream,
 ) -> Result<ResponseObjectAssembly<T>, binrw::Error>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()>,
+    T: for<'a> BinRead<Args<'a> = ()>,
 {
     // Write the object_assembly binary data to the buffer
-    let mut response_buffer = vec![0; 100];
+    let mut response_buffer = vec![0; 1000];
     let response_bytes_read = stream.read(&mut response_buffer).await?;
     response_buffer.truncate(response_bytes_read);
 

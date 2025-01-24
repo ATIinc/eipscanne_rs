@@ -108,18 +108,45 @@ impl RequestObjectAssembly<u8> {
     }
 
     pub fn new_identity(session_handle: CipUdint) -> Self {
-        let identity_cip_message =
-            MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+        Self::new_service_request(
+            session_handle,
+            CipPath::new(0x1, 0x1),
+            ServiceCode::GetAttributeAll,
+            None,
+        )
+    }
+}
 
-        // TODO: Remove this so the message isn't serialized twice
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+impl<T> RequestObjectAssembly<T>
+where
+    T: for<'a> BinWrite<Args<'a> = ()>,
+{
+    pub fn new_single_request(
+        session_handle: CipUdint,
+        request_path: CipPath,
+        data: Option<T>,
+    ) -> Self {
+        Self::new_service_request(
+            session_handle,
+            request_path,
+            ServiceCode::GetAttributeSingle,
+            data,
+        )
+    }
 
-        let _ = identity_cip_message.write(&mut temp_writer);
-
-        RequestObjectAssembly {
+    pub fn new_service_request(
+        session_handle: CipUdint,
+        request_path: CipPath,
+        service_code: ServiceCode,
+        data: Option<T>,
+    ) -> Self {
+        Self {
             packet_description: EnIpPacketDescription::new_cip_description(session_handle, 0),
-            cip_message: Some(identity_cip_message),
+            cip_message: Some(MessageRouterRequest::new_data(
+                service_code,
+                request_path,
+                data,
+            )),
         }
     }
 }

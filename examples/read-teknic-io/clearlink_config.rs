@@ -60,7 +60,6 @@ pub struct IOModeConfigData {
 // ======= Start of FiltersConfig impl ========
 
 impl IOModeConfigData {
-    #[allow(dead_code)]
     fn default() -> Self {
         IOModeConfigData {
             ai0_range: AnalogInputRange::AsDigitalInput,
@@ -88,7 +87,6 @@ pub struct IOFiltersConfigData {
 // ======= Start of IOFiltersConfigData impl ========
 
 impl IOFiltersConfigData {
-    #[allow(dead_code)]
     fn default() -> Self {
         Self {
             aip_filters: [10; 4],
@@ -112,7 +110,6 @@ pub struct EncoderConfigData {
 // ======= Start of EncoderConfigData impl ========
 
 impl EncoderConfigData {
-    #[allow(dead_code)]
     fn default() -> Self {
         Self {
             encoder_velocity_resolution: 100,
@@ -159,7 +156,6 @@ pub struct MotorConfigData {
 // ======= Start of EncoderConfigData impl ========
 
 impl MotorConfigData {
-    #[allow(dead_code)]
     fn default() -> Self {
         Self {
             config_register: ConfigRegisterData::new(false, false, false, true, false, false),
@@ -196,7 +192,6 @@ pub struct SerialAsciiConfigData {
 // ======= Start of SerialAsciiConfigData impl ========
 
 impl SerialAsciiConfigData {
-    #[allow(dead_code)]
     fn default() -> Self {
         Self {
             serial_baud_rate: 115200,
@@ -228,8 +223,7 @@ pub struct ConfigAssemblyObject {
 // ======= Start of ConfigAssemblyObject impl ========
 
 impl ConfigAssemblyObject {
-    #[allow(dead_code)]
-    fn default() -> Self {
+    pub fn default() -> Self {
         Self {
             io_mode_config_data: IOModeConfigData::default(),
             io_filters_config_data: IOFiltersConfigData::default(),

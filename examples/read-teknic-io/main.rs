@@ -1,9 +1,9 @@
+use clearlink_config::ConfigAssemblyObject;
+use clearlink_output::OutputAssemblyObject;
 use tokio::net::TcpStream;
 
-use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::eip::packet::EnIpPacketDescription;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 // Assert dependency on the different modules in this directory
@@ -39,29 +39,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .header
         .session_handle;
 
+    // ========= Write the ClearLink Config ============
+    stream_utils::write_object_assembly(
+        &mut stream,
+        RequestObjectAssembly::new_single_request(
+            provided_session_handle,
+            CipPath::new_full(0x4, 0x96, 0x3),
+            Some(ConfigAssemblyObject::default()),
+        ),
+    )
+    .await;
+    // ^^^^^^^^^ Write the ClearLink Config ^^^^^^^^^^^^
+
     // ========= Request the digital output ============
     println!("REQUESTING digital output");
 
     // TODO: Create the request for the SetDigitalIO message in the teknic_cip
-    let set_digital_output_message = MessageRouterRequest::new(
-        ServiceCode::SetAttributeSingle,
-        CipPath::new_full(0x4, 0x70, 0x3),
-    );
-
-    let set_digital_output_object = RequestObjectAssembly {
-        packet_description: EnIpPacketDescription::new_cip_description(provided_session_handle, 0),
-        cip_message: Some(set_digital_output_message),
-    };
-
-    stream_utils::write_object_assembly(&mut stream, set_digital_output_object).await;
+    stream_utils::write_object_assembly(
+        &mut stream,
+        RequestObjectAssembly::<u8>::new_service_request(
+            provided_session_handle,
+            CipPath::new_full(0x4, 0x70, 0x3),
+            ServiceCode::GetAttributeSingle,
+            None,
+        ),
+    )
+    .await;
 
     // TODO: Create the response for the SetDigitalIO message in the teknic_cip
     let set_digital_io_response_object =
-        stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+        stream_utils::read_object_assembly::<OutputAssemblyObject>(&mut stream).await?;
 
     // println!("{:#?}\n", set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
     println!("{:?}\n", set_digital_io_response_object);
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
+
+    // ========= Write the Digital Output ============
+    let mut output_assembly_data = set_digital_io_response_object
+        .cip_message
+        .unwrap()
+        .response_data
+        .data
+        .unwrap();
+
+    output_assembly_data
+        .io_output_data
+        .dop_value
+        .set_output1(true);
+
+    stream_utils::write_object_assembly(
+        &mut stream,
+        RequestObjectAssembly::new_service_request(
+            provided_session_handle,
+            CipPath::new_full(0x4, 0x70, 0x3),
+            ServiceCode::SetAttributeSingle,
+            Some(output_assembly_data),
+        ),
+    )
+    .await;
+
+    // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
     // ========= UnRegister the sesion ============
     println!("REQUESTING un-registration");
