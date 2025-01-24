@@ -25,13 +25,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stream = TcpStream::connect(address).await?;
 
     // ========= Register the session ============
-    println!("REQUESTING registration");
+    println!("REQUESTING - REGISTER session");
     stream_utils::write_object_assembly(&mut stream, RequestObjectAssembly::new_registration())
         .await;
     let registration_response = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
 
     // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
-    println!("{:?}\n", registration_response);
+    // println!("{:?}\n", registration_response);
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
     let provided_session_handle = registration_response
@@ -40,21 +40,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .session_handle;
 
     // ========= Write the ClearLink Config ============
+    println!("REQUESTING - SET config");
     stream_utils::write_object_assembly(
         &mut stream,
-        RequestObjectAssembly::new_single_request(
+        RequestObjectAssembly::new_service_request(
             provided_session_handle,
             CipPath::new_full(0x4, 0x96, 0x3),
+            ServiceCode::SetAttributeSingle,
             Some(ConfigAssemblyObject::default()),
         ),
     )
     .await;
+
+    let _config_success_response = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+
+    // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
+    // println!("{:?}\n", _config_success_response);
     // ^^^^^^^^^ Write the ClearLink Config ^^^^^^^^^^^^
 
     // ========= Request the digital output ============
-    println!("REQUESTING digital output");
+    println!("REQUESTING - GET digital output");
 
-    // TODO: Create the request for the SetDigitalIO message in the teknic_cip
     stream_utils::write_object_assembly(
         &mut stream,
         RequestObjectAssembly::<u8>::new_service_request(
@@ -70,8 +76,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let set_digital_io_response_object =
         stream_utils::read_object_assembly::<OutputAssemblyObject>(&mut stream).await?;
 
-    // println!("{:#?}\n", set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
-    println!("{:?}\n", set_digital_io_response_object);
+    // println!("{:#?}\n", _set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
+    // println!("{:?}\n", _set_digital_io_response_object);
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
     // ========= Write the Digital Output ============
@@ -82,10 +88,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .data
         .unwrap();
 
+    // let mut output_assembly_data = OutputAssemblyObject::test_default();
+
     output_assembly_data
         .io_output_data
         .dop_value
         .set_output1(true);
+
+    println!("REQUESTING - SET digital output");
 
     stream_utils::write_object_assembly(
         &mut stream,
@@ -98,10 +108,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
+    let _set_digital_io_success_response =
+        stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
     // ========= UnRegister the sesion ============
-    println!("REQUESTING un-registration");
+    println!("REQUESTING - UN REGISTER session");
     stream_utils::write_object_assembly(
         &mut stream,
         RequestObjectAssembly::new_unregistration(provided_session_handle),
