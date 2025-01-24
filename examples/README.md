@@ -7,7 +7,9 @@ Can run the examples with `cargo run --example <file_name>`
 * i.e. `cargo run --example read-identity`
 
 * i.e. `cargo run --example write-teknic-io -- --help`
-    * `cargo run --example write-teknic-io -- --index 4 --value 0`
+    * `cargo run --example write-teknic-io -- --index 4 --on`
+    * `cargo run --example write-teknic-io -- --index 4 --off`
+    * `cargo run --example write-teknic-io -- --index 4 --pwm 100`
 
 
 ## Test Examples

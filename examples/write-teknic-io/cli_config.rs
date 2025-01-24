@@ -4,16 +4,31 @@ use crate::clearlink_output::IOOutputData;
 
 #[derive(Parser)]
 pub struct OutputValue {
-    /// Turns the feature on
-    #[arg(long, conflicts_with = "off", conflicts_with = "pwm_value")]
+    /// Turns the output on
+    #[arg(
+        long,
+        required = true,
+        conflicts_with = "off",
+        conflicts_with = "pwm_value"
+    )]
     on: bool,
 
-    /// Turns the feature off
-    #[arg(long, conflicts_with = "on", conflicts_with = "pwm_value")]
+    /// Turns the output off
+    #[arg(
+        long,
+        required = true,
+        conflicts_with = "on",
+        conflicts_with = "pwm_value"
+    )]
     off: bool,
 
-    /// Sets the value to the specified number
-    #[arg(long = "pwm", conflicts_with = "on", conflicts_with = "off")]
+    /// Sets the output value to the specified number between 0 and 255 (inclusive)
+    #[arg(
+        long = "pwm",
+        required = true,
+        conflicts_with = "on",
+        conflicts_with = "off"
+    )]
     pwm_value: Option<u8>,
 }
 
