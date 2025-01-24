@@ -116,7 +116,7 @@ fn test_deserialize_empty_response() {
         response_data: ResponseData {
             status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
-            data: 0x4,
+            data: Some(0x4),
         },
     };
 

@@ -486,7 +486,7 @@ mod tests {
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,
-                    data: OutputAssemblyObject {
+                    data: Some(OutputAssemblyObject {
                         io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::new(
                             false,
                             false,
@@ -501,7 +501,7 @@ mod tests {
                         motor2_output_data: MotorOutputData::new(),
                         motor3_output_data: MotorOutputData::new(),
                         serial_ascii_output_data: SerialAsciiOutputData::new(),
-                    },
+                    }),
                 },
             }),
         };

@@ -24,7 +24,9 @@ where
     #[br(pad_before = 1)]
     pub status: ResponseStatusCode,
     pub additional_status_size: u8,
-    pub data: T,
+
+    #[br(try)]
+    pub data: Option<T>,
 }
 
 #[binread]

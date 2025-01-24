@@ -46,7 +46,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let message_router_response = identity_response_object.cip_message.unwrap();
     println!(
         "  --> Product Name: {:?}\n",
-        String::from(message_router_response.response_data.data.product_name)
+        String::from(
+            message_router_response
+                .response_data
+                .data
+                .unwrap()
+                .product_name
+        )
     );
     // ^^^^^^^^^ Request the identity object ^^^^^^^^^^^^
 

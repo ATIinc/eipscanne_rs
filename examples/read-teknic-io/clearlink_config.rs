@@ -247,15 +247,22 @@ impl ConfigAssemblyObject {
 
 #[cfg(test)]
 mod tests {
-    use binrw::BinWrite;
+    use binrw::{BinRead, BinWrite};
 
+    use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
     use hex_test_macros::prelude::*;
 
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
-    use eipscanne_rs::cip::message::shared::ServiceCode;
+    use eipscanne_rs::cip::message::response::ResponseStatusCode;
+    use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
     use eipscanne_rs::cip::path::CipPath;
     use eipscanne_rs::cip::types::CipByte;
-    use eipscanne_rs::eip::packet::EnIpPacketDescription;
+    use eipscanne_rs::eip::command::{
+        CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
+    };
+    use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
+    use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+    use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
     use crate::clearlink_config::ConfigAssemblyObject;
 
@@ -288,30 +295,30 @@ mod tests {
 
 
 
-            -------------------------------------
-            Hex Dump:
+        -------------------------------------
+        Hex Dump:
 
-            0000   6f 00 00 01 03 00 00 00 00 00 00 00 00 00 00 00
-            0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-            0020   00 00 00 00 b2 00 f0 00 10 03 20 04 24 96 30 03
-            0030   64 64 64 64 64 00 00 00 0a 0a 0a 0a 10 27 10 27
-            0040   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
-            0050   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
-            0060   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
-            0070   0a 0a 0a 0a 0a 0a 0a 0a 64 00 00 00 05 00 00 00
-            0080   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
-            0090   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
-            00a0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
-            00b0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
-            00c0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
-            00d0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
-            00e0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
-            00f0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
-            0100   00 c2 01 00 00 00 00 00 00 00 00 00 00 00 00 00
-            0110   00 00 00 00 0a 00 00 00
+        0000   6f 00 00 01 03 00 00 00 00 00 00 00 00 00 00 00
+        0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
+        0020   00 00 00 00 b2 00 f0 00 10 03 20 04 24 96 30 03
+        0030   64 64 64 64 64 00 00 00 0a 0a 0a 0a 10 27 10 27
+        0040   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
+        0050   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
+        0060   10 27 10 27 10 27 10 27 10 27 10 27 10 27 10 27
+        0070   0a 0a 0a 0a 0a 0a 0a 0a 64 00 00 00 05 00 00 00
+        0080   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
+        0090   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
+        00a0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
+        00b0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
+        00c0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
+        00d0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
+        00e0   08 00 00 00 01 00 00 00 01 00 00 00 80 96 98 00
+        00f0   00 00 00 00 00 00 00 00 ff ff ff ff ff ff ff 00
+        0100   00 c2 01 00 00 00 00 00 00 00 00 00 00 00 00 00
+        0110   00 00 00 00 0a 00 00 00
 
 
-            */
+        */
         let expected_byte_array: Vec<CipByte> = vec![
             0x6f, 0x00, 0x00, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -359,5 +366,94 @@ mod tests {
 
         // Assert equality
         assert_eq_hex!(expected_byte_array, byte_array_buffer);
+    }
+
+    #[test]
+    fn test_read_clearlink_config_assembly_object_response() {
+        /*
+        EtherNet/IP (Industrial Protocol), Session: 0x00000003, Send RR Data
+            Encapsulation Header
+                Command: Send RR Data (0x006f)
+                Length: 20
+                Session Handle: 0x00000003
+                Status: Success (0x00000000)
+                Sender Context: 0000000000000000
+                Options: 0x00000000
+            Command Specific Data
+                Interface Handle: CIP (0x00000000)
+                Timeout: 0
+                Item Count: 2
+                    Type ID: Null Address Item (0x0000)
+                        Length: 0
+                    Type ID: Unconnected Data Item (0x00b2)
+                        Length: 4
+                [Request In: 9]
+                [Time: 0.000727724 seconds]
+        Common Industrial Protocol
+            Service: Set Attribute Single (Response)
+                1... .... = Request/Response: Response (0x1)
+                .001 0000 = Service: Set Attribute Single (0x10)
+            Status: Success:
+                General Status: Success (0x00)
+                Additional Status Size: 0 words
+            [Request Path Size: 3 words]
+            [Request Path: Assembly, Instance: 0x96, Attribute: 0x03]
+            Set Attribute Single (Response)
+
+        -------------------------------------
+        Hex Dump:
+
+        0000   6f 00 14 00 03 00 00 00 00 00 00 00 00 00 00 00
+        0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
+        0020   00 00 00 00 b2 00 04 00 90 00 00 00
+
+        */
+
+        let raw_bytes: Vec<CipByte> = vec![
+            0x6f, 0x00, 0x14, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x04, 0x00, 0x90, 0x00,
+            0x00, 0x00,
+        ];
+
+        let expected_set_config_assembly_response = ResponseObjectAssembly::<u8> {
+            packet_description: EnIpPacketDescription {
+                header: EncapsulationHeader {
+                    command: EnIpCommand::SendRrData,
+                    length: Some(20),
+                    session_handle: 0x3,
+                    status_code: EncapsStatusCode::Success,
+                    sender_context: [0x0; 8],
+                    options: 0x0,
+                },
+                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+                    interface_handle: 0x0,
+                    timeout: 0,
+                    empty_data_packet: CommonPacketDescriptor {
+                        type_id: CommonPacketItemId::NullAddr,
+                        packet_length: Some(0),
+                    },
+                    unconnected_data_packet: CommonPacketDescriptor {
+                        type_id: CommonPacketItemId::UnconnectedMessage,
+                        packet_length: Some(4),
+                    },
+                }),
+            },
+            cip_message: Some(MessageRouterResponse {
+                service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, true),
+                response_data: ResponseData {
+                    status: ResponseStatusCode::Success,
+                    additional_status_size: 0,
+                    data: None,
+                },
+            }),
+        };
+
+        let byte_cursor = std::io::Cursor::new(raw_bytes);
+        let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+        let response_object = ResponseObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+
+        assert_eq!(expected_set_config_assembly_response, response_object);
     }
 }
