@@ -121,19 +121,6 @@ impl<T> RequestObjectAssembly<T>
 where
     T: for<'a> BinWrite<Args<'a> = ()>,
 {
-    pub fn new_single_request(
-        session_handle: CipUdint,
-        request_path: CipPath,
-        data: Option<T>,
-    ) -> Self {
-        Self::new_service_request(
-            session_handle,
-            request_path,
-            ServiceCode::GetAttributeSingle,
-            data,
-        )
-    }
-
     pub fn new_service_request(
         session_handle: CipUdint,
         request_path: CipPath,
