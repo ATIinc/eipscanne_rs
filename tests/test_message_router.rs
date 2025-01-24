@@ -3,7 +3,9 @@ use binrw::{BinRead, BinWrite};
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 
 use eipscanne_rs::cip::path::CipPath;
@@ -111,8 +113,8 @@ fn test_deserialize_empty_response() {
             ServiceCode::GetAttributeAll,
             true,
         )),
-        router_data: ResponseData {
-            status: 0x0,
+        response_data: ResponseData {
+            status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
             data: 0x4,
         },

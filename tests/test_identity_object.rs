@@ -5,7 +5,9 @@ use bilge::prelude::u4;
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::command::{
@@ -245,8 +247,8 @@ fn test_deserialize_cip_identity_response() {
 
     let expected_cip_identity_response = MessageRouterResponse {
         service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true),
-        router_data: ResponseData {
-            status: 0x0,
+        response_data: ResponseData {
+            status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
             data: IdentityResponse {
                 vendor_id: VendorId::TeknicInc,
@@ -394,8 +396,8 @@ fn test_deserialize_full_identity_response() {
             },
             cip_message: Some(MessageRouterResponse {
                 service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true).into(),
-                router_data: ResponseData {
-                    status: 0x0,
+                response_data: ResponseData {
+                    status: ResponseStatusCode::Success,
                     additional_status_size: 0x0,
                     data: IdentityResponse {
                         vendor_id: VendorId::TeknicInc,
