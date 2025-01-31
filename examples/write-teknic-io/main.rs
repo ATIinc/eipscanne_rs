@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Connect to the server at IP address and port
     // let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
-    let address = format!("172.31.19.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
+    let address = format!("{}:{}", cli_args.address, ETHERNET_IP_PORT);
 
     let mut stream = TcpStream::connect(address).await?;
 
