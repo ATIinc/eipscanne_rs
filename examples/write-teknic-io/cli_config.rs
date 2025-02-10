@@ -9,7 +9,8 @@ pub struct OutputValue {
         long,
         required = true,
         conflicts_with = "off",
-        conflicts_with = "pwm_value"
+        conflicts_with = "pwm_value",
+        conflicts_with = "npn_config"
     )]
     on: bool,
 
@@ -18,7 +19,8 @@ pub struct OutputValue {
         long,
         required = true,
         conflicts_with = "on",
-        conflicts_with = "pwm_value"
+        conflicts_with = "pwm_value",
+        conflicts_with = "npn_config"
     )]
     off: bool,
 
@@ -27,9 +29,19 @@ pub struct OutputValue {
         long = "pwm",
         required = true,
         conflicts_with = "on",
-        conflicts_with = "off"
+        conflicts_with = "off",
+        conflicts_with = "npn_config"
     )]
     pwm_value: Option<u8>,
+
+    #[arg(
+        long = "npn",
+        required = true,
+        conflicts_with = "on",
+        conflicts_with = "off",
+        conflicts_with = "pwm_value"
+    )]
+    npn_config: Option<u8>,
 }
 
 /// Simple program to greet a person
@@ -57,6 +69,7 @@ pub fn set_io_data(io_output_data: &mut IOOutputData, index: usize, output_value
             on: is_on,
             off: _,
             pwm_value: None,
+            npn_config: None,
         } => {
             io_output_data.set_digital_output(index, is_on);
         }
@@ -64,8 +77,18 @@ pub fn set_io_data(io_output_data: &mut IOOutputData, index: usize, output_value
             on: _,
             off: _,
             pwm_value: Some(pwm),
+            npn_config: None,
         } => {
             io_output_data.set_digital_pwm(index, pwm);
+        }
+        OutputValue {
+            on: _,
+            off: _,
+            pwm_value: _,
+            npn_config: Some(_npn),
+        } => {
+
+            // io_output_data.set_digital_pwm(index, pwm);
         }
     }
 }
