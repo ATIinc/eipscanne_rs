@@ -22,7 +22,7 @@ pub struct CliArgs {
     #[arg(short, long, default_value = "172.31.19.10")]
     pub address: String,
 
-    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..5))]
+    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..15))]
     pub index: u8,
 
     #[command(flatten)]
