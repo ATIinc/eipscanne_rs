@@ -1,6 +1,6 @@
 use clap::Parser;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 pub struct OutputValue {
     /// Turns the output on
     #[arg(long, required = true, conflicts_with = "off")]
@@ -12,7 +12,7 @@ pub struct OutputValue {
 }
 
 /// Simple program to greet a person
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(
     version,
     about,
@@ -22,8 +22,8 @@ pub struct CliArgs {
     #[arg(short, long, default_value = "172.31.19.10")]
     pub address: String,
 
-    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..15))]
-    pub index: u8,
+    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..15), num_args = 1.., value_delimiter = ' ')]
+    pub select: Vec<u8>,
 
     #[command(flatten)]
     pub output_value: OutputValue,

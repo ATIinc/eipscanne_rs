@@ -20,6 +20,7 @@ const ETHERNET_IP_PORT: u16 = 0xAF12;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
+    // println!("{:#?}", cli_args);
 
     // Connect to the server at IP address and port
     // let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
@@ -68,7 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // |||| Actually set the output ||||
     // |||||||||||||||||||||||||||||||||
     let mut output_valve_data = SolenoidValves::default();
-    output_valve_data.set_valve_index(cli_args.index as usize, cli_args.output_value.on);
+    for index in cli_args.select {
+        output_valve_data.set_valve_index(index as usize, cli_args.output_value.on);
+    }
 
     println!("REQUESTING - SET Solenoid Valve Output");
 
