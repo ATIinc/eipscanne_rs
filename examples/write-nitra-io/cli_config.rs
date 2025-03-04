@@ -1,14 +1,28 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 pub struct OutputValue {
     /// Turns the output on
-    #[arg(long, required = false, conflicts_with = "off")]
+    #[arg(long, required = true, conflicts_with = "off")]
     pub on: bool,
 
     /// Turns the output off
-    #[arg(long, required = false, conflicts_with = "on")]
+    #[arg(long, required = true, conflicts_with = "on")]
     pub off: bool,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum OperatingMode {
+
+    Custom {
+    },
+    Selection {
+        #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..15), num_args = 1.., value_delimiter = ' ')]
+        valves: Vec<u8>,
+    
+        #[command(flatten)]
+        output_value: OutputValue,
+    }
 }
 
 /// Simple program to greet a person
@@ -22,12 +36,6 @@ pub struct CliArgs {
     #[arg(short, long, default_value = "172.31.19.10")]
     pub address: String,
 
-    #[arg(short, long, default_value_t = false)]
-    pub custom: bool,
-
-    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..15), num_args = 1.., value_delimiter = ' ')]
-    pub select: Vec<u8>,
-
-    #[command(flatten)]
-    pub output_value: OutputValue,
+    #[command(subcommand)]
+    pub mode: OperatingMode,
 }

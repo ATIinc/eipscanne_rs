@@ -11,7 +11,7 @@ mod duplicated_stream_utils;
 mod nitra;
 
 // Make sure the code itself looks the same
-use cli_config::CliArgs;
+use cli_config::{CliArgs, OperatingMode};
 use duplicated_stream_utils as stream_utils;
 use nitra::{SolenoidValves, StatusByte};
 
@@ -43,15 +43,15 @@ async fn write_solenoid_value(stream: &mut TcpStream, provided_session_handle: u
     Ok(true)
 }
 
-async fn handle_cli(cli_args: CliArgs, stream: &mut TcpStream, provided_session_handle: u32) -> Result<bool, binrw::Error> {
+async fn handle_select(stream: &mut TcpStream, provided_session_handle: u32, valve_nums: Vec<u8>, output_value: bool) -> Result<bool, binrw::Error> {
  // ========= Write the Solenoid Valve Output ============
 
     // |||||||||||||||||||||||||||||||||
     // |||| Actually set the output ||||
     // |||||||||||||||||||||||||||||||||
     let mut output_valve_data = SolenoidValves::default();
-    for index in cli_args.select {
-        output_valve_data.set_valve_index(index as usize, cli_args.output_value.on);
+    for index in valve_nums {
+        output_valve_data.set_valve_index(index as usize, output_value);
     }
 
     write_solenoid_value(stream, provided_session_handle, output_valve_data).await
@@ -76,7 +76,7 @@ async fn handle_custom(stream: &mut TcpStream, provided_session_handle: u32) -> 
     write_solenoid_value(stream, provided_session_handle, on_valves).await?;
 
     // sleep
-    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
 
     println!("\nREQUESTING - SET Solenoid Valve OFF");
 
@@ -133,12 +133,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("{:#?}\n", _status_byte);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _status_byte);
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
+    match cli_args.mode {
+        OperatingMode::Custom {} => {
+            handle_custom(&mut stream, provided_session_handle).await?;
 
-    if cli_args.custom {
-        handle_custom(&mut stream, provided_session_handle).await?;
-    }
-    else {
-        handle_cli(cli_args, &mut stream, provided_session_handle).await?;
+        }
+        OperatingMode::Selection { valves, output_value } => {
+            handle_select(&mut stream, provided_session_handle, valves, output_value.on).await?;
+
+        }
     }
 
     // ========= UnRegister the sesion ============

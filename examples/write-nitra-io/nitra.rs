@@ -1,5 +1,4 @@
 use binrw::{
-    binrw,
     BinRead,
     BinWrite, // #[binrw] attribute
               // BinRead,  // trait for reading
