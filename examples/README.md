@@ -46,3 +46,11 @@ i.e. `cargo run --example write-teknic-io -- --help`
 1. Writes the modified OutputAssembly object
 1. Reads the modified OutputAssembly object success response
 1. Requests an unregistration for the session_id 
+
+## Write-Nitro-IO
+
+Sets valves on the Nitra Ethernet/IP Pneumatic Regulator
+
+i.e. `cargo run --example write-nitra-io -- --help`
+* `cargo run --example write-nitra-io -- --address 172.31.19.60 custom`
+* `cargo run --example write-nitra-io -- --address 172.31.19.60 selection --valves 0 2 --on`
