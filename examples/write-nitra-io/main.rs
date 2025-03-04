@@ -59,7 +59,17 @@ async fn handle_cli(cli_args: CliArgs, stream: &mut TcpStream, provided_session_
 
 async fn handle_custom(stream: &mut TcpStream, provided_session_handle: u32) -> Result<bool, binrw::Error> {
     let mut on_valves = SolenoidValves::default();
-    on_valves.set_valve1(true);
+
+    // 0 = Tool Changer Turret Retract
+    // 1 = Tool Changer Turret Extend
+    // 2 = Tool Changer Vehicle Retract
+    // 3 = Tool Changer Vehicle Extend
+    // 4 = Hub Retract
+    // 5 = Hub Extend
+    // 6 = Bead Pressor Retract
+    // 7 = Bead Presser Extend
+
+    on_valves.set_valve7(true);
 
     println!("\nREQUESTING - SET Solenoid Valve ON");
 
@@ -71,7 +81,7 @@ async fn handle_custom(stream: &mut TcpStream, provided_session_handle: u32) -> 
     println!("\nREQUESTING - SET Solenoid Valve OFF");
 
     let mut off_valves = SolenoidValves::default();
-    off_valves.set_valve0(true);
+    off_valves.set_valve7(false);
 
     write_solenoid_value(stream, provided_session_handle, off_valves).await
 }
