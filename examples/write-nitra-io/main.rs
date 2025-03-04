@@ -17,6 +17,67 @@ use nitra::{SolenoidValves, StatusByte};
 
 const ETHERNET_IP_PORT: u16 = 0xAF12;
 
+async fn write_solenoid_value(stream: &mut TcpStream, provided_session_handle: u32, valves: SolenoidValves) -> Result<bool, binrw::Error> {
+    // ========= Write the Solenoid Valve Output ============
+
+    // |||||||||||||||||||||||||||||||||
+    // |||| Actually set the output ||||
+    // |||||||||||||||||||||||||||||||||
+    println!("REQUESTING - SET Solenoid Valve Output");
+   
+    stream_utils::write_object_assembly(
+        stream,
+        RequestObjectAssembly::new_service_request(
+            provided_session_handle,
+            CipPath::new_full(0x4, 100, 3),
+            ServiceCode::SetAttributeSingle,
+            Some(valves),
+        ),
+    )
+    .await;
+
+    let _set_valve_success = stream_utils::read_object_assembly::<u8>(stream).await?;
+
+    // ^^^^^^^^^ Write the Solenoid Valve Output ^^^^^^^^^^^^
+
+    Ok(true)
+}
+
+async fn handle_cli(cli_args: CliArgs, stream: &mut TcpStream, provided_session_handle: u32) -> Result<bool, binrw::Error> {
+ // ========= Write the Solenoid Valve Output ============
+
+    // |||||||||||||||||||||||||||||||||
+    // |||| Actually set the output ||||
+    // |||||||||||||||||||||||||||||||||
+    let mut output_valve_data = SolenoidValves::default();
+    for index in cli_args.select {
+        output_valve_data.set_valve_index(index as usize, cli_args.output_value.on);
+    }
+
+    write_solenoid_value(stream, provided_session_handle, output_valve_data).await
+}
+
+async fn handle_custom(stream: &mut TcpStream, provided_session_handle: u32) -> Result<bool, binrw::Error> {
+    let mut on_valves = SolenoidValves::default();
+    on_valves.set_valve1(true);
+
+    println!("\nREQUESTING - SET Solenoid Valve ON");
+
+    write_solenoid_value(stream, provided_session_handle, on_valves).await?;
+
+    // sleep
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+    println!("\nREQUESTING - SET Solenoid Valve OFF");
+
+    let mut off_valves = SolenoidValves::default();
+    off_valves.set_valve0(true);
+
+    write_solenoid_value(stream, provided_session_handle, off_valves).await
+}
+
+
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
@@ -63,32 +124,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("{:?}\n", _status_byte);
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
-    // ========= Write the Solenoid Valve Output ============
-
-    // |||||||||||||||||||||||||||||||||
-    // |||| Actually set the output ||||
-    // |||||||||||||||||||||||||||||||||
-    let mut output_valve_data = SolenoidValves::default();
-    for index in cli_args.select {
-        output_valve_data.set_valve_index(index as usize, cli_args.output_value.on);
+    if cli_args.custom {
+        handle_custom(&mut stream, provided_session_handle).await?;
     }
-
-    println!("REQUESTING - SET Solenoid Valve Output");
-
-    stream_utils::write_object_assembly(
-        &mut stream,
-        RequestObjectAssembly::new_service_request(
-            provided_session_handle,
-            CipPath::new_full(0x4, 100, 3),
-            ServiceCode::SetAttributeSingle,
-            Some(output_valve_data),
-        ),
-    )
-    .await;
-
-    let _set_valve_success = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
-
-    // ^^^^^^^^^ Write the Solenoid Valve Output ^^^^^^^^^^^^
+    else {
+        handle_cli(cli_args, &mut stream, provided_session_handle).await?;
+    }
 
     // ========= UnRegister the sesion ============
     println!("REQUESTING - UN REGISTER session");
