@@ -42,9 +42,9 @@ const HOMING_VELOCITY_STEPS: i32 = 2000;
 /// Acceleration limit for the homing move in steps/s².
 const HOMING_ACCELERATION_STEPS: u32 = 100;
 
-/// MODIFY THIS TO REPRODUCE THE BUG — try values that are positive and negative
+/// MODIFY THIS TO REPRODUCE THE "BUG" — try values that are positive and negative
 /// Deceleration limit for the homing move in steps/s².
-const HOMING_DECELERATION_STEPS: i32 = -8;
+const HOMING_DECELERATION_STEPS: i32 = 8;
 
 /// How often (in milliseconds) to poll the input assembly while waiting
 /// for a status flag to change.
