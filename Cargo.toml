@@ -11,3 +11,11 @@ hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
 # TOKIO: Not actually a dependency of the package, just used for testing
 # CLAP: Not actually a depencency of the package, just used for testing
 tokio = { version = "1.43.1", features = ["full"] }
+
+[dev-dependencies]
+tracing = "0.1.41"
+tracing-subscriber = "0.3.20"
+
+[[example]]
+name = "teknic-homing-diag"
+path = "examples/teknic-homing-diag/main.rs"

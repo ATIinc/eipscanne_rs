@@ -45,4 +45,38 @@ i.e. `cargo run --example write-teknic-io -- --help`
 1. Modifies the value of the appropriate digital output (from commandline)
 1. Writes the modified OutputAssembly object
 1. Reads the modified OutputAssembly object success response
-1. Requests an unregistration for the session_id 
+1. Requests an unregistration for the session_id
+
+## Teknic-Homing-Diag
+
+Runs a full sensor-based homing sequence on a single Teknic ClearLink motor connector and is designed to help diagnose homing-related bugs (e.g. unexpected behaviour with specific deceleration values).
+
+Before running, edit the constants at the top of `examples/teknic-homing-diag/main.rs` to match your hardware:
+
+| Constant | Description |
+|---|---|
+| `CLEARLINK_IP` | IPv4 address of the ClearLink device |
+| `MOTOR_INDEX` | Motor connector to home (0–3) |
+| `HOME_SENSOR_CONNECTOR` | I/O pin for the home sensor, or `-1` for hard-stop homing |
+| `HOMING_VELOCITY_STEPS` | Jog velocity during the homing move (steps/s) |
+| `HOMING_ACCELERATION_STEPS` | Acceleration limit (steps/s²) |
+| `HOMING_DECELERATION_STEPS` | Deceleration limit (steps/s²) — set this to a negative value to reproduce the bug |
+
+Run with:
+
+```
+cargo run --example teknic-homing-diag
+```
+
+Press **Ctrl+C** at any time to abort the homing sequence. The example will always attempt to disable the motor and unregister the EtherNet/IP session before exiting.
+
+Sequence of operations:
+1. Connects to the ClearLink device over TCP
+1. Registers an EtherNet/IP session
+1. Clears any active shutdowns or motor faults
+1. Writes the homing configuration (enables homing, sets the home sensor connector and deceleration limit)
+1. Enables the motor and waits for it to report ready
+1. Issues a velocity homing move and waits for the device to acknowledge it
+1. Clears the move flags and waits for the `has_homed` status bit to be set
+1. Disables the motor
+1. Unregisters the EtherNet/IP session
