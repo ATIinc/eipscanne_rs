@@ -1,0 +1,15 @@
+[package]
+name = "teknic_homing_diag_rs"
+version = "0.1.0"
+edition = "2024"
+
+# This crate is intentionally NOT part of the Firefly workspace.
+# It is a self-contained diagnostic tool to be sent to Teknic for homing bug analysis.
+
+[dependencies]
+tokio = { version = "1.44.2", features = ["rt-multi-thread", "macros", "time", "net", "io-util", "signal"] }
+eipscanne_rs = { git = "https://github.com/ATIinc/eipscanne_rs.git", rev = "8de15012ebaf97fe16f068f52917d75e36dc1cb1" }
+binrw = "0.14.1"
+bilge = "0.2.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.20"
