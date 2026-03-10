@@ -103,8 +103,8 @@ pub struct MotorConfigData {
     pub max_deceleration: CipDint,
     soft_limit_position1: CipDint,
     soft_limit_position2: CipDint,
-    positive_limit_connector: CipSint,
-    negative_limit_connector: CipSint,
+    pub positive_limit_connector: CipSint,
+    pub negative_limit_connector: CipSint,
     /// Set to the I/O pin index (0–12) for sensor-based homing, or -1 for hard-stop homing
     pub home_sensor_connector: CipSint,
     brake_output_connector: CipSint,

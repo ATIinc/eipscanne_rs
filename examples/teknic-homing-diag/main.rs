@@ -255,6 +255,10 @@ impl HomingSession {
         cfg.config_register.set_homing_enable(true);
         cfg.config_register.set_hlfb_inversion(true);
         cfg.home_sensor_connector = HOME_SENSOR_CONNECTOR;
+        
+        // NOTE: Uncomment to test homing with a shared limit pin sensor
+        // cfg.negative_limit_connector = HOME_SENSOR_CONNECTOR;
+        // cfg.positive_limit_connector = HOME_SENSOR_CONNECTOR;
         cfg.max_deceleration = HOMING_DECELERATION_STEPS;
 
         self.connection.write_config_assembly().await;
@@ -353,6 +357,7 @@ impl HomingSession {
             tracing::info!("Motor has shutdowns — clearing...");
             {
                 let out = self.connection.get_motor_output_mut();
+                // NOTE: Fault clearing also appears to work without toggling the enable
                 out.output_register.set_enable(false);
                 out.output_register.set_clear_alerts(true);
             }
