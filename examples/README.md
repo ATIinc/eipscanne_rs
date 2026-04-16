@@ -47,11 +47,11 @@ i.e. `cargo run --example write-teknic-io -- --help`
 1. Reads the modified OutputAssembly object success response
 1. Requests an unregistration for the session_id
 
-## Teknic-Homing-Diag
+## Teknic-SD-Homing-Diag
 
 Runs a full sensor-based homing sequence on a single Teknic ClearLink motor connector and is designed to help diagnose homing-related bugs (e.g. unexpected behaviour with specific deceleration values).
 
-Before running, edit the constants at the top of `examples/teknic-homing-diag/main.rs` to match your hardware:
+Before running, edit the constants at the top of `examples/teknic-sd-homing-diag/main.rs` to match your hardware:
 
 | Constant | Description |
 |---|---|
@@ -65,7 +65,7 @@ Before running, edit the constants at the top of `examples/teknic-homing-diag/ma
 Run with:
 
 ```
-cargo run --example teknic-homing-diag
+cargo run --example teknic-sd-homing-diag
 ```
 
 Press **Ctrl+C** at any time to abort the homing sequence. The example will always attempt to disable the motor and unregister the EtherNet/IP session before exiting.
