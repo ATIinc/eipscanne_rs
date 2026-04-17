@@ -7,6 +7,7 @@ use eipscanne_rs::cip::types::{CipDint, CipInt, CipUsint};
 // ClearPath-IP Software Reference, Appendix E: Controlword & Move Commands
 
 /// Move Type enumeration from the ClearPath-IP MoveType Reference Table.
+#[allow(dead_code)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MoveType {
     /// MoveType 1: Absolute Move (MAM)

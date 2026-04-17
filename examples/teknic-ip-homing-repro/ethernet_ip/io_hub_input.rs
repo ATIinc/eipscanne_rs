@@ -10,6 +10,7 @@ use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 
 
 /// Analog input connectors: I/O-0 through I/O-12 (hardware reports millivolts)
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum AnalogInputPin {
     IO0 = 0,
@@ -462,6 +463,7 @@ pub struct AnalogInputs {
 }
 
 impl AnalogInputs {
+    #[allow(dead_code)]
     pub fn get(self, pin: AnalogInputPin) -> CipInt {
         match pin {
             AnalogInputPin::IO0 => self.io0,

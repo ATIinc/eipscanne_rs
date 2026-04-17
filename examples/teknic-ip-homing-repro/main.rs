@@ -22,7 +22,7 @@ use ethernet_ip::consts::{
     ASSEMBLY_ATTRIBUTE_ID, ASSEMBLY_OBJECT_ID, ETHERNET_IP_PORT,
     IO_HUB_4E_INPUT_ASSEMBLY_INSTANCE_ID, IO_HUB_4E_OUTPUT_ASSEMBLY_INSTANCE_ID,
 };
-use ethernet_ip::io_hub_input::InputAssemblyHub4E;
+use ethernet_ip::io_hub_input::{InputAssemblyHub4E, MotorInputData};
 use ethernet_ip::io_hub_output::OutputAssemblyHub4E;
 
 // ── Configurable constants ────────────────────────────────────────────────────
@@ -30,8 +30,14 @@ use ethernet_ip::io_hub_output::OutputAssemblyHub4E;
 /// Milliseconds to sleep between successive homing commands.
 const DELAY_MS: u64 = 100;
 
+/// Milliseconds between input polls during the post-homing observation window.
+const OBSERVE_POLL_MS: u64 = 100;
+
+/// Seconds to observe motor state after all homing commands complete.
+const POST_HOMING_OBSERVE_SECS: u64 = 10;
+
 /// Number of homing commands to send.
-const HOMING_COUNT: u32 = 10;
+const HOMING_COUNT: u32 = 1;
 
 /// IP address of the IO-HUB-4-E device.
 const DEVICE_IP: [u8; 4] = [172, 31, 19, 18];
@@ -143,6 +149,73 @@ async fn fault_clear_if_needed(
     Ok(())
 }
 
+fn log_motor_status(m: &MotorInputData) {
+    let sw = m.statusword;
+    println!(
+        "  pos={} vel={} torque={} | homing={} has_homed={} in_home_sensor={} | \
+         enabled={} ready={} cmd_complete={} shutdown={} warning={} | \
+         move_type_ack={} move_num_ack={}",
+        m.position_measured,
+        m.velocity_measured,
+        m.torque_measured,
+        sw.homing() as u8,
+        sw.has_homed() as u8,
+        sw.in_home_sensor() as u8,
+        sw.enabled() as u8,
+        sw.ready_for_command() as u8,
+        sw.command_complete() as u8,
+        sw.motor_shutdown_present() as u8,
+        sw.motor_warning_present() as u8,
+        m.move_type_ack,
+        m.move_number_ack,
+    );
+}
+
+async fn run_homing_loop(
+    stream: &mut TcpStream,
+    session: CipUdint,
+    assembly: &mut OutputAssemblyHub4E,
+) -> anyhow::Result<()> {
+    // Read the current move number before starting so we can increment from it.
+    let initial_input = read_input(stream, session).await?;
+    let initial_move_number = initial_input.motor0_input_data.move_number_ack;
+    println!(
+        "Starting homing succession test: count={HOMING_COUNT}, delay={DELAY_MS}ms, \
+         initial_move_number={initial_move_number}"
+    );
+
+    let mut move_number = initial_move_number;
+
+    for i in 0..HOMING_COUNT {
+        move_number = move_number.wrapping_add(1);
+        assembly.motor0_output_data.move_number = move_number;
+        apply_motor_command(MotorCommand::HomingMove, &mut assembly.motor0_output_data);
+        write_output(stream, session, *assembly).await?;
+        println!("HomingMove {}/{HOMING_COUNT} sent (move_number={move_number})", i + 1);
+        tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+
+        let input = read_input(stream, session).await?;
+        log_motor_status(&input.motor0_input_data);
+    }
+
+    println!("All commands sent — waiting for homing to complete (timeout={POST_HOMING_OBSERVE_SECS}s, Ctrl+C to cancel)");
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(POST_HOMING_OBSERVE_SECS);
+    loop {
+        let input = read_input(stream, session).await?;
+        log_motor_status(&input.motor0_input_data);
+        if input.motor0_input_data.statusword.has_homed() {
+            println!("Homing complete");
+            break;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            println!("Observation timeout — homing did not complete in {POST_HOMING_OBSERVE_SECS}s");
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(OBSERVE_POLL_MS)).await;
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let addr = format!("{}:{}", Ipv4Addr::from(DEVICE_IP), ETHERNET_IP_PORT);
@@ -169,14 +242,14 @@ async fn main() -> anyhow::Result<()> {
     write_output(&mut stream, session, assembly).await?;
     println!("Motor M0 enabled");
 
-    // ── Homing loop ───────────────────────────────────────────────────────────
-    println!("Starting homing succession test: count={HOMING_COUNT}, delay={DELAY_MS}ms");
-
-    for i in 0..HOMING_COUNT {
-        apply_motor_command(MotorCommand::HomingMove, &mut assembly.motor0_output_data);
-        write_output(&mut stream, session, assembly).await?;
-        println!("HomingMove {}/{HOMING_COUNT} sent", i + 1);
-        tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+    // ── Homing loop (cancellable via Ctrl+C) ─────────────────────────────────
+    tokio::select! {
+        result = run_homing_loop(&mut stream, session, &mut assembly) => {
+            result?;
+        },
+        _ = tokio::signal::ctrl_c() => {
+            println!("Ctrl+C received — cancelled early");
+        },
     }
 
     // ── Unregister session ────────────────────────────────────────────────────
