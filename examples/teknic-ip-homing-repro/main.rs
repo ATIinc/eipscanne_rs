@@ -35,7 +35,7 @@ use ethernet_ip::io_hub_output::OutputAssemblyHub4E;
 // ── Configurable constants ────────────────────────────────────────────────────
 
 /// Milliseconds to sleep between successive homing commands.
-const DELAY_MS: u64 = 100;
+const DELAY_MS: u64 = 50;
 
 /// Milliseconds between input polls during the post-homing observation window.
 const OBSERVE_POLL_MS: u64 = 500;
@@ -46,7 +46,7 @@ const POST_HOMING_OBSERVE_SECS: u64 = 10;
 /// Number of homing commands to send in rapid succession.
 /// Set to > 1 to reproduce the bug: each command arrives while the previous
 /// homing is still in progress.
-const HOMING_COUNT: u32 = 1;
+const HOMING_COUNT: u32 = 10;
 
 /// IP address of the IO-HUB-4-E device.
 const DEVICE_IP: [u8; 4] = [172, 31, 19, 18];
