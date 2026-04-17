@@ -4,7 +4,7 @@
 // The repro sequence:
 //   1. Clear any pre-existing faults
 //   2. Enable the motor
-//   3. Send HOMING_COUNT homing commands, spaced DELAY_MS apart
+//   3. Send HOMING_COUNT homing commands, spaced COMMAND_DELAY apart
 //      (each arrives while the previous homing is still in progress)
 //   4. Wait up to POST_HOMING_OBSERVE_SECS for homing to complete
 //
@@ -34,19 +34,19 @@ use ethernet_ip::io_hub_output::OutputAssemblyHub4E;
 
 // ── Configurable constants ────────────────────────────────────────────────────
 
-/// Milliseconds to sleep between successive homing commands.
-const DELAY_MS: u64 = 50;
+/// Delay between successive homing commands.
+const COMMAND_DELAY: Duration = Duration::from_millis(10);
 
-/// Milliseconds between input polls during the post-homing observation window.
-const OBSERVE_POLL_MS: u64 = 500;
+/// How often to poll motor status during the post-command observation window.
+const OBSERVE_POLL: Duration = Duration::from_millis(500);
 
-/// Seconds to observe motor state after all homing commands complete.
-const POST_HOMING_OBSERVE_SECS: u64 = 10;
+/// How long to wait for homing to complete after all commands are sent.
+const HOMING_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Number of homing commands to send in rapid succession.
 /// Set to > 1 to reproduce the bug: each command arrives while the previous
 /// homing is still in progress.
-const HOMING_COUNT: u32 = 10;
+const HOMING_COUNT: u32 = 4;
 
 /// IP address of the IO-HUB-4-E device.
 const DEVICE_IP: [u8; 4] = [172, 31, 19, 18];
@@ -189,7 +189,7 @@ async fn run_homing_loop(
     let initial_input = read_input(stream, session).await?;
     let initial_move_number = initial_input.motor0_input_data.move_number_ack;
     println!(
-        "Starting homing succession test: count={HOMING_COUNT}, delay={DELAY_MS}ms, \
+        "Starting homing succession test: count={HOMING_COUNT}, delay={COMMAND_DELAY:?}, \
          initial_move_number={initial_move_number}"
     );
 
@@ -203,12 +203,12 @@ async fn run_homing_loop(
         apply_motor_command(MotorCommand::HomingMove, &mut assembly.motor0_output_data);
         write_output(stream, session, *assembly).await?;
         println!("  HomingMove {}/{HOMING_COUNT} sent (move_number={move_number})", i + 1);
-        tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
+        tokio::time::sleep(COMMAND_DELAY).await;
     }
 
     // Phase 2: poll until homing completes or the observation window expires.
-    println!("All {HOMING_COUNT} commands sent — polling for completion (timeout={POST_HOMING_OBSERVE_SECS}s)");
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(POST_HOMING_OBSERVE_SECS);
+    println!("All {HOMING_COUNT} commands sent — polling for completion (timeout={HOMING_TIMEOUT:?})");
+    let deadline = tokio::time::Instant::now() + HOMING_TIMEOUT;
     loop {
         let input = read_input(stream, session).await?;
         log_motor_status(&input.motor0_input_data);
@@ -217,10 +217,10 @@ async fn run_homing_loop(
             break;
         }
         if tokio::time::Instant::now() >= deadline {
-            println!("Observation timeout — homing did not complete in {POST_HOMING_OBSERVE_SECS}s");
+            println!("Observation timeout — homing did not complete within {HOMING_TIMEOUT:?}");
             break;
         }
-        tokio::time::sleep(Duration::from_millis(OBSERVE_POLL_MS)).await;
+        tokio::time::sleep(OBSERVE_POLL).await;
     }
     Ok(())
 }
