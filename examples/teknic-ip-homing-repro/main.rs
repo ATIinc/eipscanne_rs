@@ -1,8 +1,15 @@
-// Bare-minimum homing succession repro using eipscanne_rs explicit messaging
-// directly — no io_hub_rs state machine, channels, or background tasks.
+// Reproduces a bug in ClearPath-IP motors where sending repeated homing commands
+// before homing has completed leaves the motor in a bad state.
+//
+// The repro sequence:
+//   1. Clear any pre-existing faults
+//   2. Enable the motor
+//   3. Send HOMING_COUNT homing commands, spaced DELAY_MS apart
+//      (each arrives while the previous homing is still in progress)
+//   4. Wait up to POST_HOMING_OBSERVE_SECS for homing to complete
 //
 // Edit the constants below, then run with:
-//   cargo run --bin homing_direct
+//   cargo run --bin teknic-ip-homing-repro
 
 use std::net::Ipv4Addr;
 use std::time::Duration;
@@ -36,8 +43,10 @@ const OBSERVE_POLL_MS: u64 = 100;
 /// Seconds to observe motor state after all homing commands complete.
 const POST_HOMING_OBSERVE_SECS: u64 = 10;
 
-/// Number of homing commands to send.
-const HOMING_COUNT: u32 = 1;
+/// Number of homing commands to send in rapid succession.
+/// Set to > 1 to reproduce the bug: each command arrives while the previous
+/// homing is still in progress.
+const HOMING_COUNT: u32 = 3;
 
 /// IP address of the IO-HUB-4-E device.
 const DEVICE_IP: [u8; 4] = [172, 31, 19, 18];
@@ -186,19 +195,19 @@ async fn run_homing_loop(
 
     let mut move_number = initial_move_number;
 
+    // Phase 1: fire homing commands in rapid succession, before the previous
+    // homing has a chance to complete. This is what triggers the bug.
     for i in 0..HOMING_COUNT {
         move_number = move_number.wrapping_add(1);
         assembly.motor0_output_data.move_number = move_number;
         apply_motor_command(MotorCommand::HomingMove, &mut assembly.motor0_output_data);
         write_output(stream, session, *assembly).await?;
-        println!("HomingMove {}/{HOMING_COUNT} sent (move_number={move_number})", i + 1);
+        println!("  HomingMove {}/{HOMING_COUNT} sent (move_number={move_number})", i + 1);
         tokio::time::sleep(Duration::from_millis(DELAY_MS)).await;
-
-        let input = read_input(stream, session).await?;
-        log_motor_status(&input.motor0_input_data);
     }
 
-    println!("All commands sent — waiting for homing to complete (timeout={POST_HOMING_OBSERVE_SECS}s, Ctrl+C to cancel)");
+    // Phase 2: poll until homing completes or the observation window expires.
+    println!("All {HOMING_COUNT} commands sent — polling for completion (timeout={POST_HOMING_OBSERVE_SECS}s)");
     let deadline = tokio::time::Instant::now() + Duration::from_secs(POST_HOMING_OBSERVE_SECS);
     loop {
         let input = read_input(stream, session).await?;
