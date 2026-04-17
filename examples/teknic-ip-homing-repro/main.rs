@@ -38,7 +38,7 @@ use ethernet_ip::io_hub_output::OutputAssemblyHub4E;
 const DELAY_MS: u64 = 100;
 
 /// Milliseconds between input polls during the post-homing observation window.
-const OBSERVE_POLL_MS: u64 = 100;
+const OBSERVE_POLL_MS: u64 = 500;
 
 /// Seconds to observe motor state after all homing commands complete.
 const POST_HOMING_OBSERVE_SECS: u64 = 10;
@@ -46,7 +46,7 @@ const POST_HOMING_OBSERVE_SECS: u64 = 10;
 /// Number of homing commands to send in rapid succession.
 /// Set to > 1 to reproduce the bug: each command arrives while the previous
 /// homing is still in progress.
-const HOMING_COUNT: u32 = 3;
+const HOMING_COUNT: u32 = 1;
 
 /// IP address of the IO-HUB-4-E device.
 const DEVICE_IP: [u8; 4] = [172, 31, 19, 18];
@@ -260,6 +260,10 @@ async fn main() -> anyhow::Result<()> {
             println!("Ctrl+C received — cancelled early");
         },
     }
+
+    apply_motor_command(MotorCommand::Disable, &mut assembly.motor0_output_data);
+    write_output(&mut stream, session, assembly).await?;
+    println!("Motor M0 disabled");
 
     // ── Unregister session ────────────────────────────────────────────────────
     stream_utils::write_object_assembly(
