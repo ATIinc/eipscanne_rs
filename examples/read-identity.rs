@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING registration");
     stream_utils::write_object_assembly(&mut stream, RequestObjectAssembly::new_registration())
         .await;
-    let registration_response = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+    let registration_response = stream_utils::read_object_assembly(&mut stream).await?;
 
     // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
     println!("{:?}\n", registration_response);
@@ -37,22 +37,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         RequestObjectAssembly::new_identity(provided_session_handle),
     )
     .await;
-    let identity_response_object =
-        stream_utils::read_object_assembly::<IdentityResponse>(&mut stream).await?;
+    let (identity_response_object, identity_response) =
+        stream_utils::read_typed_object_assembly::<IdentityResponse>(&mut stream).await?;
 
     // println!("{:#?}\n", identity_response_object);      // NOTE: the :#? triggers a pretty-print
     println!("{:?}\n", identity_response_object);
 
-    let message_router_response = identity_response_object.cip_message.unwrap();
     println!(
         "  --> Product Name: {:?}\n",
-        String::from(
-            message_router_response
-                .response_data
-                .data
-                .unwrap()
-                .product_name
-        )
+        String::from(identity_response.product_name)
     );
     // ^^^^^^^^^ Request the identity object ^^^^^^^^^^^^
 

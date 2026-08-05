@@ -5,19 +5,19 @@ pub mod prelude {
 
 #[macro_export]
 macro_rules! assert_eq_hex {
-    // Case when both expected and actual are provided, along with a config
-    ($expected:expr, $actual:expr, $config:expr) => {
+    // Case when both left and right are provided, along with a config
+    ($left:expr, $right:expr, $config:expr) => {
         assert_eq!(
-            $expected,
-            $actual,
-            "\n\nValues don't match in hex!\nExpected:\n-------\n{} \n\nActual:\n------- \n{}\n",
-            config_hex(&$expected, $config),
-            config_hex(&$actual, $config)
+            $left,
+            $right,
+            "\n\nValues don't match in hex!\nLeft:\n-------\n{} \n\nRight:\n------- \n{}\n",
+            config_hex(&$left, $config),
+            config_hex(&$right, $config)
         );
     };
 
-    // Case when only expected and actual are provided
-    ($expected:expr, $actual:expr) => {
+    // Case when only left and right are provided
+    ($left:expr, $right:expr) => {
         const HEX_FORMAT_CONFIG: HexConfig = HexConfig {
             title: false,
             ascii: true,
@@ -29,6 +29,6 @@ macro_rules! assert_eq_hex {
         };
 
         // Call the first macro clause, passing the default config
-        assert_eq_hex!($expected, $actual, HEX_FORMAT_CONFIG)
+        assert_eq_hex!($left, $right, HEX_FORMAT_CONFIG)
     };
 }

@@ -162,7 +162,7 @@ fn test_deserialize_register_session_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response_object = ResponseObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+    let session_response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,

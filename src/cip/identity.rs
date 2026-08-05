@@ -37,7 +37,7 @@ Attribute: 7 (Product Name)
 #[derive(Debug, PartialEq)]
 #[repr(u16)]
 pub enum VendorId {
-    #[br(magic = 0x01a8u16)]
+    #[brw(magic = 0x01a8u16)]
     TeknicInc,
     Unknown(u16),
 }
@@ -47,7 +47,7 @@ pub enum VendorId {
 #[derive(Debug, PartialEq)]
 #[repr(u16)]
 pub enum DeviceType {
-    #[br(magic = 0x002bu16)]
+    #[brw(magic = 0x002bu16)]
     GenericDevice,
     Unknown(u16),
 }

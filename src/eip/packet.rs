@@ -28,7 +28,12 @@ pub struct EncapsulationHeader {
 // ======= Start of EncapsulationHeader impl ========
 
 #[binrw::writer(writer: writer, endian)]
-fn header_length_writer(_obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
+fn header_length_writer(obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
+    if obj.is_some() {
+        let existing_value = obj.unwrap();
+        return existing_value.write_options(writer, endian, ());
+    }
+
     arg0.write_options(writer, endian, ())
 }
 

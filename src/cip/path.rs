@@ -70,6 +70,25 @@ pub enum PathData {
     FormatAsU16(u16),
 }
 
+impl Into<u16> for PathData {
+    /// Converts the path data to a u16, regardless of its underlying format.
+    fn into(self) -> u16 {
+        match self {
+            PathData::FormatAsU8(data) => data as u16,
+            PathData::FormatAsU16(data) => data,
+        }
+    }
+}
+
+impl<'a> Into<u16> for &'a PathData {
+    fn into(self) -> u16 {
+        match self {
+            PathData::FormatAsU8(data) => *data as u16,
+            PathData::FormatAsU16(data) => *data,
+        }
+    }
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -116,13 +135,12 @@ impl LogicalPathSegment {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-// #[br(import(path_length: u8))]
+#[br(import(path_length: u8))]
 pub struct CipPath {
     pub class_id_segment: LogicalPathSegment,
     pub instance_id_segment: LogicalPathSegment,
 
-    // #[br(if(path_length == 3))]
-    #[br(try)]
+    #[br(if(path_length == 3))]
     pub attribute_id_segment: Option<LogicalPathSegment>,
 }
 
@@ -156,3 +174,38 @@ impl CipPath {
 }
 
 // ^^^^^^^^ End of CipPath impl ^^^^^^^^
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_data_into_u16_u8_variant() {
+        let data = PathData::FormatAsU8(42);
+        let value: u16 = data.into();
+        assert_eq!(value, 42u16);
+    }
+
+    #[test]
+    fn test_path_data_into_u16_u16_variant() {
+        let data = PathData::FormatAsU16(4242);
+        let value: u16 = data.into();
+        assert_eq!(value, 4242u16);
+    }
+
+
+    #[test]
+    fn test_path_data_ref_into_u16_u8_variant() {
+        let data = PathData::FormatAsU8(42);
+        let value: u16 = (&data).into();
+        assert_eq!(value, 42u16);
+    }
+
+    #[test]
+    fn test_path_data_ref_into_u16_u16_variant() {
+        let data = PathData::FormatAsU16(4242);
+        let value: u16 = (&data).into();
+        assert_eq!(value, 4242u16);
+    }
+}

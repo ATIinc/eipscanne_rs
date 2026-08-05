@@ -2,3 +2,4 @@
 captures/identity-capture.pcapng filter=lfs diff=lfs merge=lfs -text
 captures/set-digital-output.pcapng filter=lfs diff=lfs merge=lfs -text
 captures/set-relative-move-1000.pcapng filter=lfs diff=lfs merge=lfs -text
+* !text !filter !merge !diff

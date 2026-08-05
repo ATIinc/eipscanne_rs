@@ -1,13 +1,11 @@
-use std::io::SeekFrom;
+use std::io::{SeekFrom};
 use std::mem;
 
-use binrw::{
-    binwrite,
-    BinResult,
-    BinWrite, // BinWrite, // trait for writing
-};
+use binrw::{binrw, BinResult, BinWrite};
 
-use super::shared::{ServiceCode, ServiceContainer};
+use super::shared::{ServiceCode, ServiceContainer, SIZE_OF_SERVICE_CONTAINER};
+use crate::cip::message::data::{CipData, CipDataOpt};
+use crate::cip::message::shared::{BYTES_IN_A_WORD, SIZE_OF_CIP_USINT};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUsint;
 
@@ -34,66 +32,68 @@ fn write_cip_path_with_size(cip_path: &CipPath) -> BinResult<()> {
     Ok(())
 }
 
-#[binwrite]
+#[binrw]
 #[derive(Debug, PartialEq)]
-#[bw(little)]
-pub struct RequestData<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
+#[brw(little)]
+#[br(import(additional_data_length: u16))]
+pub struct RequestData {
     pub total_word_size: CipUsint,
     // override the total_word_size by seeking back before it
     #[bw(seek_before = SeekFrom::Current(-1 * (mem::size_of::<CipUsint>() as i64)), write_with = write_cip_path_with_size)]
+    #[br(args(total_word_size))]
     pub cip_path: CipPath,
-    pub additional_data: Option<T>,
+
+    // Subtract the number of bytes taken up by the `total_word_size` field and the `cip_path``
+    #[br(args(additional_data_length - (SIZE_OF_CIP_USINT as u16) - (BYTES_IN_A_WORD * total_word_size as u16)))]
+    pub additional_data: CipDataOpt,
 }
 
 // ======= Start of RequestData impl ========
 
-impl<T> RequestData<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
-    pub fn new(path: CipPath, request_data_content: Option<T>) -> Self {
+impl RequestData {
+    pub fn new(
+        word_size: Option<CipUsint>,
+        path: CipPath,
+        request_data_content: Option<Box<dyn CipData>>,
+    ) -> Self {
         RequestData {
-            total_word_size: 0,
+            total_word_size: word_size.unwrap_or(0),
             cip_path: path,
-            additional_data: request_data_content,
+            additional_data: match request_data_content {
+                None => CipDataOpt::Raw(vec![]),
+                Some(content) => CipDataOpt::Typed(content),
+            },
         }
     }
 }
 
-#[binwrite]
+#[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct MessageRouterRequest<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
+#[br(import(additional_data_length: u16))]
+pub struct MessageRouterRequest {
     pub service_container: ServiceContainer,
-    pub request_data: RequestData<T>,
+
+    // Subtract number of bytes in the service container
+    #[br(args(additional_data_length - SIZE_OF_SERVICE_CONTAINER as u16))]
+    pub request_data: RequestData,
 }
 
 // ======= Start of MessageRouterRequest impl ========
 
-impl MessageRouterRequest<u8> {
+impl MessageRouterRequest {
     pub fn new(service_code: ServiceCode, path: CipPath) -> Self {
         Self::new_data(service_code, path, None)
     }
-}
 
-impl<T> MessageRouterRequest<T>
-where
-    T: for<'a> BinWrite<Args<'a> = ()>,
-{
     pub fn new_data(
         service_code: ServiceCode,
         path: CipPath,
-        request_data_content: Option<T>,
+        request_data_content: Option<Box<dyn CipData>>,
     ) -> Self {
         MessageRouterRequest {
             service_container: ServiceContainer::new(service_code, false),
-            request_data: RequestData::new(path, request_data_content),
+            request_data: RequestData::new(None, path, request_data_content),
         }
     }
 }

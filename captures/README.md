@@ -1,5 +1,4 @@
 # Capture
 
-## Viewing Binary Files
-1. Install the hex-editor extension
-    * `ms-vscode.hexeditor`
+## Viewing Wireshark Files
+1. Install wireshark: https://www.wireshark.org/

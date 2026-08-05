@@ -1,6 +1,14 @@
+use std::mem;
+
 use binrw::{BinRead, BinWrite};
 
 use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, FromBits, Number};
+
+use crate::cip::types::CipUsint;
+
+pub const BYTES_IN_A_WORD: u16 = 2;
+pub const SIZE_OF_CIP_USINT: usize = mem::size_of::<CipUsint>();
+pub const SIZE_OF_SERVICE_CONTAINER: usize = mem::size_of::<ServiceContainer>();
 
 #[bitsize(7)]
 #[derive(FromBits, PartialEq, Debug)]

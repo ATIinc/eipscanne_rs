@@ -241,6 +241,8 @@ impl ConfigAssemblyObject {
 
 #[cfg(test)]
 mod tests {
+    use std::vec;
+
     use binrw::{BinRead, BinWrite};
 
     use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
@@ -249,6 +251,7 @@ mod tests {
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
     use eipscanne_rs::cip::message::response::ResponseStatusCode;
     use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::path::CipPath;
     use eipscanne_rs::cip::types::CipByte;
     use eipscanne_rs::eip::command::{
@@ -341,7 +344,7 @@ mod tests {
         let set_clearlink_config_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
             CipPath::new_full(0x4, 0x96, 0x3),
-            Some(ConfigAssemblyObject::default()),
+            Some(Box::new(ConfigAssemblyObject::default())),
         );
 
         let set_clearlink_config_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
@@ -410,7 +413,7 @@ mod tests {
             0x00, 0x00,
         ];
 
-        let expected_set_config_assembly_response = ResponseObjectAssembly::<u8> {
+        let expected_set_config_assembly_response = ResponseObjectAssembly {
             packet_description: EnIpPacketDescription {
                 header: EncapsulationHeader {
                     command: EnIpCommand::SendRrData,
@@ -438,7 +441,7 @@ mod tests {
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,
-                    data: None,
+                    data: CipDataOpt::Raw(vec![]),
                 },
             }),
         };
@@ -446,7 +449,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object = ResponseObjectAssembly::<u8>::read(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
         assert_eq!(expected_set_config_assembly_response, response_object);
     }

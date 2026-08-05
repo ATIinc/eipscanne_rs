@@ -33,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING - REGISTER session");
     stream_utils::write_object_assembly(&mut stream, RequestObjectAssembly::new_registration())
         .await;
-    let registration_response = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+    let registration_response = stream_utils::read_object_assembly(&mut stream).await?;
 
     // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", registration_response);
@@ -52,12 +52,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             provided_session_handle,
             CipPath::new_full(0x4, 0x96, 0x3),
             ServiceCode::SetAttributeSingle,
-            Some(ConfigAssemblyObject::default()),
+            Some(Box::new(ConfigAssemblyObject::default())),
         ),
     )
     .await;
 
-    let _config_success_response = stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+    let _config_success_response = stream_utils::read_object_assembly(&mut stream).await?;
 
     // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _config_success_response);
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     stream_utils::write_object_assembly(
         &mut stream,
-        RequestObjectAssembly::<u8>::new_service_request(
+        RequestObjectAssembly::new_service_request(
             provided_session_handle,
             CipPath::new_full(0x4, 0x70, 0x3),
             ServiceCode::GetAttributeSingle,
@@ -78,20 +78,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .await;
 
     // TODO: Create the response for the SetDigitalIO message in the teknic_cip
-    let set_digital_io_response_object =
-        stream_utils::read_object_assembly::<OutputAssemblyObject>(&mut stream).await?;
+    let (_set_digital_io_response_object, mut output_assembly_object) =
+        stream_utils::read_typed_object_assembly::<OutputAssemblyObject>(&mut stream).await?;
 
     // println!("{:#?}\n", _set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _set_digital_io_response_object);
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
     // ========= Write the Digital Output ============
-    let mut output_assembly_data = set_digital_io_response_object
-        .cip_message
-        .unwrap()
-        .response_data
-        .data
-        .unwrap();
 
     // let mut output_assembly_data = OutputAssemblyObject::test_default();
 
@@ -99,7 +93,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // |||| Actually set the output ||||
     // |||||||||||||||||||||||||||||||||
     set_io_data(
-        &mut output_assembly_data.io_output_data,
+        &mut output_assembly_object.io_output_data,
         cli_args.index as usize,
         cli_args.output_value,
     );
@@ -112,13 +106,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             provided_session_handle,
             CipPath::new_full(0x4, 0x70, 0x3),
             ServiceCode::SetAttributeSingle,
-            Some(output_assembly_data),
+            Some(Box::new(output_assembly_object)),
         ),
     )
     .await;
 
     let _set_digital_io_success_response =
-        stream_utils::read_object_assembly::<u8>(&mut stream).await?;
+        stream_utils::read_object_assembly(&mut stream).await?;
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 

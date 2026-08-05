@@ -169,12 +169,16 @@ mod tests {
 
     use bilge::prelude::u10;
 
+    use eipscanne_rs::cip::message::request::RequestData;
+    use pretty_assertions::assert_eq;
+
     use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
-    use eipscanne_rs::object_assembly::ResponseObjectAssembly;
+    use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
     use hex_test_macros::prelude::*;
 
     use eipscanne_rs::cip::message::response::{ResponseData, ResponseStatusCode};
     use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::message::{
         request::MessageRouterRequest, response::MessageRouterResponse,
     };
@@ -184,6 +188,7 @@ mod tests {
         CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
     };
     use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+
 
     use crate::clearlink_output::{
         DigitalOutputs, IOOutputData, MotorOutputData, OutputAssemblyObject, SerialAsciiOutputData,
@@ -218,7 +223,7 @@ mod tests {
         let set_digital_output_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
             CipPath::new_full(0x4, 0x70, 0x3),
-            Some(OutputAssemblyObject {
+            Some(Box::new(OutputAssemblyObject {
                 io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::new(
                     false,
                     true,
@@ -233,7 +238,7 @@ mod tests {
                 motor2_output_data: MotorOutputData::new(),
                 motor3_output_data: MotorOutputData::new(),
                 serial_ascii_output_data: SerialAsciiOutputData::new(),
-            }),
+            })),
         );
 
         // Write the object_assembly binary data to the buffer
@@ -353,7 +358,7 @@ mod tests {
         let set_digital_output_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
             CipPath::new_full(0x4, 0x70, 0x3),
-            Some(OutputAssemblyObject {
+            Some(Box::new(OutputAssemblyObject {
                 io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::new(
                     false,
                     true,
@@ -368,7 +373,7 @@ mod tests {
                 motor2_output_data: MotorOutputData::new(),
                 motor3_output_data: MotorOutputData::new(),
                 serial_ascii_output_data: SerialAsciiOutputData::new(),
-            }),
+            })),
         );
 
         let set_digital_output_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
@@ -515,7 +520,7 @@ mod tests {
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,
-                    data: Some(OutputAssemblyObject {
+                    data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
                         io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::new(
                             false,
                             false,
@@ -530,7 +535,7 @@ mod tests {
                         motor2_output_data: MotorOutputData::new(),
                         motor3_output_data: MotorOutputData::new(),
                         serial_ascii_output_data: SerialAsciiOutputData::new(),
-                    }),
+                    })),
                 },
             }),
         };
@@ -539,8 +544,110 @@ mod tests {
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
         let response_object =
-            ResponseObjectAssembly::<OutputAssemblyObject>::read(&mut buf_reader).unwrap();
+            ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
         assert_eq!(expected_output_assembly_response, response_object);
+    }
+
+    /// For ADAPTER testing
+    #[test]
+    fn test_read_output_assembly_object_raw_request() {
+        let raw_byte_array: Vec<CipByte> = vec![
+            0x6f, 0x00, 0x30, 0x01, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x20, 0x01, 0x10, 0x03,
+            0x20, 0x04, 0x24, 0x70, 0x30, 0x03, 0x00, 0x00, 0x00, // 0x02
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+
+        // Read the object_assembly binary data from the buffer
+        let byte_cursor = std::io::Cursor::new(raw_byte_array);
+        let mut buf_reader = std::io::BufReader::new(byte_cursor);
+
+        let request_object = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
+
+        let expected_output_assembly_request = RequestObjectAssembly {
+            packet_description: EnIpPacketDescription {
+                header: EncapsulationHeader {
+                    command: EnIpCommand::SendRrData,
+                    // NOTE: For some reason the serialized length is 300... But the Wireshark data said 300
+                    //  Could be an internal subtraction?
+                    length: Some(304),
+                    session_handle: 0x3,
+                    status_code: EncapsStatusCode::Success,
+                    sender_context: [0x0; 8],
+                    options: 0x0,
+                },
+                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+                    interface_handle: 0x0,
+                    timeout: 0,
+                    empty_data_packet: CommonPacketDescriptor {
+                        type_id: CommonPacketItemId::NullAddr,
+                        packet_length: Some(0),
+                    },
+                    unconnected_data_packet: CommonPacketDescriptor {
+                        type_id: CommonPacketItemId::UnconnectedMessage,
+                        // NOTE: For some reason the serialized length is 288... But the Wireshark data said 284
+                        //  Could be an internal subtraction?
+                        packet_length: Some(288),
+                    },
+                }),
+            },
+            cip_message: Some(MessageRouterRequest {
+                service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, false),
+                request_data: RequestData::new(
+                    Some(0x3),
+                    CipPath::new_full(0x4, 0x70, 0x3),
+                    Some(Box::new(OutputAssemblyObject {
+                        io_output_data: IOOutputData {
+                            aop_value: 0x00, // 0x02
+                            dop_value: DigitalOutputs::new(
+                                false,
+                                false,
+                                false,
+                                false,
+                                false,
+                                false,
+                                u10::new(0x0),
+                            ),
+                            dop_pwm: [0x0; 6],
+                            ccio_output_data: 0x0,
+                            encoder_add_to_position: 0x0,
+                        },
+                        motor0_output_data: MotorOutputData::new(),
+                        motor1_output_data: MotorOutputData::new(),
+                        motor2_output_data: MotorOutputData::new(),
+                        motor3_output_data: MotorOutputData::new(),
+                        serial_ascii_output_data: SerialAsciiOutputData::new(),
+                    })),
+                ),
+            }),
+        };
+
+        // Assert equality
+        assert_eq!(request_object, expected_output_assembly_request);
+        assert_eq!(
+            request_object.cip_message,
+            expected_output_assembly_request.cip_message
+        );
     }
 }
