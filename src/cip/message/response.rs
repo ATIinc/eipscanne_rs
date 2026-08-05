@@ -4,7 +4,10 @@ use binrw::{
     BinWrite, // BinRead,  // trait for reading
 };
 
-use crate::cip::{message::{data::CipDataOpt, shared::SIZE_OF_CIP_USINT}, types::CipUsint};
+use crate::cip::{
+    message::{data::CipDataOpt, shared::SIZE_OF_CIP_USINT},
+    types::CipUsint,
+};
 
 use super::shared::{ServiceContainer, SIZE_OF_SERVICE_CONTAINER};
 
@@ -19,8 +22,7 @@ pub enum ResponseStatusCode {
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 #[br(import(data_length: u16))]
-pub struct ResponseData
-{
+pub struct ResponseData {
     #[brw(pad_before = 1)]
     pub status: ResponseStatusCode,
     pub additional_status_size: CipUsint,
@@ -34,8 +36,7 @@ pub struct ResponseData
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 #[br(import(data_length: u16))]
-pub struct MessageRouterResponse
-{
+pub struct MessageRouterResponse {
     #[br(assert(service_container.response()))]
     pub service_container: ServiceContainer,
 

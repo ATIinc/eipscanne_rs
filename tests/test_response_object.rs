@@ -7,6 +7,7 @@ use hex_test_macros::prelude::*;
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
+use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
@@ -17,7 +18,6 @@ use eipscanne_rs::eip::command::{
 };
 use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
-use eipscanne_rs::cip::message::data::CipDataOpt;
 
 #[test]
 fn test_serialize_rr_data() {

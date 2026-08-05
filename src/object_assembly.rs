@@ -129,8 +129,7 @@ impl RequestObjectAssembly {
 #[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct ResponseObjectAssembly
-{
+pub struct ResponseObjectAssembly {
     pub packet_description: EnIpPacketDescription,
 
     // TODO: Validate that the size of the EnIpPacketDescription correctly matches the remaining bytes
@@ -151,13 +150,11 @@ pub struct ResponseObjectAssembly
 
 // ======= Start of ResponseObjectAssembly impl ========
 
-impl WriteEndian for ResponseObjectAssembly
-{
+impl WriteEndian for ResponseObjectAssembly {
     const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
 }
 
-impl BinWrite for ResponseObjectAssembly
-{
+impl BinWrite for ResponseObjectAssembly {
     type Args<'a> = ();
 
     fn write_options<W: std::io::Write + std::io::Seek>(

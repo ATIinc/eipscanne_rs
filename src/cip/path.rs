@@ -175,7 +175,6 @@ impl CipPath {
 
 // ^^^^^^^^ End of CipPath impl ^^^^^^^^
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -193,7 +192,6 @@ mod tests {
         let value: u16 = data.into();
         assert_eq!(value, 4242u16);
     }
-
 
     #[test]
     fn test_path_data_ref_into_u16_u8_variant() {

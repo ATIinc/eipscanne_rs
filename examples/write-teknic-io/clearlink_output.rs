@@ -176,9 +176,9 @@ mod tests {
     use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
     use hex_test_macros::prelude::*;
 
+    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::message::response::{ResponseData, ResponseStatusCode};
     use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
-    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::message::{
         request::MessageRouterRequest, response::MessageRouterResponse,
     };
@@ -188,7 +188,6 @@ mod tests {
         CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
     };
     use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
-
 
     use crate::clearlink_output::{
         DigitalOutputs, IOOutputData, MotorOutputData, OutputAssemblyObject, SerialAsciiOutputData,
@@ -543,8 +542,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object =
-            ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
         assert_eq!(expected_output_assembly_response, response_object);
     }

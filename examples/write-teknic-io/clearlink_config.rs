@@ -248,10 +248,10 @@ mod tests {
     use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
     use hex_test_macros::prelude::*;
 
+    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
     use eipscanne_rs::cip::message::response::ResponseStatusCode;
     use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
-    use eipscanne_rs::cip::message::data::CipDataOpt;
     use eipscanne_rs::cip::path::CipPath;
     use eipscanne_rs::cip::types::CipByte;
     use eipscanne_rs::eip::command::{

@@ -1,4 +1,4 @@
-use std::io::{SeekFrom};
+use std::io::SeekFrom;
 use std::mem;
 
 use binrw::{binrw, BinResult, BinWrite};

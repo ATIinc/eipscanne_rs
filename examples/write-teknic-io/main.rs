@@ -111,8 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await;
 
-    let _set_digital_io_success_response =
-        stream_utils::read_object_assembly(&mut stream).await?;
+    let _set_digital_io_success_response = stream_utils::read_object_assembly(&mut stream).await?;
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 

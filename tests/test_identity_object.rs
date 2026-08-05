@@ -246,7 +246,8 @@ fn test_deserialize_cip_identity_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     let cip_identity_response =
-        MessageRouterResponse::read_args(&mut buf_reader, (message_router_response_length,)).unwrap();
+        MessageRouterResponse::read_args(&mut buf_reader, (message_router_response_length,))
+            .unwrap();
 
     let expected_cip_identity_response = MessageRouterResponse {
         service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true),
@@ -379,8 +380,7 @@ fn test_deserialize_full_identity_response() {
     let byte_cursor = std::io::Cursor::new(identity_response_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let identity_response =
-        ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let identity_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_identity_response =
         ResponseObjectAssembly {

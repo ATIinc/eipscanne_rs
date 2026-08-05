@@ -20,8 +20,7 @@ pub async fn write_object_assembly(stream: &mut TcpStream, object_assembly: Requ
 
 pub async fn read_object_assembly(
     stream: &mut TcpStream,
-) -> Result<ResponseObjectAssembly, binrw::Error>
-{
+) -> Result<ResponseObjectAssembly, binrw::Error> {
     // Write the object_assembly binary data to the buffer
     let mut response_buffer = vec![0; 500];
     let response_bytes_read = stream.read(&mut response_buffer).await?;
@@ -39,7 +38,7 @@ pub async fn read_typed_object_assembly<T>(
     stream: &mut TcpStream,
 ) -> Result<(ResponseObjectAssembly, T), binrw::Error>
 where
-    T: for<'a> BinRead<Args<'a> = ()> + CipData + 'static
+    T: for<'a> BinRead<Args<'a> = ()> + CipData + 'static,
 {
     let raw_assembly_response = read_object_assembly(stream).await?;
 
@@ -55,7 +54,6 @@ where
             let typed_object = T::read_le(&mut buf_reader)?;
 
             return Ok((raw_assembly_response, typed_object));
-
         }
     }
 

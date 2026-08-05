@@ -15,7 +15,12 @@ pub trait CipData: std::fmt::Debug + Send + Sync {
 #[cfg(feature = "async")]
 impl<T> CipData for T
 where
-    T: for<'a> BinRead<Args<'a> = ()> + for<'a> BinWrite<Args<'a> = ()> + Sized + std::fmt::Debug + Send + Sync,
+    T: for<'a> BinRead<Args<'a> = ()>
+        + for<'a> BinWrite<Args<'a> = ()>
+        + Sized
+        + std::fmt::Debug
+        + Send
+        + Sync,
 {
     fn write_to(&self, mut w: &mut dyn WriteSeekTrait, endian: Endian) -> BinResult<()> {
         match endian {
@@ -42,7 +47,6 @@ where
         }
     }
 }
-
 
 #[derive(Debug)]
 pub enum CipDataOpt {

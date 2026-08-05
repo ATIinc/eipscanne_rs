@@ -8,9 +8,9 @@ use eipscanne_rs::cip::message::response::{
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 
+use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::cip::message::data::CipDataOpt;
 
 #[test]
 fn test_serialize_service_container() {
@@ -109,7 +109,9 @@ fn test_deserialize_empty_response() {
 
     let message_router_response_length: u16 = 4;
 
-    let message_router_response = MessageRouterResponse::read_args(&mut buf_reader, (message_router_response_length,)).unwrap();
+    let message_router_response =
+        MessageRouterResponse::read_args(&mut buf_reader, (message_router_response_length,))
+            .unwrap();
 
     let expected_message_router_response = MessageRouterResponse {
         service_container: ServiceContainer::from(ServiceContainer::new(
