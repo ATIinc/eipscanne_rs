@@ -7,7 +7,9 @@ use binrw::{
 
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData};
+use super::command::{
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, PacketWriteArgs, RegisterData,
+};
 use super::constants as eip_constants;
 
 #[binwrite]
@@ -105,8 +107,8 @@ impl WriteEndian for EnIpPacketDescription {
 }
 
 impl BinWrite for EnIpPacketDescription {
-    // The EnIpPacketDescription is passed the packet_length
-    type Args<'a> = (u16,);
+    // The EnIpPacketDescription is passed the lengths of the data that follows it
+    type Args<'a> = PacketWriteArgs;
 
     fn write_options<W: std::io::Write + std::io::Seek>(
         &self,
@@ -127,7 +129,9 @@ impl BinWrite for EnIpPacketDescription {
         };
 
         // Step 2: Calculate the total data size after header
-        let full_proceeding_data_length = (temp_buffer.len() as u16) + args.0;
+        let (unconnected_data_length, trailing_items_length, _item_count) = args;
+        let full_proceeding_data_length =
+            (temp_buffer.len() as u16) + unconnected_data_length + trailing_items_length;
 
         // Step 3: Write the full struct to the actual writer
         if let Err(write_err) =

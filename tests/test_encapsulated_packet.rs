@@ -90,7 +90,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
 
     // NOTE: The args are passed by the ObjectAssembly
     identity_request_packet
-        .write_options(&mut writer, binrw::Endian::Little, (10,))
+        .write_options(&mut writer, binrw::Endian::Little, (10, 0, 2))
         .unwrap();
 
     assert_eq!(expected_eip_byte_array, identity_byte_array);
@@ -123,7 +123,7 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
         .write_options(
             &mut writer,
             binrw::Endian::Little,
-            (message_request_buffer.len() as u16,),
+            (message_request_buffer.len() as u16, 0, 2),
         )
         .unwrap();
 

@@ -79,6 +79,7 @@ fn test_write_output_assembly_object_request() {
 
     let set_digital_output_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
         packet_description: EnIpPacketDescription::new_cip_description(provided_session_handle, 0),
+        additional_items: vec![],
         cip_message: Some(full_path_request),
     };
 

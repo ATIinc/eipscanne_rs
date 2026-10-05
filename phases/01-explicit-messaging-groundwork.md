@@ -1,0 +1,67 @@
+# Phase 1 — explicit-messaging groundwork
+
+**Status:** In review (branch `feat/SW-4573-1-explicit-groundwork`)
+
+## Goal
+
+Generalize the explicit-messaging code so the Connection Manager traffic of the next phases fits
+without rewrites, while keeping every existing byte-exact test green. No new protocol features.
+
+## Scope
+
+* **Dependencies** — bump `bilge` 0.2 → 0.5 (generated `new` constructors are now private by
+  default, so bitfields that are constructed from other modules use `#[bitsize(N, new = pub)]`;
+  the `Number` prelude import is gone), `tokio` 1.43 → 1.53, `clap` 4.5 → 4.6, `pretty-hex` 0.4.2.
+* **Service codes** — `ServiceCode` gains the Connection Manager services: `ForwardClose` (0x4E),
+  `UnconnectedSend` (0x52), `ForwardOpen` (0x54), `GetConnectionData` (0x56),
+  `SearchConnectionData` (0x57), `GetConnectionOwner` (0x5A), `LargeForwardOpen` (0x5B).
+* **General status** — `ResponseStatusCode` lists every general status code (0x00–0x2B) and keeps
+  unknown codes as `Unknown(u8)`. `ResponseData` now parses the additional status words
+  (`additional_status: Vec<u16>`, one per `additional_status_size`) that error replies carry, e.g.
+  the extended status of a failed `Forward_Open`.
+* **EPATH** — `src/cip/path.rs`:
+  * all segment types (`PortSegment`, `LogicalSegment`, `NetworkSegment`, `SymbolicSegment`,
+    `DataSegment`) and all logical segment types (`ClassId`, `InstanceId`, `MemberId`,
+    `ConnectionPoint`, `AttributeId`, `Special`, `ServiceId`, `Reserved`);
+  * `SimpleDataSegment` (0x80, size in words, data words);
+  * `PathSegment` (`Logical` | `Data`) and `EPath`, a padded path with any number of segments,
+    read with its byte length and written back-to-back; `EPath::new_assembly_connection`
+    builds the usual `config instance / O->T connection point / T->O connection point` path;
+  * `write_path_with_word_size`, a reusable `write_with` function that prefixes a path with its
+    size in 16-bit words (used by the request path today, by `Forward_Open` / `Forward_Close`
+    next);
+  * `LogicalPathSegment` rejects bytes whose segment type is not "logical" instead of
+    misinterpreting them.
+* **Common Packet Format** — `src/eip/description.rs`, `src/eip/command.rs`,
+  `src/object_assembly.rs`:
+  * `CommonPacketItemId` keeps unknown IDs (`Unknown(u16)`) so unexpected items are skipped by
+    length instead of failing the packet;
+  * `SockaddrInfo` (family, port, address in big endian; zero padding) with conversions from and
+    to `SocketAddrV4`;
+  * `AdditionalItem` / `CommonPacketItem`: typed O->T and T->O Sockaddr Info items plus a raw
+    fallback;
+  * `RRPacketData::item_count` is a real field now; on write it is derived from the number of items
+    actually serialized;
+  * `RequestObjectAssembly` / `ResponseObjectAssembly` carry `additional_items` after the CIP
+    message, and the write path serializes the CIP message and the trailing items separately so the
+    encapsulation length and the Unconnected Data Item length stay correct (the write arguments
+    threaded through `EnIpPacketDescription` → `CommandSpecificData` → `RRPacketData` are now
+    `(unconnected_data_length, trailing_items_length, item_count)`).
+* **README** — "Related projects" section.
+
+## Tests
+
+* Existing suites unchanged apart from the new struct literal fields.
+* `tests/test_common_packet.rs` — Sockaddr Info byte order, Sockaddr Info items, unknown items,
+  a reply with three items round-tripped byte-for-byte.
+* `tests/test_epath.rs` — assembly connection path, 16-bit class/instance path, data segment,
+  rejection of unsupported segment types and of segments overrunning the declared length.
+* `tests/test_general_status.rs` — additional status words, unknown general status, service codes.
+
+## Verification
+
+```
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --examples && cargo build --features async
+```
+
+Pre-existing clippy style warnings (`Into` impls, `-1 *`, `if let Err` blocks) are left untouched.

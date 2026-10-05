@@ -2,12 +2,11 @@ use std::vec;
 
 use binrw::{BinRead, BinWrite};
 
-use bilge::prelude::u3;
-
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::path::{
-    CipPath, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType, PathData, SegmentType,
+    CipPath, LogicalPathDefinition, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType,
+    PathData, SegmentType,
 };
 use eipscanne_rs::cip::types::CipByte;
 
@@ -177,59 +176,36 @@ fn test_deserialize_cip_path() {
 }
 
 #[test]
-fn test_deserialize_unknown_cip_path() {
+fn test_deserialize_non_logical_segment_is_rejected() {
     /*
-    Request Path: Identity, Instance: 0x0001
-    Path Segment: 0x21 (16-Bit Class Segment)
-        001. .... = Path Segment Type: Logical Segment (1)
-        ...0 00.. = Logical Segment Type: Class ID (0)
-        .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-        Class: Identity (0x0001)
-    Path Segment: 0x25 (16-Bit Instance Segment)
-        001. .... = Path Segment Type: Logical Segment (1)
-        ...0 01.. = Logical Segment Type: Instance ID (1)
-        .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-        Instance: 0x0001
+    The first byte has the Path Segment Type bits set to 100 (a data segment), so it cannot be
+    interpreted as a logical segment even though the remaining bits look like a 16-bit segment:
 
-    -------------------------------------
+        100. .... = Path Segment Type: Data Segment (4)
+        ...1 10.. = Logical Segment Type: Service ID (6)
+        .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
+
     Hex Dump:
 
-    0000   21 00 01 00 25 00 01 00
-
+    0000   99 00 01 00 25 00 01 00
     */
     let raw_bytes: Vec<CipByte> = vec![0b10011001, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
+
+    let path_definition = LogicalPathDefinition::from(raw_bytes[0]);
+    assert_eq!(path_definition.segment_type(), SegmentType::DataSegment);
+    assert_eq!(
+        path_definition.logical_segment_type(),
+        LogicalSegmentType::ServiceId
+    );
+    assert_eq!(
+        path_definition.logical_segment_format(),
+        LogicalSegmentFormat::FormatAsU16
+    );
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    // Read from buffered reader
-    let cip_path = CipPath::read(&mut buf_reader).unwrap();
-
-    // Assert equality
-    assert_eq!(
-        cip_path.class_id_segment.path_definition.segment_type(),
-        SegmentType::Unknown(u3::new(0x4))
-    );
-
-    assert_eq!(cip_path.class_id_segment.data, PathData::FormatAsU16(0x1));
-    assert_eq!(
-        cip_path
-            .class_id_segment
-            .path_definition
-            .logical_segment_type(),
-        LogicalSegmentType::Unknown(u3::new(0x6))
-    );
-    assert_eq!(
-        cip_path.instance_id_segment.data,
-        PathData::FormatAsU16(0x1)
-    );
-    assert_eq!(
-        cip_path
-            .instance_id_segment
-            .path_definition
-            .logical_segment_type(),
-        LogicalSegmentType::InstanceId
-    );
+    assert!(CipPath::read(&mut buf_reader).is_err());
 }
 
 #[test]

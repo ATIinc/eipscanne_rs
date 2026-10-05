@@ -1,12 +1,12 @@
 use binrw::{binrw, BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, u10, Bitsized, DebugBits, FromBits, Number};
+use bilge::prelude::{bitsize, u10, DebugBits, FromBits};
 
 use eipscanne_rs::cip::types::{CipDint, CipDword, CipInt, CipUdint, CipUlint, CipUsint};
 
 // https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
 
-#[bitsize(16)]
+#[bitsize(16, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(repr = u16)]
 #[bw(map = |&x| u16::from(x))]
@@ -380,6 +380,7 @@ mod tests {
                 provided_session_handle,
                 0,
             ),
+            additional_items: vec![],
             cip_message: Some(set_digital_output_message),
         };
 
@@ -502,6 +503,7 @@ mod tests {
                     options: 0x0,
                 },
                 command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+                    item_count: 2,
                     interface_handle: 0x0,
                     timeout: 0,
                     empty_data_packet: CommonPacketDescriptor {
@@ -514,11 +516,13 @@ mod tests {
                     },
                 }),
             },
+            additional_items: vec![],
             cip_message: Some(MessageRouterResponse {
                 service_container: ServiceContainer::new(ServiceCode::GetAttributeSingle, true),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,
+                    additional_status: vec![],
                     data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
                         io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::new(
                             false,
@@ -596,6 +600,7 @@ mod tests {
                     options: 0x0,
                 },
                 command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+                    item_count: 2,
                     interface_handle: 0x0,
                     timeout: 0,
                     empty_data_packet: CommonPacketDescriptor {
@@ -610,6 +615,7 @@ mod tests {
                     },
                 }),
             },
+            additional_items: vec![],
             cip_message: Some(MessageRouterRequest {
                 service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, false),
                 request_data: RequestData::new(

@@ -95,6 +95,7 @@ fn test_deserialize_cip_identity_request() {
                     RRPacketData::test_with_size(0x0, 0x0, Some(10)),
                 ),
             },
+            additional_items: vec![],
             cip_message: Some(MessageRouterRequest {
                 service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, false),
                 request_data: RequestData::new(Some(0x4), CipPath::new(0x1, 0x1), None),
@@ -152,6 +153,7 @@ fn test_deserialize_registration_request() {
                 option_flags: 0x00,
             }),
         },
+        additional_items: vec![],
         cip_message: None,
     };
 

@@ -1,7 +1,6 @@
 use binrw::{binrw, BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, DebugBits, FromBits, Number};
-use bilge::Bitsized;
+use bilge::prelude::{bitsize, DebugBits, FromBits};
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipDword, CipSint, CipUdint, CipUint, CipUsint};
 
 #[binrw]
@@ -120,7 +119,7 @@ impl EncoderConfigData {
 
 // ^^^^^^^ End of EncoderConfigData impl ^^^^^^^^
 
-#[bitsize(32)]
+#[bitsize(32, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
@@ -352,6 +351,7 @@ mod tests {
                 provided_session_handle,
                 0,
             ),
+            additional_items: vec![],
             cip_message: Some(set_clearlink_config_message),
         };
 
@@ -424,6 +424,7 @@ mod tests {
                     options: 0x0,
                 },
                 command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+                    item_count: 2,
                     interface_handle: 0x0,
                     timeout: 0,
                     empty_data_packet: CommonPacketDescriptor {
@@ -436,11 +437,13 @@ mod tests {
                     },
                 }),
             },
+            additional_items: vec![],
             cip_message: Some(MessageRouterResponse {
                 service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, true),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,
+                    additional_status: vec![],
                     data: CipDataOpt::Raw(vec![]),
                 },
             }),

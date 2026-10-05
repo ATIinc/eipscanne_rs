@@ -1,7 +1,11 @@
+use std::io::{Cursor, Seek, Write};
+
 use binrw::meta::WriteEndian;
 use binrw::{
     binread,
+    BinResult,
     BinWrite, // trait for writing
+    Endian,
 };
 
 use crate::cip::message::data::CipData;
@@ -10,8 +14,56 @@ use crate::cip::message::{
 };
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
-use crate::eip::command::CommandSpecificData;
+use crate::eip::command::{CommandSpecificData, BASE_ITEM_COUNT};
+use crate::eip::description::CommonPacketItem;
 use crate::eip::packet::EnIpPacketDescription;
+
+/// Writes a complete encapsulated packet: header, command specific data, the CIP message and any
+/// Common Packet Format items that follow it.
+///
+/// The CIP message and the trailing items are serialized first so the lengths in the header and
+/// in the Unconnected Data Item descriptor can be filled in.
+fn write_assembly<W, M>(
+    writer: &mut W,
+    endian: Endian,
+    packet_description: &EnIpPacketDescription,
+    cip_message: &Option<M>,
+    additional_items: &[CommonPacketItem],
+) -> BinResult<()>
+where
+    W: Write + Seek,
+    M: for<'a> BinWrite<Args<'a> = ()>,
+{
+    // Step 1: Serialize the `cip_message` field
+    let mut cip_message_buffer = Vec::new();
+    cip_message.write_options(&mut Cursor::new(&mut cip_message_buffer), endian, ())?;
+
+    // Step 2: Serialize the items that follow the CIP message
+    let mut additional_items_buffer = Vec::new();
+    {
+        let mut additional_items_writer = Cursor::new(&mut additional_items_buffer);
+        for item in additional_items {
+            item.write_options(&mut additional_items_writer, endian, ())?;
+        }
+    }
+
+    // Step 3: Write the full packet, passing the sizes that are only known now
+    let item_count = BASE_ITEM_COUNT + additional_items.len() as u16;
+    packet_description.write_options(
+        writer,
+        endian,
+        (
+            cip_message_buffer.len() as u16,
+            additional_items_buffer.len() as u16,
+            item_count,
+        ),
+    )?;
+
+    writer.write_all(&cip_message_buffer)?;
+    writer.write_all(&additional_items_buffer)?;
+
+    Ok(())
+}
 
 #[binread]
 #[derive(Debug, PartialEq)]
@@ -31,6 +83,14 @@ pub struct RequestObjectAssembly {
         })
     )]
     pub cip_message: Option<MessageRouterRequest>,
+
+    // Items following the CIP message (e.g. Sockaddr Info items of a Forward_Open).
+    // Only read when the CIP message was read, so a failed CIP read never gets interpreted as items.
+    #[br(
+        if(cip_message.is_some()),
+        count = packet_description.command_specific_data.additional_item_count()
+    )]
+    pub additional_items: Vec<CommonPacketItem>,
 }
 
 // ======= Start of RequestObjectAssembly impl ========
@@ -46,36 +106,15 @@ impl BinWrite for RequestObjectAssembly {
         &self,
         writer: &mut W,
         endian: binrw::Endian,
-        args: Self::Args<'_>,
+        _args: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `cip_message` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
-
-        let cip_message_write_result =
-            self.cip_message
-                .write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = cip_message_write_result {
-            return Err(write_err);
-        }
-
-        // Step 2: Calculate the packet size
-        let packet_byte_size = temp_buffer.len() as u16;
-
-        // Step 3: Write the full packet
-        if let Err(write_err) =
-            self.packet_description
-                .write_options(writer, endian, (packet_byte_size,))
-        {
-            return Err(write_err);
-        }
-
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
-
-        Ok(())
+        write_assembly(
+            writer,
+            endian,
+            &self.packet_description,
+            &self.cip_message,
+            &self.additional_items,
+        )
     }
 }
 
@@ -86,6 +125,7 @@ impl RequestObjectAssembly {
         RequestObjectAssembly {
             packet_description: EnIpPacketDescription::new_registration_description(),
             cip_message: None,
+            additional_items: vec![],
         }
     }
 
@@ -95,6 +135,7 @@ impl RequestObjectAssembly {
                 session_handle,
             ),
             cip_message: None,
+            additional_items: vec![],
         }
     }
 
@@ -122,7 +163,14 @@ impl RequestObjectAssembly {
                 request_path,
                 data,
             )),
+            additional_items: vec![],
         }
+    }
+
+    /// Appends a Common Packet Format item after the CIP message (e.g. a Sockaddr Info item)
+    pub fn with_additional_item(mut self, item: CommonPacketItem) -> Self {
+        self.additional_items.push(item);
+        self
     }
 }
 
@@ -146,6 +194,14 @@ pub struct ResponseObjectAssembly {
         })
     )]
     pub cip_message: Option<MessageRouterResponse>,
+
+    // Items following the CIP message (e.g. Sockaddr Info items of a Forward_Open reply).
+    // Only read when the CIP message was read, so a failed CIP read never gets interpreted as items.
+    #[br(
+        if(cip_message.is_some()),
+        count = packet_description.command_specific_data.additional_item_count()
+    )]
+    pub additional_items: Vec<CommonPacketItem>,
 }
 
 // ======= Start of ResponseObjectAssembly impl ========
@@ -161,37 +217,25 @@ impl BinWrite for ResponseObjectAssembly {
         &self,
         writer: &mut W,
         endian: binrw::Endian,
-        args: Self::Args<'_>,
+        _args: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `cip_message` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
-
-        let cip_message_write_result =
-            self.cip_message
-                .write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = cip_message_write_result {
-            return Err(write_err);
-        }
-
-        // Step 2: Calculate the packet size
-        let packet_byte_size = temp_buffer.len() as u16;
-
-        // Step 3: Write the full packet
-        if let Err(write_err) =
-            self.packet_description
-                .write_options(writer, endian, (packet_byte_size,))
-        {
-            return Err(write_err);
-        }
-
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
-
-        Ok(())
+        write_assembly(
+            writer,
+            endian,
+            &self.packet_description,
+            &self.cip_message,
+            &self.additional_items,
+        )
     }
 }
 
-// ^^^^^^^^ End of RequestObjectAssembly impl ^^^^^^^^
+impl ResponseObjectAssembly {
+    /// The Sockaddr Info items that followed the CIP message, if any
+    pub fn sockaddr_info_items(&self) -> impl Iterator<Item = &CommonPacketItem> {
+        self.additional_items
+            .iter()
+            .filter(|item| item.sockaddr_info().is_some())
+    }
+}
+
+// ^^^^^^^^ End of ResponseObjectAssembly impl ^^^^^^^^

@@ -1,4 +1,4 @@
-use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, FromBits, Number};
+use bilge::prelude::{bitsize, u4, DebugBits, FromBits};
 
 use binrw::{
     binrw, // #[binrw] attribute
@@ -60,7 +60,7 @@ pub struct Revision {
     pub minor: CipByte,
 }
 
-#[bitsize(16)]
+#[bitsize(16, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits)]
 pub struct IdentityStatusBits {
     pub owned: bool,

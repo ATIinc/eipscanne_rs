@@ -2,7 +2,7 @@ use std::mem;
 
 use binrw::{BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, FromBits, Number};
+use bilge::prelude::{bitsize, u7, DebugBits, FromBits};
 
 use crate::cip::types::CipUsint;
 
@@ -40,11 +40,20 @@ pub enum ServiceCode {
     RemoveMember = 0x1B,
     GroupSync = 0x1C, /* End CIP common services */
 
+    /* Start Connection Manager object specific services */
+    ForwardClose = 0x4E,
+    UnconnectedSend = 0x52,
+    ForwardOpen = 0x54,
+    GetConnectionData = 0x56,
+    SearchConnectionData = 0x57,
+    GetConnectionOwner = 0x5A,
+    LargeForwardOpen = 0x5B, /* End Connection Manager object specific services */
+
     #[fallback]
     Unknown(u7),
 }
 
-#[bitsize(8)]
+#[bitsize(8, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]

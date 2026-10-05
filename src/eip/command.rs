@@ -40,19 +40,41 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
+/// Number of Common Packet Format items that every SendRRData packet carries: the address item and the data item
+pub const BASE_ITEM_COUNT: CipUint = 2;
+
+/// Values that are only known once the data following the command specific data has been serialized:
+/// `(unconnected_data_length, trailing_items_length, item_count)`
+///
+/// * `unconnected_data_length`: length of the Unconnected Data Item (the CIP message)
+/// * `trailing_items_length`: length of every item written after the CIP message
+/// * `item_count`: total number of items in the Common Packet Format
+pub type PacketWriteArgs = (u16, u16, u16);
+
+#[binrw::writer(writer: writer, endian)]
+fn item_count_writer(obj: &CipUint, provided_item_count: u16) -> binrw::BinResult<()> {
+    // Without a provided count (e.g. when the struct is written on its own) keep the field value
+    if provided_item_count == 0 {
+        return obj.write_options(writer, endian, ());
+    }
+
+    provided_item_count.write_options(writer, endian, ())
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-#[bw(import(provided_packet_length: u16))]
+#[bw(import(unconnected_data_length: u16, _trailing_items_length: u16, provided_item_count: u16))]
 pub struct RRPacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
 
-    #[bw(calc = 2)]
-    pub _item_count: CipUint,
+    // Read from the wire; written from the number of items actually serialized
+    #[bw(args(provided_item_count), write_with = item_count_writer)]
+    pub item_count: CipUint,
     pub empty_data_packet: CommonPacketDescriptor,
 
-    #[bw(args(Some(provided_packet_length)))]
+    #[bw(args(Some(unconnected_data_length)))]
     pub unconnected_data_packet: CommonPacketDescriptor,
 }
 
@@ -68,6 +90,7 @@ impl RRPacketData {
         RRPacketData {
             interface_handle,
             timeout,
+            item_count: BASE_ITEM_COUNT,
             empty_data_packet: CommonPacketDescriptor {
                 type_id: CommonPacketItemId::NullAddr,
                 packet_length: Some(0),
@@ -81,6 +104,11 @@ impl RRPacketData {
 
     pub fn new(interface_handle: CipUdint, timeout: CipUint) -> Self {
         Self::test_with_size(interface_handle, timeout, None)
+    }
+
+    /// Number of items that follow the data item
+    pub fn additional_item_count(&self) -> usize {
+        self.item_count.saturating_sub(BASE_ITEM_COUNT) as usize
     }
 }
 
@@ -98,7 +126,7 @@ pub struct RegisterData {
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 #[br(import(command_type: EnIpCommand))]
-#[bw(import(provided_packet_length: u16))]
+#[bw(import(unconnected_data_length: u16, trailing_items_length: u16, item_count: u16))]
 pub enum CommandSpecificData {
     #[br(pre_assert(command_type == EnIpCommand::UnRegisterSession))]
     UnregisterSession,
@@ -107,9 +135,11 @@ pub enum CommandSpecificData {
     RegisterSession(RegisterData),
 
     #[br(pre_assert(command_type == EnIpCommand::SendRrData))]
-    SendRrData(#[bw(args(provided_packet_length))] RRPacketData),
+    SendRrData(
+        #[bw(args(unconnected_data_length, trailing_items_length, item_count))] RRPacketData,
+    ),
     /*  When reading -- make sure the provided command_type matches.
-    When writing -- make sure the packet length is passed on */
+    When writing -- make sure the packet lengths are passed on */
 }
 
 // ======= Start of CommandSpecificData impl ========
@@ -124,6 +154,14 @@ impl CommandSpecificData {
 
     pub fn new_request(interface_handle: CipUdint, timeout: CipUint) -> Self {
         Self::SendRrData(RRPacketData::new(interface_handle, timeout))
+    }
+
+    /// Number of Common Packet Format items that follow the data item (0 for commands without one)
+    pub fn additional_item_count(&self) -> usize {
+        match self {
+            CommandSpecificData::SendRrData(rr_data) => rr_data.additional_item_count(),
+            _ => 0,
+        }
     }
 }
 

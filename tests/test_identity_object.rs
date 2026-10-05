@@ -254,6 +254,7 @@ fn test_deserialize_cip_identity_response() {
         response_data: ResponseData {
             status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
+            additional_status: vec![],
             data: CipDataOpt::Typed(Box::new(IdentityResponse {
                 vendor_id: VendorId::TeknicInc,
                 device_type: DeviceType::GenericDevice,
@@ -397,11 +398,13 @@ fn test_deserialize_full_identity_response() {
                     RRPacketData::test_with_size(0x0, 0x0, Some(28)),
                 ),
             },
+            additional_items: vec![],
             cip_message: Some(MessageRouterResponse {
                 service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true).into(),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0x0,
+                    additional_status: vec![],
                     data: CipDataOpt::Typed(Box::new(IdentityResponse {
                         vendor_id: VendorId::TeknicInc,
                         device_type: DeviceType::GenericDevice,
