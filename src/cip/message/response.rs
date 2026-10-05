@@ -8,7 +8,7 @@ use crate::cip::{
     types::{CipUint, CipUsint},
 };
 
-use super::shared::{ServiceContainer, SIZE_OF_SERVICE_CONTAINER};
+use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceContainer};
 
 /// General Status of a Message Router response.
 ///

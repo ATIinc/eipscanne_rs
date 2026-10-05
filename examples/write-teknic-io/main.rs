@@ -14,7 +14,7 @@ mod duplicated_stream_utils;
 // Make sure the code itself looks the same
 use clearlink_config::ConfigAssemblyObject;
 use clearlink_output::OutputAssemblyObject;
-use cli_config::{set_io_data, CliArgs};
+use cli_config::{CliArgs, set_io_data};
 use duplicated_stream_utils as stream_utils;
 
 const ETHERNET_IP_PORT: u16 = 0xAF12;

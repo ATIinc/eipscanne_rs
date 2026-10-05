@@ -6,7 +6,7 @@ use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceC
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, BASE_ITEM_COUNT,
+    BASE_ITEM_COUNT, CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
 use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 

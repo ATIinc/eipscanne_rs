@@ -1,4 +1,4 @@
-use bilge::prelude::{bitsize, u4, BuilderBits, DebugBits, DefaultBits, FromBits};
+use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u4};
 
 use binrw::{
     binrw, // #[binrw] attribute

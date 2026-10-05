@@ -32,6 +32,8 @@ point. Update the **Status** line of a phase when it changes.
   types to what the baseline actually sends and parses instead of covering the whole specification.
 * **Wireshark naming.** Struct and field names follow the names Wireshark shows for the same bytes
   (`enip.*` and `cip.cm.*` fields), in `snake_case`.
+* **Path-based module layout.** Modules are declared in `src/<name>.rs` with their submodules in
+  `src/<name>/`; no `mod.rs` files.
 * **Bitfields are built by name.** Every `bilge` bitfield derives `BuilderBits`
   (`Type::builder().field(value)....build()`, each field set exactly once, reserved bits zero) and,
   when every field has a zero default, `DefaultBits` (`Type::default()` plus `set_*` setters). The

@@ -3,10 +3,10 @@ use std::mem;
 
 use binrw::binrw;
 
-use super::shared::{ServiceCode, ServiceContainer, SIZE_OF_SERVICE_CONTAINER};
+use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 use crate::cip::message::data::{CipData, CipDataOpt};
 use crate::cip::message::shared::{BYTES_IN_A_WORD, SIZE_OF_CIP_USINT};
-use crate::cip::path::{write_path_with_word_size, CipPath};
+use crate::cip::path::{CipPath, write_path_with_word_size};
 use crate::cip::types::CipUsint;
 
 #[binrw]

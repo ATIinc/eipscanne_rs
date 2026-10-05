@@ -1,8 +1,8 @@
 use binrw::meta::WriteEndian;
 use binrw::{
+    BinWrite, // trait for writing
     binread,
     binwrite,
-    BinWrite, // trait for writing
 };
 
 use crate::cip::types::{CipByte, CipUdint, CipUint};

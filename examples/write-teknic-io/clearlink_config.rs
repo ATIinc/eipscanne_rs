@@ -1,6 +1,6 @@
-use binrw::{binrw, BinRead, BinWrite};
+use binrw::{BinRead, BinWrite, binrw};
 
-use bilge::prelude::{bitsize, u26, BuilderBits, DebugBits, FromBits};
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u26};
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipDword, CipSint, CipUdint, CipUint, CipUsint};
 
 #[binrw]

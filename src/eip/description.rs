@@ -1,11 +1,11 @@
 use binrw::{
-    binrw,    // #[binrw] attribute
     BinWrite, // trait for writing
+    binrw,    // #[binrw] attribute
 };
 
 use crate::cip::types::{CipUint, CipUsint};
 
-use super::sockaddr::{SockaddrInfo, SOCKADDR_INFO_LENGTH};
+use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
 
 /// Type ID of a Common Packet Format item.
 ///

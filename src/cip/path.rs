@@ -1,15 +1,15 @@
 use std::io::{Seek, Write};
 
 use binrw::{
-    binrw,
     BinRead,
     BinResult,
     BinWrite, // #[binrw] attribute
     Endian,
+    binrw,
 };
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
-use bilge::prelude::{bitsize, u2, u3, BuilderBits, DebugBits, FromBits};
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3};
 
 use crate::cip::types::CipUsint;
 

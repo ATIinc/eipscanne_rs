@@ -2,10 +2,10 @@ use std::io::{Cursor, Seek, Write};
 
 use binrw::meta::WriteEndian;
 use binrw::{
-    binread,
     BinResult,
     BinWrite, // trait for writing
     Endian,
+    binread,
 };
 
 use crate::cip::message::data::CipData;
@@ -14,7 +14,7 @@ use crate::cip::message::{
 };
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
-use crate::eip::command::{CommandSpecificData, BASE_ITEM_COUNT};
+use crate::eip::command::{BASE_ITEM_COUNT, CommandSpecificData};
 use crate::eip::description::CommonPacketItem;
 use crate::eip::packet::EnIpPacketDescription;
 

@@ -1,7 +1,7 @@
 use binrw::{
-    binrw,    // #[binrw] attribute
     BinRead,  // trait for reading
     BinWrite, // trait for writing
+    binrw,    // #[binrw] attribute
 };
 
 use crate::cip::types::{CipUdint, CipUint};
