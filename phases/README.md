@@ -28,6 +28,10 @@ point. Update the **Status** line of a phase when it changes.
   `binrw` + `bilge`; sockets, timers and the cyclic loop live in an example and a small utility crate.
 * **Wireshark naming.** Struct and field names follow the names Wireshark shows for the same bytes
   (`enip.*` and `cip.cm.*` fields), in `snake_case`.
+* **Bitfields are built by name.** Every `bilge` bitfield derives `BuilderBits`
+  (`Type::builder().field(value)....build()`, each field set exactly once, reserved bits zero) and,
+  when every field has a zero default, `DefaultBits` (`Type::default()` plus `set_*` setters). The
+  positional `new(...)` constructor stays private.
 * **EIPScanner parity.** Behaviour mirrors the C++ [EIPScanner](https://github.com/nimbuscontrols/EIPScanner)
   `ConnectionManager` / `IOConnection` logic unless the specification says otherwise.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against

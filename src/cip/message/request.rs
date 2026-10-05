@@ -69,7 +69,7 @@ impl MessageRouterRequest {
         request_data_content: Option<Box<dyn CipData>>,
     ) -> Self {
         MessageRouterRequest {
-            service_container: ServiceContainer::new(service_code, false),
+            service_container: ServiceContainer::new_request(service_code),
             request_data: RequestData::new(None, path, request_data_content),
         }
     }

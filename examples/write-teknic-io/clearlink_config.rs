@@ -1,6 +1,6 @@
 use binrw::{binrw, BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, DebugBits, FromBits};
+use bilge::prelude::{bitsize, u26, BuilderBits, DebugBits, FromBits};
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipDword, CipSint, CipUdint, CipUint, CipUsint};
 
 #[binrw]
@@ -119,8 +119,8 @@ impl EncoderConfigData {
 
 // ^^^^^^^ End of EncoderConfigData impl ^^^^^^^^
 
-#[bitsize(32, new = pub)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[bitsize(32)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct ConfigRegisterData {
@@ -130,7 +130,7 @@ pub struct ConfigRegisterData {
     hlfb_inversion: bool,                // bit = 3, // NOTE: The default if HIGH
     position_capture_active_level: bool, // bit = 4,
     software_limit_enable: bool,         // bit = 5,
-    _padding: [bool; 26],                // bits 6-31
+    reserved: u26,                       // bits 6-31
 }
 #[binrw]
 #[brw(little)]
@@ -157,7 +157,14 @@ pub struct MotorConfigData {
 impl MotorConfigData {
     fn default() -> Self {
         Self {
-            config_register: ConfigRegisterData::new(false, false, false, true, false, false),
+            config_register: ConfigRegisterData::builder()
+                .homing_enable(false)
+                .home_sensor_active_level(false)
+                .enable_inversion(false)
+                .hlfb_inversion(true)
+                .position_capture_active_level(false)
+                .software_limit_enable(false)
+                .build(),
             follow_divisor: 1,
             follow_multiplier: 1,
             max_deceleration: 10000000,
@@ -439,7 +446,7 @@ mod tests {
             },
             additional_items: vec![],
             cip_message: Some(MessageRouterResponse {
-                service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, true),
+                service_container: ServiceContainer::new_response(ServiceCode::SetAttributeSingle),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0,

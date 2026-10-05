@@ -32,7 +32,7 @@ fn test_deserialize_response_with_additional_status() {
         MessageRouterResponse::read_args(&mut buf_reader, (raw_bytes.len() as u16,)).unwrap();
 
     let expected_response = MessageRouterResponse {
-        service_container: ServiceContainer::new(ServiceCode::ForwardOpen, true),
+        service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
         response_data: ResponseData {
             status: ResponseStatusCode::ConnectionFailure,
             additional_status_size: 1,
@@ -63,7 +63,7 @@ fn test_deserialize_response_with_additional_status_and_data() {
 
     assert_eq!(
         response.service_container,
-        ServiceContainer::new(ServiceCode::GetAttributeSingle, true)
+        ServiceContainer::new_response(ServiceCode::GetAttributeSingle)
     );
     assert_eq!(
         response.response_data.status,
@@ -103,15 +103,15 @@ fn test_unknown_general_status_is_preserved() {
 #[test]
 fn test_connection_manager_service_codes() {
     assert_eq!(
-        u8::from(ServiceContainer::new(ServiceCode::ForwardOpen, false)),
+        u8::from(ServiceContainer::new_request(ServiceCode::ForwardOpen)),
         0x54
     );
     assert_eq!(
-        u8::from(ServiceContainer::new(ServiceCode::LargeForwardOpen, false)),
+        u8::from(ServiceContainer::new_request(ServiceCode::LargeForwardOpen)),
         0x5b
     );
     assert_eq!(
-        u8::from(ServiceContainer::new(ServiceCode::ForwardClose, true)),
+        u8::from(ServiceContainer::new_response(ServiceCode::ForwardClose)),
         0xce
     );
 }

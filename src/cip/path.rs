@@ -9,7 +9,7 @@ use binrw::{
 };
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
-use bilge::prelude::{bitsize, u2, u3, DebugBits, FromBits};
+use bilge::prelude::{bitsize, u2, u3, BuilderBits, DebugBits, FromBits};
 
 use crate::cip::types::{CipUsint, CipWord};
 
@@ -54,8 +54,8 @@ pub enum LogicalSegmentFormat {
     Unknown(u2),
 }
 
-#[bitsize(8, new = pub)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[bitsize(8)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct LogicalPathDefinition {
@@ -121,11 +121,11 @@ pub struct LogicalPathSegment {
 impl LogicalPathSegment {
     pub fn new_u8(logical_segment_type: LogicalSegmentType, data: u8) -> Self {
         LogicalPathSegment {
-            path_definition: LogicalPathDefinition::new(
-                LogicalSegmentFormat::FormatAsU8,
-                logical_segment_type,
-                SegmentType::LogicalSegment,
-            ),
+            path_definition: LogicalPathDefinition::builder()
+                .logical_segment_format(LogicalSegmentFormat::FormatAsU8)
+                .logical_segment_type(logical_segment_type)
+                .segment_type(SegmentType::LogicalSegment)
+                .build(),
             u16_padding: None,
             data: PathData::FormatAsU8(data),
         }
@@ -133,11 +133,11 @@ impl LogicalPathSegment {
 
     pub fn new_u16(logical_segment_type: LogicalSegmentType, data: u16) -> Self {
         LogicalPathSegment {
-            path_definition: LogicalPathDefinition::new(
-                LogicalSegmentFormat::FormatAsU16,
-                logical_segment_type,
-                SegmentType::LogicalSegment,
-            ),
+            path_definition: LogicalPathDefinition::builder()
+                .logical_segment_format(LogicalSegmentFormat::FormatAsU16)
+                .logical_segment_type(logical_segment_type)
+                .segment_type(SegmentType::LogicalSegment)
+                .build(),
             u16_padding: Some(0x0),
             data: PathData::FormatAsU16(data),
         }

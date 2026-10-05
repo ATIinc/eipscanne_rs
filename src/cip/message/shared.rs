@@ -2,7 +2,7 @@ use std::mem;
 
 use binrw::{BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, u7, DebugBits, FromBits};
+use bilge::prelude::{bitsize, u7, BuilderBits, DebugBits, DefaultBits, FromBits};
 
 use crate::cip::types::CipUsint;
 
@@ -11,9 +11,10 @@ pub const SIZE_OF_CIP_USINT: usize = mem::size_of::<CipUsint>();
 pub const SIZE_OF_SERVICE_CONTAINER: usize = mem::size_of::<ServiceContainer>();
 
 #[bitsize(7)]
-#[derive(FromBits, PartialEq, Debug)]
+#[derive(FromBits, PartialEq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum ServiceCode {
+    #[default]
     None = 0x00,
     /* Start CIP common services */
     GetAttributeAll = 0x01,
@@ -53,14 +54,38 @@ pub enum ServiceCode {
     Unknown(u7),
 }
 
-#[bitsize(8, new = pub)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[bitsize(8)]
+#[derive(
+    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
+)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct ServiceContainer {
     pub service: ServiceCode,
     pub response: bool,
 }
+
+// ======= Start of ServiceContainer impl ========
+
+impl ServiceContainer {
+    /// The service byte of a request
+    pub fn new_request(service: ServiceCode) -> Self {
+        ServiceContainer::builder()
+            .service(service)
+            .response(false)
+            .build()
+    }
+
+    /// The service byte of a response (request bit set)
+    pub fn new_response(service: ServiceCode) -> Self {
+        ServiceContainer::builder()
+            .service(service)
+            .response(true)
+            .build()
+    }
+}
+
+// ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
 
 // NOTE:
 //  - Keeping a generic MessageRouter struct here for future reference

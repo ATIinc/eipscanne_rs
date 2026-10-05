@@ -9,9 +9,14 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
 
 ## Scope
 
-* **Dependencies** — bump `bilge` 0.2 → 0.5 (generated `new` constructors are now private by
-  default, so bitfields that are constructed from other modules use `#[bitsize(N, new = pub)]`;
-  the `Number` prelude import is gone), `tokio` 1.43 → 1.53, `clap` 4.5 → 4.6, `pretty-hex` 0.4.2.
+* **Dependencies** — bump `bilge` 0.2 → 0.5 (the `Number` prelude import is gone and generated
+  `new` constructors are private by default), `tokio` 1.43 → 1.53, `clap` 4.5 → 4.6,
+  `pretty-hex` 0.4.2.
+* **Named bitfield construction** — all bitfields (`ServiceContainer`, `LogicalPathDefinition`,
+  `IdentityStatusBits`, the example's `DigitalOutputs` and `ConfigRegisterData`) derive
+  `BuilderBits`, and `DefaultBits` where every field defaults to zero; call sites use
+  `Type::builder().field(value)....build()` or `Type::default()` instead of the positional `new`.
+  `ServiceContainer::new_request(code)` / `new_response(code)` wrap the builder for the common case.
 * **Service codes** — `ServiceCode` gains the Connection Manager services: `ForwardClose` (0x4E),
   `UnconnectedSend` (0x52), `ForwardOpen` (0x54), `GetConnectionData` (0x56),
   `SearchConnectionData` (0x57), `GetConnectionOwner` (0x5A), `LargeForwardOpen` (0x5B).

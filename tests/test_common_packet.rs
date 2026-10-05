@@ -188,7 +188,7 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
             }),
         },
         cip_message: Some(MessageRouterResponse {
-            service_container: ServiceContainer::new(ServiceCode::ForwardOpen, true),
+            service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
             response_data: ResponseData {
                 status: ResponseStatusCode::Success,
                 additional_status_size: 0,

@@ -1,7 +1,5 @@
 use binrw::BinWrite;
 
-use bilge::prelude::u4;
-
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::identity::{
@@ -138,7 +136,7 @@ fn test_serialize_generic_response() {
         },
         additional_items: vec![],
         cip_message: Some(MessageRouterResponse {
-            service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true).into(),
+            service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll).into(),
             response_data: ResponseData {
                 status: ResponseStatusCode::Success,
                 additional_status_size: 0x0,
@@ -151,19 +149,7 @@ fn test_serialize_generic_response() {
                         major: 2,
                         minor: 93,
                     },
-                    status: IdentityStatusBits::new(
-                        false,
-                        false,
-                        false,
-                        false,
-                        u4::new(0x0),
-                        false,
-                        false,
-                        false,
-                        false,
-                        u4::new(0x0),
-                    )
-                    .into(),
+                    status: IdentityStatusBits::default().into(),
                     serial_number: 0x01ff3d32,
                     product_name: CipShortString::from("ClearLink".to_string()),
                 })),

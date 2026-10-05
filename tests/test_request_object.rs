@@ -97,7 +97,7 @@ fn test_deserialize_cip_identity_request() {
             },
             additional_items: vec![],
             cip_message: Some(MessageRouterRequest {
-                service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, false),
+                service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
                 request_data: RequestData::new(Some(0x4), CipPath::new(0x1, 0x1), None),
             }),
         };
