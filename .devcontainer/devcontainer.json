@@ -1,43 +1,19 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/rust
 {
 	"name": "Rust",
-	"image": "mcr.microsoft.com/devcontainers/rust:2-trixie",
-	"features": {
-		// Claude uses gh for GitHub operations; auth comes from the bind-mounted ~/.config/gh
-		"ghcr.io/devcontainers/features/github-cli:1": {}
+	"build": {
+		"dockerfile": "Dockerfile"
 	},
-	"remoteUser": "vscode",
-	// Setup the host environment (directories for bind mounts, shared Claude config)
 	"initializeCommand": ".devcontainer/initializeHost.sh",
-	"postCreateCommand": ".devcontainer/post-create.sh",
-	// Run in the host network namespace (like firefly), so EtherNet/IP devices on the host's networks are directly
-	// reachable. Because of that, don't use port forwarding at all: VS Code would otherwise try to auto-forward every
-	// port listening on the host (tailscaled, etc.), producing a stream of permission errors.
 	"runArgs": [
-		"--network=host"
+		// Host network namespace, so EtherNet/IP devices on the host's networks are directly reachable
+		"--network=host",
+		// GH_TOKEN for gh (and git, via the host gitconfig's gh credential helper), see the DANGER note in initializeHost.sh
+		"--env-file",
+		"${localWorkspaceFolder}/.devcontainer/.env"
 	],
-	"forwardPorts": [],
-	"containerEnv": {
-		// Keep Claude Code's mutable config file inside the bind-mounted ~/.claude directory (as ~/.claude/.claude.json)
-		// instead of the container-local ~/.claude.json, which is lost on rebuild (forcing a fresh login). The host
-		// shares the same file via a ~/.claude.json symlink that initializeHost.sh sets up.
-		"CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-		// Same Claude Code settings as the firefly image
-		"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-		"CLAUDE_CODE_EXPERIMENTAL_FEATURES": "1",
-		"CLAUDE_CODE_DISABLE_MOUSE": "1"
-	},
+	// Shared Claude Code config and auth (see CLAUDE_CONFIG_DIR in the Dockerfile)
 	"mounts": [
-		"type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,readonly",
-		// Authentication for AI Tools. NOTE: deliberately no single-file bind of ~/.claude.json — a file bind pins the
-		// inode, and Claude Code saves its config via atomic rename, which strands the container on a stale copy.
-		"type=bind,source=${localEnv:HOME}/.anthropic,target=/home/vscode/.anthropic",
-		"type=bind,source=${localEnv:HOME}/.claude,target=/home/vscode/.claude",
-		// Expose ~/.claude at its host path too, so absolute installPaths in plugins/installed_plugins.json resolve
-		"type=bind,source=${localEnv:HOME}/.claude,target=${localEnv:HOME}/.claude",
-		"type=bind,source=${localEnv:HOME}/.config/claude-code,target=/home/vscode/.config/claude-code",
-		"type=bind,source=${localEnv:HOME}/.config/gh,target=/home/vscode/.config/gh"
+		"type=bind,source=${localEnv:HOME}/.claude,target=/home/vscode/.claude"
 	],
 	"customizations": {
 		"vscode": {
@@ -45,8 +21,9 @@
 				"anthropic.claude-code"
 			],
 			"settings": {
-				"remote.autoForwardPorts": false,
-				"remote.restoreForwardedPorts": false
+				// With host networking, VS Code would try to auto-forward every port listening on the host (tailscaled,
+				// etc.), producing a stream of permission errors
+				"remote.autoForwardPorts": false
 			}
 		}
 	}
