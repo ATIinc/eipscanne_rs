@@ -1,11 +1,11 @@
-use std::net::{Ipv4Addr, SocketAddrV4};
-
 use binrw::{
     binrw,    // #[binrw] attribute
     BinWrite, // trait for writing
 };
 
-use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
+use crate::cip::types::{CipUint, CipUsint};
+
+use super::sockaddr::{SockaddrInfo, SOCKADDR_INFO_LENGTH};
 
 /// Type ID of a Common Packet Format item.
 ///
@@ -62,64 +62,16 @@ fn descripter_length_writer(obj: &Option<CipUint>, arg0: Option<u16>) -> binrw::
 
 // ^^^^^^^^ End of CommonPacketDescriptor impl ^^^^^^^^
 
-/// Length of the data carried by a Sockaddr Info item
-pub const SOCKADDR_INFO_LENGTH: u16 = 16;
-/// Only IPv4 socket addresses are allowed
-pub const SOCKADDR_FAMILY_INET: CipInt = 2;
-
-/// Socket address information exchanged while opening an I/O connection (Sockaddr Info in Wireshark).
+/// The data of a Common Packet Format item, selected by the Type ID of its descriptor.
 ///
-/// Unlike the rest of the protocol, the family, port and address are sent in big endian order.
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub struct SockaddrInfo {
-    #[brw(big)]
-    pub sin_family: CipInt,
-    #[brw(big)]
-    pub sin_port: CipUint,
-    #[brw(big)]
-    pub sin_addr: CipUdint,
-    pub sin_zero: [CipUsint; 8],
-}
-
-// ======= Start of SockaddrInfo impl ========
-
-impl SockaddrInfo {
-    pub fn new(address: SocketAddrV4) -> Self {
-        SockaddrInfo {
-            sin_family: SOCKADDR_FAMILY_INET,
-            sin_port: address.port(),
-            sin_addr: u32::from(*address.ip()),
-            sin_zero: [0; 8],
-        }
-    }
-
-    pub fn socket_address(&self) -> SocketAddrV4 {
-        SocketAddrV4::new(Ipv4Addr::from(self.sin_addr), self.sin_port)
-    }
-}
-
-impl From<SocketAddrV4> for SockaddrInfo {
-    fn from(address: SocketAddrV4) -> Self {
-        SockaddrInfo::new(address)
-    }
-}
-
-impl From<SockaddrInfo> for SocketAddrV4 {
-    fn from(info: SockaddrInfo) -> Self {
-        info.socket_address()
-    }
-}
-
-// ^^^^^^^^ End of SockaddrInfo impl ^^^^^^^^
-
-/// The data of a Common Packet Format item that follows the address and data items of a packet.
+/// Only the items that may follow the address and data items of a packet are modelled; the
+/// address and data items themselves are handled by the command specific data and the object
+/// assemblies.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
 #[br(import(type_id: CommonPacketItemId, packet_length: u16))]
-pub enum AdditionalItem {
+pub enum CommonPacketItemData {
     #[br(pre_assert(
         type_id == CommonPacketItemId::O2TSockAddrInfo && packet_length == SOCKADDR_INFO_LENGTH
     ))]
@@ -134,70 +86,45 @@ pub enum AdditionalItem {
     Unknown(#[br(count = packet_length)] Vec<CipUsint>),
 }
 
-// ======= Start of AdditionalItem impl ========
+// ======= Start of CommonPacketItemData impl ========
 
-impl AdditionalItem {
+impl CommonPacketItemData {
     /// Number of data bytes of the item (the Length field of its descriptor)
     pub fn byte_len(&self) -> u16 {
         match self {
-            AdditionalItem::O2TSockAddrInfo(_) | AdditionalItem::T2OSockAddrInfo(_) => {
+            CommonPacketItemData::O2TSockAddrInfo(_) | CommonPacketItemData::T2OSockAddrInfo(_) => {
                 SOCKADDR_INFO_LENGTH
             }
-            AdditionalItem::Unknown(data) => data.len() as u16,
+            CommonPacketItemData::Unknown(data) => data.len() as u16,
         }
     }
 }
 
-// ^^^^^^^^ End of AdditionalItem impl ^^^^^^^^
+// ^^^^^^^^ End of CommonPacketItemData impl ^^^^^^^^
 
-/// A complete Common Packet Format item (descriptor + data) that is not the address or data item
-/// of the packet, e.g. the Sockaddr Info items of a Forward_Open exchange.
+/// A complete Common Packet Format item (descriptor + data) that follows the address and data
+/// items of a packet, e.g. the Sockaddr Info items of a Forward_Open exchange.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
 pub struct CommonPacketItem {
-    #[bw(args(Some(item.byte_len())))]
+    #[bw(args(Some(data.byte_len())))]
     pub descriptor: CommonPacketDescriptor,
 
     #[br(args(descriptor.type_id, descriptor.packet_length.unwrap_or(0)))]
-    pub item: AdditionalItem,
+    pub data: CommonPacketItemData,
 }
 
 // ======= Start of CommonPacketItem impl ========
 
 impl CommonPacketItem {
-    fn new(type_id: CommonPacketItemId, item: AdditionalItem) -> Self {
+    pub fn new(type_id: CommonPacketItemId, data: CommonPacketItemData) -> Self {
         CommonPacketItem {
             descriptor: CommonPacketDescriptor {
                 type_id,
-                packet_length: Some(item.byte_len()),
+                packet_length: Some(data.byte_len()),
             },
-            item,
-        }
-    }
-
-    /// Sockaddr Info describing where originator-to-target I/O data must be sent
-    pub fn new_o2t_sockaddr_info(address: SocketAddrV4) -> Self {
-        Self::new(
-            CommonPacketItemId::O2TSockAddrInfo,
-            AdditionalItem::O2TSockAddrInfo(SockaddrInfo::new(address)),
-        )
-    }
-
-    /// Sockaddr Info describing where target-to-originator I/O data must be sent
-    pub fn new_t2o_sockaddr_info(address: SocketAddrV4) -> Self {
-        Self::new(
-            CommonPacketItemId::T2OSockAddrInfo,
-            AdditionalItem::T2OSockAddrInfo(SockaddrInfo::new(address)),
-        )
-    }
-
-    pub fn sockaddr_info(&self) -> Option<&SockaddrInfo> {
-        match &self.item {
-            AdditionalItem::O2TSockAddrInfo(info) | AdditionalItem::T2OSockAddrInfo(info) => {
-                Some(info)
-            }
-            AdditionalItem::Unknown(_) => None,
+            data,
         }
     }
 }

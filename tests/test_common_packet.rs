@@ -14,9 +14,10 @@ use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
 use eipscanne_rs::eip::description::{
-    AdditionalItem, CommonPacketDescriptor, CommonPacketItem, CommonPacketItemId, SockaddrInfo,
+    CommonPacketDescriptor, CommonPacketItem, CommonPacketItemData, CommonPacketItemId,
 };
 use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 fn sample_address() -> SocketAddrV4 {
@@ -104,7 +105,7 @@ fn test_unknown_item_is_kept_as_raw_bytes() {
                 type_id: CommonPacketItemId::Unknown(0x1234),
                 packet_length: Some(3),
             },
-            item: AdditionalItem::Unknown(vec![0xaa, 0xbb, 0xcc]),
+            data: CommonPacketItemData::Unknown(vec![0xaa, 0xbb, 0xcc]),
         }
     );
     assert!(item.sockaddr_info().is_none());

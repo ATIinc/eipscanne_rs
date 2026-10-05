@@ -6,7 +6,7 @@ use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceC
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
+    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, BASE_ITEM_COUNT,
 };
 use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
 
@@ -90,7 +90,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
 
     // NOTE: The args are passed by the ObjectAssembly
     identity_request_packet
-        .write_options(&mut writer, binrw::Endian::Little, (10, 0, 2))
+        .write_options(&mut writer, binrw::Endian::Little, (10, 0, BASE_ITEM_COUNT))
         .unwrap();
 
     assert_eq!(expected_eip_byte_array, identity_byte_array);
@@ -123,7 +123,7 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
         .write_options(
             &mut writer,
             binrw::Endian::Little,
-            (message_request_buffer.len() as u16, 0, 2),
+            (message_request_buffer.len() as u16, 0, BASE_ITEM_COUNT),
         )
         .unwrap();
 

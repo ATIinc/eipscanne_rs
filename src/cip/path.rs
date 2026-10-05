@@ -209,22 +209,13 @@ impl CipPath {
         ])
     }
 
-    /// `[class, instance]` using 8-bit logical segments
-    pub fn new_u8(class_id: u8, instance_id: u8) -> Self {
+    /// `[class, instance, attribute]` using 8-bit logical segments
+    pub fn new_full(class_id: u8, instance_id: u8, attribute_id: u8) -> Self {
         Self::from_segments(vec![
             LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, class_id),
             LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, instance_id),
+            LogicalPathSegment::new_u8(LogicalSegmentType::AttributeId, attribute_id),
         ])
-    }
-
-    /// `[class, instance, attribute]` using 8-bit logical segments
-    pub fn new_full(class_id: u8, instance_id: u8, attribute_id: u8) -> Self {
-        let mut cip_path = Self::new_u8(class_id, instance_id);
-        cip_path.push(LogicalPathSegment::new_u8(
-            LogicalSegmentType::AttributeId,
-            attribute_id,
-        ));
-        cip_path
     }
 
     /// The usual I/O connection path to the Assembly object:
@@ -242,10 +233,6 @@ impl CipPath {
         ])
     }
 
-    pub fn push(&mut self, segment: LogicalPathSegment) {
-        self.segments.push(segment);
-    }
-
     /// Number of bytes the path occupies on the wire
     pub fn byte_len(&self) -> usize {
         self.segments.iter().map(LogicalPathSegment::byte_len).sum()
@@ -257,7 +244,7 @@ impl CipPath {
     }
 
     /// Value of the first logical segment of the given type, regardless of its 8/16-bit format
-    pub fn logical_value(&self, logical_segment_type: LogicalSegmentType) -> Option<u16> {
+    fn logical_value(&self, logical_segment_type: LogicalSegmentType) -> Option<u16> {
         self.segments
             .iter()
             .find(|segment| segment.path_definition.logical_segment_type() == logical_segment_type)
@@ -342,15 +329,15 @@ mod tests {
         assert_eq!(class_instance.segments.len(), 2);
         assert_eq!(class_instance.word_len(), 4);
 
-        assert_eq!(CipPath::new_u8(0x06, 0x01).byte_len(), 4);
-
-        let mut connection_path = CipPath::new_assembly_connection(0x97, 0x96, 0x64);
+        let connection_path = CipPath::new_assembly_connection(0x97, 0x96, 0x64);
+        assert_eq!(connection_path.byte_len(), 8);
         assert_eq!(connection_path.word_len(), 4);
-        connection_path.push(LogicalPathSegment::new_u16(
-            LogicalSegmentType::AttributeId,
-            0x0003,
-        ));
-        assert_eq!(connection_path.byte_len(), 12);
-        assert_eq!(connection_path.word_len(), 6);
+
+        let mixed_path = CipPath::from_segments(vec![
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, 0x04),
+            LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, 0x0096),
+        ]);
+        assert_eq!(mixed_path.byte_len(), 6);
+        assert_eq!(mixed_path.word_len(), 3);
     }
 }

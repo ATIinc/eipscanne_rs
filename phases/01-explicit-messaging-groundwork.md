@@ -30,7 +30,7 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
     `ConnectionPoint`, `AttributeId`, `Special`, `ServiceId`, `Reserved`);
   * `CipPath` is now a list of logical segments (any length) instead of a fixed
     class/instance/attribute shape: it reads with the path size in words, keeps the
-    `new` / `new_full` constructors, adds `new_u8` and `new_assembly_connection` (the usual
+    `new` / `new_full` constructors, adds `new_assembly_connection` (the usual
     `config instance / O->T connection point / T->O connection point` path) and
     `class_id()` / `instance_id()` / `attribute_id()` accessors. Only logical segments are
     modelled; application-defined content (such as configuration data) is not part of the path
@@ -44,10 +44,11 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   `src/object_assembly.rs`:
   * `CommonPacketItemId` keeps unknown IDs (`Unknown(u16)`) so unexpected items are skipped by
     length instead of failing the packet;
-  * `SockaddrInfo` (family, port, address in big endian; zero padding) with conversions from and
-    to `SocketAddrV4`;
-  * `AdditionalItem` / `CommonPacketItem`: typed O->T and T->O Sockaddr Info items plus a raw
-    fallback;
+  * `CommonPacketItem` / `CommonPacketItemData`: a typed item (descriptor + data) for the items
+    that follow the address and data items — O->T and T->O Sockaddr Info plus a raw fallback;
+  * `src/eip/sockaddr.rs` (implicit-messaging only): `SockaddrInfo` (family, port, address in big
+    endian; zero padding) with conversions from and to `SocketAddrV4`, and the Sockaddr Info item
+    constructors;
   * `RRPacketData::item_count` is a real field now; on write it is derived from the number of items
     actually serialized;
   * `RequestObjectAssembly` / `ResponseObjectAssembly` carry `additional_items` after the CIP
