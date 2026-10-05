@@ -23,7 +23,7 @@ New workspace crate `eds_parser/` (deps `pest`, `pest_derive`):
   trigger/transport mask, connection parameter mask, O->T / T->O RPI, size and format, config
   entries, name, help, path). Empty sizes/RPIs resolve through the referenced `AssemN` / `ParamN`.
 * `bridge.rs` (depends on `eipscanne_rs`): `ConnectionN` → `ConnectionParameters` (class, trigger,
-  connection types, priorities, fixed/variable, real-time formats, sizes, RPIs, `EPath` from the path
+  connection types, priorities, fixed/variable, real-time formats, sizes, RPIs, `CipPath` from the path
   string with `[ParamN]` substitution).
 
 ## Tests

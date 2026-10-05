@@ -26,6 +26,10 @@ point. Update the **Status** line of a phase when it changes.
 
 * **Packets only in the library.** The crate stays a packet (de)serialization library built on
   `binrw` + `bilge`; sockets, timers and the cyclic loop live in an example and a small utility crate.
+* **Application data is declared by the caller.** Assemblies, configuration data and other
+  device-specific payloads are plain `binrw` structs in the caller's code (see `examples/`) and are
+  passed in as `CipData`; the library frames them but never models their content. Keep the protocol
+  types to what the baseline actually sends and parses instead of covering the whole specification.
 * **Wireshark naming.** Struct and field names follow the names Wireshark shows for the same bytes
   (`enip.*` and `cip.cm.*` fields), in `snake_case`.
 * **Bitfields are built by name.** Every `bilge` bitfield derives `BuilderBits`

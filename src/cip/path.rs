@@ -1,4 +1,4 @@
-use std::io::{Cursor, Seek, Write};
+use std::io::{Seek, Write};
 
 use binrw::{
     binrw,
@@ -11,7 +11,7 @@ use binrw::{
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
 use bilge::prelude::{bitsize, u2, u3, BuilderBits, DebugBits, FromBits};
 
-use crate::cip::types::{CipUsint, CipWord};
+use crate::cip::types::CipUsint;
 
 pub const BYTES_PER_PATH_WORD: usize = 2;
 
@@ -154,84 +154,14 @@ impl LogicalPathSegment {
 
 // ^^^^^^^^ End of LogicalPathSegment impl ^^^^^^^^
 
-/// A Simple Data Segment: application data (such as configuration) carried inside a path.
-///
-/// The segment type byte (0x80) is followed by the data size in 16-bit words and the data words.
-#[binrw]
-#[brw(little, magic = 0x80u8)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct SimpleDataSegment {
-    pub data_size: CipUsint,
-
-    #[br(count = data_size)]
-    pub data: Vec<CipWord>,
-}
-
-// ======= Start of SimpleDataSegment impl ========
-
-impl SimpleDataSegment {
-    pub fn new(data: Vec<CipWord>) -> Self {
-        SimpleDataSegment {
-            data_size: data.len() as CipUsint,
-            data,
-        }
-    }
-
-    /// Number of bytes this segment occupies on the wire
-    pub fn byte_len(&self) -> usize {
-        // segment type byte + data size byte + the data words
-        2 + BYTES_PER_PATH_WORD * self.data.len()
-    }
-}
-
-// ^^^^^^^^ End of SimpleDataSegment impl ^^^^^^^^
-
-/// One segment of a padded EPATH.
-///
-/// The data segment is tried first because its segment type byte is a fixed value; a logical
-/// segment accepts any byte whose segment type bits identify a logical segment.
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-pub enum PathSegment {
-    Data(SimpleDataSegment),
-    Logical(LogicalPathSegment),
-}
-
-// ======= Start of PathSegment impl ========
-
-impl PathSegment {
-    /// Number of bytes this segment occupies on the wire
-    pub fn byte_len(&self) -> usize {
-        match self {
-            PathSegment::Data(segment) => segment.byte_len(),
-            PathSegment::Logical(segment) => segment.byte_len(),
-        }
-    }
-}
-
-impl From<LogicalPathSegment> for PathSegment {
-    fn from(segment: LogicalPathSegment) -> Self {
-        PathSegment::Logical(segment)
-    }
-}
-
-impl From<SimpleDataSegment> for PathSegment {
-    fn from(segment: SimpleDataSegment) -> Self {
-        PathSegment::Data(segment)
-    }
-}
-
-// ^^^^^^^^ End of PathSegment impl ^^^^^^^^
-
 #[binrw::parser(reader, endian)]
-fn parse_segments_until(byte_len: u16) -> BinResult<Vec<PathSegment>> {
+fn parse_segments_until(word_len: u8) -> BinResult<Vec<LogicalPathSegment>> {
     let start_position = reader.stream_position()?;
-    let end_position = start_position + byte_len as u64;
+    let end_position = start_position + (word_len as usize * BYTES_PER_PATH_WORD) as u64;
 
     let mut segments = Vec::new();
     while reader.stream_position()? < end_position {
-        segments.push(PathSegment::read_options(reader, endian, ())?);
+        segments.push(LogicalPathSegment::read_options(reader, endian, ())?);
     }
 
     let final_position = reader.stream_position()?;
@@ -248,34 +178,53 @@ fn parse_segments_until(byte_len: u16) -> BinResult<Vec<PathSegment>> {
     Ok(segments)
 }
 
-/// A padded EPATH made of an arbitrary list of segments (Connection Path in Wireshark).
+/// A padded path made of logical segments (Request Path / Connection Path in Wireshark).
 ///
-/// Reading needs the byte length of the path, which the surrounding packet always provides as a
-/// word count.
+/// Only logical segments are modelled: every path this library builds or parses consists of
+/// class, instance, attribute and connection point segments. Reading takes the path size in
+/// 16-bit words, which is how every packet carries it (Request Path Size, Connection Path Size).
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone, Default)]
-#[br(import(byte_len: u16))]
-pub struct EPath {
-    #[br(parse_with = parse_segments_until, args(byte_len))]
-    pub segments: Vec<PathSegment>,
+#[br(import(path_word_size: u8))]
+pub struct CipPath {
+    #[br(parse_with = parse_segments_until, args(path_word_size))]
+    pub segments: Vec<LogicalPathSegment>,
 }
 
-// ======= Start of EPath impl ========
+// ======= Start of CipPath impl ========
 
-impl EPath {
+impl CipPath {
     pub const ASSEMBLY_CLASS_ID: u8 = 0x04;
 
-    pub fn new(segments: Vec<PathSegment>) -> Self {
-        EPath { segments }
+    pub fn from_segments(segments: Vec<LogicalPathSegment>) -> Self {
+        CipPath { segments }
     }
 
-    /// `[class, instance]` using 16-bit logical segments (same layout as `CipPath::new`)
-    pub fn new_class_instance(class_id: u16, instance_id: u16) -> Self {
-        EPath::new(vec![
-            LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, class_id).into(),
-            LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, instance_id).into(),
+    /// `[class, instance]` using 16-bit logical segments
+    pub fn new(class_id: u16, instance_id: u16) -> Self {
+        Self::from_segments(vec![
+            LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, class_id),
+            LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, instance_id),
         ])
+    }
+
+    /// `[class, instance]` using 8-bit logical segments
+    pub fn new_u8(class_id: u8, instance_id: u8) -> Self {
+        Self::from_segments(vec![
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, class_id),
+            LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, instance_id),
+        ])
+    }
+
+    /// `[class, instance, attribute]` using 8-bit logical segments
+    pub fn new_full(class_id: u8, instance_id: u8, attribute_id: u8) -> Self {
+        let mut cip_path = Self::new_u8(class_id, instance_id);
+        cip_path.push(LogicalPathSegment::new_u8(
+            LogicalSegmentType::AttributeId,
+            attribute_id,
+        ));
+        cip_path
     }
 
     /// The usual I/O connection path to the Assembly object:
@@ -285,114 +234,66 @@ impl EPath {
         o2t_connection_point: u8,
         t2o_connection_point: u8,
     ) -> Self {
-        EPath::new(vec![
-            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, Self::ASSEMBLY_CLASS_ID).into(),
-            LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, configuration_instance)
-                .into(),
-            LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, o2t_connection_point)
-                .into(),
-            LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, t2o_connection_point)
-                .into(),
+        Self::from_segments(vec![
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, Self::ASSEMBLY_CLASS_ID),
+            LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, configuration_instance),
+            LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, o2t_connection_point),
+            LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, t2o_connection_point),
         ])
     }
 
-    pub fn push(&mut self, segment: impl Into<PathSegment>) {
-        self.segments.push(segment.into());
+    pub fn push(&mut self, segment: LogicalPathSegment) {
+        self.segments.push(segment);
     }
 
     /// Number of bytes the path occupies on the wire
     pub fn byte_len(&self) -> usize {
-        self.segments.iter().map(PathSegment::byte_len).sum()
+        self.segments.iter().map(LogicalPathSegment::byte_len).sum()
     }
 
-    /// Number of 16-bit words the path occupies on the wire (Connection Path Size / Request Path Size)
+    /// Number of 16-bit words the path occupies on the wire (Request Path Size / Connection Path Size)
     pub fn word_len(&self) -> usize {
         self.byte_len().div_ceil(BYTES_PER_PATH_WORD)
     }
+
+    /// Value of the first logical segment of the given type, regardless of its 8/16-bit format
+    pub fn logical_value(&self, logical_segment_type: LogicalSegmentType) -> Option<u16> {
+        self.segments
+            .iter()
+            .find(|segment| segment.path_definition.logical_segment_type() == logical_segment_type)
+            .map(|segment| (&segment.data).into())
+    }
+
+    pub fn class_id(&self) -> Option<u16> {
+        self.logical_value(LogicalSegmentType::ClassId)
+    }
+
+    pub fn instance_id(&self) -> Option<u16> {
+        self.logical_value(LogicalSegmentType::InstanceId)
+    }
+
+    pub fn attribute_id(&self) -> Option<u16> {
+        self.logical_value(LogicalSegmentType::AttributeId)
+    }
 }
 
-// ^^^^^^^^ End of EPath impl ^^^^^^^^
+// ^^^^^^^^ End of CipPath impl ^^^^^^^^
 
-/// Writes a path preceded by its size in 16-bit words.
+/// Writes a path preceded by its size in 16-bit words (Request Path Size / Connection Path Size).
 ///
-/// Usable as a `write_with` function for any padded path type (`CipPath`, `EPath`, ...).
-pub fn write_path_with_word_size<W, P>(
-    path: &P,
+/// Usable as a `write_with` function for a `CipPath` field.
+pub fn write_path_with_word_size<W>(
+    path: &CipPath,
     writer: &mut W,
     endian: Endian,
     _args: (),
 ) -> BinResult<()>
 where
     W: Write + Seek,
-    P: for<'a> BinWrite<Args<'a> = ()>,
 {
-    // Step 1: Write the path into a temporary buffer
-    let mut temp_buffer = Vec::new();
-    let mut temp_writer = Cursor::new(&mut temp_buffer);
-
-    path.write_options(&mut temp_writer, endian, ())?;
-
-    // Step 2: Calculate the path word size
-    if temp_buffer.len() % BYTES_PER_PATH_WORD != 0 {
-        return Err(binrw::Error::AssertFail {
-            pos: writer.stream_position()?,
-            message: format!(
-                "a padded path must be word aligned but it is {} bytes long",
-                temp_buffer.len()
-            ),
-        });
-    }
-    let path_word_size = temp_buffer.len() / BYTES_PER_PATH_WORD;
-
-    // Step 3: Write the size followed by the path
-    writer.write_all(&[path_word_size as CipUsint])?;
-    writer.write_all(&temp_buffer)?;
-
-    Ok(())
+    writer.write_all(&[path.word_len() as CipUsint])?;
+    path.write_options(writer, endian, ())
 }
-
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-#[br(import(path_length: u8))]
-pub struct CipPath {
-    pub class_id_segment: LogicalPathSegment,
-    pub instance_id_segment: LogicalPathSegment,
-
-    #[br(if(path_length == 3))]
-    pub attribute_id_segment: Option<LogicalPathSegment>,
-}
-
-// ======= Start of CipPath impl ========
-
-impl CipPath {
-    pub fn new(class_id: u16, instance_id: u16) -> Self {
-        CipPath {
-            class_id_segment: LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, class_id),
-            instance_id_segment: LogicalPathSegment::new_u16(
-                LogicalSegmentType::InstanceId,
-                instance_id,
-            ),
-            attribute_id_segment: None,
-        }
-    }
-
-    pub fn new_full(class_id: u8, instance_id: u8, attribute_id: u8) -> Self {
-        CipPath {
-            class_id_segment: LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, class_id),
-            instance_id_segment: LogicalPathSegment::new_u8(
-                LogicalSegmentType::InstanceId,
-                instance_id,
-            ),
-            attribute_id_segment: Some(LogicalPathSegment::new_u8(
-                LogicalSegmentType::AttributeId,
-                attribute_id,
-            )),
-        }
-    }
-}
-
-// ^^^^^^^^ End of CipPath impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
@@ -427,16 +328,29 @@ mod tests {
     }
 
     #[test]
-    fn test_epath_byte_and_word_len() {
-        let mut path = EPath::new_assembly_connection(0x97, 0x96, 0x64);
-        assert_eq!(path.byte_len(), 8);
-        assert_eq!(path.word_len(), 4);
+    fn test_cip_path_accessors_and_sizes() {
+        let full_path = CipPath::new_full(0x04, 0x96, 0x03);
+        assert_eq!(full_path.class_id(), Some(0x04));
+        assert_eq!(full_path.instance_id(), Some(0x96));
+        assert_eq!(full_path.attribute_id(), Some(0x03));
+        assert_eq!(full_path.byte_len(), 6);
+        assert_eq!(full_path.word_len(), 3);
 
-        path.push(SimpleDataSegment::new(vec![0x0001, 0x0002]));
-        assert_eq!(path.byte_len(), 14);
-        assert_eq!(path.word_len(), 7);
+        let class_instance = CipPath::new(0x0001, 0x0001);
+        assert_eq!(class_instance.class_id(), Some(0x0001));
+        assert_eq!(class_instance.attribute_id(), None);
+        assert_eq!(class_instance.segments.len(), 2);
+        assert_eq!(class_instance.word_len(), 4);
 
-        let class_instance = EPath::new_class_instance(0x06, 0x01);
-        assert_eq!(class_instance.byte_len(), 8);
+        assert_eq!(CipPath::new_u8(0x06, 0x01).byte_len(), 4);
+
+        let mut connection_path = CipPath::new_assembly_connection(0x97, 0x96, 0x64);
+        assert_eq!(connection_path.word_len(), 4);
+        connection_path.push(LogicalPathSegment::new_u16(
+            LogicalSegmentType::AttributeId,
+            0x0003,
+        ));
+        assert_eq!(connection_path.byte_len(), 12);
+        assert_eq!(connection_path.word_len(), 6);
     }
 }

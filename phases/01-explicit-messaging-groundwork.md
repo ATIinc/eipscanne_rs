@@ -28,10 +28,13 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   * all segment types (`PortSegment`, `LogicalSegment`, `NetworkSegment`, `SymbolicSegment`,
     `DataSegment`) and all logical segment types (`ClassId`, `InstanceId`, `MemberId`,
     `ConnectionPoint`, `AttributeId`, `Special`, `ServiceId`, `Reserved`);
-  * `SimpleDataSegment` (0x80, size in words, data words);
-  * `PathSegment` (`Logical` | `Data`) and `EPath`, a padded path with any number of segments,
-    read with its byte length and written back-to-back; `EPath::new_assembly_connection`
-    builds the usual `config instance / O->T connection point / T->O connection point` path;
+  * `CipPath` is now a list of logical segments (any length) instead of a fixed
+    class/instance/attribute shape: it reads with the path size in words, keeps the
+    `new` / `new_full` constructors, adds `new_u8` and `new_assembly_connection` (the usual
+    `config instance / O->T connection point / T->O connection point` path) and
+    `class_id()` / `instance_id()` / `attribute_id()` accessors. Only logical segments are
+    modelled; application-defined content (such as configuration data) is not part of the path
+    type, following the same rule as assemblies: the caller declares it and passes it in;
   * `write_path_with_word_size`, a reusable `write_with` function that prefixes a path with its
     size in 16-bit words (used by the request path today, by `Forward_Open` / `Forward_Close`
     next);

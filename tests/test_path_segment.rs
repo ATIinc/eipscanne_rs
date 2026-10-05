@@ -150,27 +150,26 @@ fn test_deserialize_cip_path() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    // Read from buffered reader
-    let cip_path = CipPath::read(&mut buf_reader).unwrap();
+    // Read from buffered reader, 4 words long
+    let cip_path = CipPath::read_args(&mut buf_reader, (4,)).unwrap();
 
     // Assert equality
-    assert_eq!(cip_path.class_id_segment.data, PathData::FormatAsU16(0x1));
+    assert_eq!(cip_path.class_id(), Some(0x1));
+    assert_eq!(cip_path.instance_id(), Some(0x1));
+    assert_eq!(cip_path.attribute_id(), None);
+    assert_eq!(cip_path.segments.len(), 2);
+
+    let class_segment = &cip_path.segments[0];
+    assert_eq!(class_segment.data, PathData::FormatAsU16(0x1));
     assert_eq!(
-        cip_path
-            .class_id_segment
-            .path_definition
-            .logical_segment_type(),
+        class_segment.path_definition.logical_segment_type(),
         LogicalSegmentType::ClassId
     );
+
+    let instance_segment = &cip_path.segments[1];
+    assert_eq!(instance_segment.data, PathData::FormatAsU16(0x1));
     assert_eq!(
-        cip_path.instance_id_segment.data,
-        PathData::FormatAsU16(0x1)
-    );
-    assert_eq!(
-        cip_path
-            .instance_id_segment
-            .path_definition
-            .logical_segment_type(),
+        instance_segment.path_definition.logical_segment_type(),
         LogicalSegmentType::InstanceId
     );
 }
@@ -205,7 +204,7 @@ fn test_deserialize_non_logical_segment_is_rejected() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    assert!(CipPath::read(&mut buf_reader).is_err());
+    assert!(CipPath::read_args(&mut buf_reader, (4,)).is_err());
 }
 
 #[test]
