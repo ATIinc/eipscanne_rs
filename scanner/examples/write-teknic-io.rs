@@ -17,9 +17,6 @@ mod assemblies {
 use assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
 use assemblies::clearlink::output::{IOOutputData, OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 
-/// The ClearLink to talk to unless one is given on the command line
-const DEFAULT_ADAPTER_IP: &str = "172.31.19.10";
-
 #[derive(Parser)]
 struct OutputValue {
     /// Turns the output on
@@ -59,8 +56,8 @@ struct OutputValue {
 )]
 struct CliArgs {
     /// IP address of the ClearLink
-    #[arg(long)]
-    host: Option<String>,
+    #[arg(long, default_value = "172.31.19.10")]
+    host: String,
 
     /// The digital output to set
     #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..5))]
@@ -73,10 +70,6 @@ struct CliArgs {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
-    let adapter_ip = cli_args
-        .host
-        .clone()
-        .unwrap_or_else(|| DEFAULT_ADAPTER_IP.to_string());
 
     // The two assemblies this example talks to
     let config_assembly = CipPath::new_full(
@@ -92,7 +85,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
-    let mut session = Session::register((adapter_ip.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register((cli_args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
     // ========= Write the ClearLink Config ============
