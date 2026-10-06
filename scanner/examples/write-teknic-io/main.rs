@@ -4,8 +4,8 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use eipscanne_rs::object_assembly::RequestObjectAssembly;
-use eipscanne_utils::session::Session;
+use scanner::explicit::{send_request, typed_data};
+use scanner::session::Session;
 
 // Assert dependency on the different modules in this directory
 mod clearlink_config;
@@ -33,24 +33,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut session = Session::register((adapter_ip.as_str(), ETHERNET_IP_TCP_PORT)).await?;
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
-    let provided_session_handle = session.session_handle();
-
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");
-    session
-        .send(&RequestObjectAssembly::new_service_request(
-            provided_session_handle,
-            CipPath::new_full(
-                ASSEMBLY_CLASS_ID,
-                CONFIG_ASSEMBLY_INSTANCE,
-                ASSEMBLY_DATA_ATTRIBUTE_ID,
-            ),
-            ServiceCode::SetAttributeSingle,
-            Some(Box::new(ConfigAssemblyObject::default())),
-        ))
-        .await?;
-
-    let _config_success_response = session.read_reply().await?;
+    let _config_success_response = send_request(
+        &mut session,
+        CipPath::new_full(
+            ASSEMBLY_CLASS_ID,
+            CONFIG_ASSEMBLY_INSTANCE,
+            ASSEMBLY_DATA_ATTRIBUTE_ID,
+        ),
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(ConfigAssemblyObject::default())),
+    )
+    .await?;
 
     // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _config_success_response);
@@ -59,22 +54,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= Request the digital output ============
     println!("REQUESTING - GET digital output");
 
-    session
-        .send(&RequestObjectAssembly::new_service_request(
-            provided_session_handle,
-            CipPath::new_full(
-                ASSEMBLY_CLASS_ID,
-                OUTPUT_ASSEMBLY_INSTANCE,
-                ASSEMBLY_DATA_ATTRIBUTE_ID,
-            ),
-            ServiceCode::GetAttributeSingle,
-            None,
-        ))
-        .await?;
+    let output_assembly_reply = send_request(
+        &mut session,
+        CipPath::new_full(
+            ASSEMBLY_CLASS_ID,
+            OUTPUT_ASSEMBLY_INSTANCE,
+            ASSEMBLY_DATA_ATTRIBUTE_ID,
+        ),
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
 
     // TODO: Create the response for the SetDigitalIO message in the teknic_cip
-    let (_set_digital_io_response_object, mut output_assembly_object) =
-        session.read_typed_reply::<OutputAssemblyObject>().await?;
+    let mut output_assembly_object: OutputAssemblyObject = typed_data(&output_assembly_reply)?;
 
     // println!("{:#?}\n", _set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _set_digital_io_response_object);
@@ -95,20 +88,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("REQUESTING - SET digital output");
 
-    session
-        .send(&RequestObjectAssembly::new_service_request(
-            provided_session_handle,
-            CipPath::new_full(
-                ASSEMBLY_CLASS_ID,
-                OUTPUT_ASSEMBLY_INSTANCE,
-                ASSEMBLY_DATA_ATTRIBUTE_ID,
-            ),
-            ServiceCode::SetAttributeSingle,
-            Some(Box::new(output_assembly_object)),
-        ))
-        .await?;
-
-    let _set_digital_io_success_response = session.read_reply().await?;
+    let _set_digital_io_success_response = send_request(
+        &mut session,
+        CipPath::new_full(
+            ASSEMBLY_CLASS_ID,
+            OUTPUT_ASSEMBLY_INSTANCE,
+            ASSEMBLY_DATA_ATTRIBUTE_ID,
+        ),
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(output_assembly_object)),
+    )
+    .await?;
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 

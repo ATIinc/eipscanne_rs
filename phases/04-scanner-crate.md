@@ -1,12 +1,28 @@
-# Phase 4 — `eipscanne_utils` crate: open a connection and exchange I/O
+# Phase 4 — `scanner` crate: open a connection and exchange I/O
 
 **Status:** Implemented, awaiting review (verified on loopback against a fake adapter; the OpENer run is still to do, see Verification)
 
 ## Goal
 
 Open a class 1 connection to a real adapter, exchange cyclic I/O with it and close it again, in code
-a person can read top to bottom. The crate is scaffolding: production code uses it as a reference
-and reuses the parts it needs. The library (`eipscanne_rs`) stays packet (de)serialization only.
+a person can read top to bottom. The crate is the scanner side built on the library: production
+code uses it as a reference and reuses the parts it needs (it is a workspace member, so another
+crate can depend on it from this repository next to `eipscanne_rs`). The library (`eipscanne_rs`)
+stays packet (de)serialization only.
+
+## Layout
+
+```text
+scanner/src/session.rs     the encapsulation session over TCP 44818, shared by both kinds of messaging
+scanner/src/explicit.rs    explicit (unconnected) messaging: send_request, typed_data, read_identity
+scanner/src/implicit.rs    implicit messaging: the stages below as submodules, re-exported flat
+scanner/src/implicit/{config,open,produce,consume,close,udp}.rs
+```
+
+Explicit and implicit messaging are kept apart so it is clear which functions each one needs: the
+`read-identity` and `write-teknic-io` examples import `session` and `explicit`, the `implicit-io`
+example imports `session` and `implicit`. The Forward_Open and Forward_Close are unconnected
+messages, but they exist only to bracket an I/O connection, so they sit under `implicit`.
 
 ## The stages of implicit messaging
 
@@ -23,18 +39,21 @@ Each stage is one module, and each stage hands a plain struct to the next one:
 ```
 
 The sending and receiving directions share no state, so they are two types rather than one
-connection object. Only `session`, `open`, `close` and the example's loop touch the network;
-`Producer` and `Consumer` take packets and timestamps in and give packets and verdicts out.
+connection object. Only `session`, `implicit::open`, `implicit::close`, `implicit::udp` and the
+example's loop touch the network; `Producer` and `Consumer` take packets and timestamps in and
+give packets and verdicts out.
 
 ## Scope
 
 ### Workspace
 
-* The root `Cargo.toml` gains `[workspace] members = ["hex_test_macros", "eipscanne_utils"]`;
+* The root `Cargo.toml` gains `[workspace] members = ["hex_test_macros", "scanner"]` and
+  `default-members = [".", "scanner"]`, so `cargo run --example <name>`, `cargo test` and
+  `cargo clippy` cover the library and the scanner from the root without `-p`;
   `hex_test_macros/Cargo.lock` goes away.
-* New crate `eipscanne_utils/` (package `eipscanne-utils`, not published), depending on
-  `eipscanne_rs`, `tokio` and `binrw`.
-* All examples move into the new crate (`eipscanne_utils/examples/`): `read-identity`,
+* New crate `scanner/` (package `scanner`, not published; the name is taken on crates.io, so
+  publishing it would mean renaming), depending on `eipscanne_rs`, `tokio`, `binrw` and `bilge`.
+* All examples move into the new crate (`scanner/examples/`): `read-identity`,
   `write-teknic-io` and the new `implicit-io`. `examples/stream_utils.rs` and
   `examples/write-teknic-io/duplicated_stream_utils.rs` are deleted in favour of `session.rs`.
   The library then has no dependency on its utilities (no dev-dependency cycle), and `tokio` and
@@ -43,19 +62,31 @@ connection object. Only `session`, `open`, `close` and the example's loop touch 
 
 ### `src/lib.rs`
 
-Module docs listing the five stages above, in order, with the module that implements each.
+Module docs: the shared session, then explicit versus implicit messaging and which examples use
+which. `implicit.rs` lists the stages above with the submodule that implements each.
 
-### Stage 1 and 5 — `src/session.rs`
+### Stage 1 and 5 — `src/session.rs` (shared)
 
-* `Session { stream: TcpStream, session_handle: CipUdint }`.
+* `Session { stream: TcpStream, session_handle: CipUdint, peer_ip: Ipv4Addr }`.
 * `Session::register(address)`: connect, send RegisterSession, keep the handle from the reply.
-* `send(packet)`, `read_reply() -> EnIpPacket`, `read_typed_reply::<T>()`: what the duplicated
-  stream utils do today, except that a reply is read as the 24-byte encapsulation header followed
-  by exactly `length` bytes, instead of a single read into a 500-byte buffer.
+  Fails when the adapter's address is not IPv4, which is all I/O connections support.
+* `send(packet)`, `read_reply() -> EnIpPacket`: what the duplicated stream utils do today, except
+  that a reply is read as the 24-byte encapsulation header followed by exactly `length` bytes,
+  instead of a single read into a 500-byte buffer, and an encapsulation status other than success
+  is an error.
 * `peer_ip()`: the adapter's IP address, needed by stages 2 and 3b.
 * `unregister(self)`: send UnregisterSession and drop the stream.
 
-### Connection settings — `src/config.rs`
+### Explicit messaging — `src/explicit.rs`
+
+* `send_request(&mut Session, path, service, data) -> EnIpPacket`: build the Message Router
+  request, send it, read the reply, fail with `ExplicitError::Status { general_status,
+  additional_status }` unless the general status is success.
+* `typed_data::<T>(&EnIpPacket) -> T`: the reply's data decoded as a caller-declared `binrw` type
+  (what `read_typed_object_assembly` did in the old stream utils).
+* `read_identity(&mut Session) -> IdentityResponse`: Get_Attributes_All on the Identity object.
+
+### Connection settings — `src/implicit/config.rs`
 
 * `ConnectionConfig`: everything the caller decides before opening, as plain fields:
   configuration instance, per direction (`o2t`, `t2o`) the connection point, application data
@@ -68,7 +99,7 @@ Module docs listing the five stages above, in order, with the module that implem
   directions need them to frame their data.
 * Phase 5 (EDS parser) produces a `ConnectionConfig`.
 
-### Stage 2 — `src/open.rs`
+### Stage 2 — `src/implicit/open.rs`
 
 * `forward_open(&mut Session, ConnectionConfig) -> Result<OpenConnection, OpenError>`:
   sends `RequestObjectAssembly::new_forward_open`, reads the reply with
@@ -82,7 +113,7 @@ Module docs listing the five stages above, in order, with the module that implem
   (address `0.0.0.0` meaning the session's peer IP), otherwise the peer IP on
   `ETHERNET_IP_IO_UDP_PORT`.
 
-### Stage 3a — `src/produce.rs`
+### Stage 3a — `src/implicit/produce.rs`
 
 * `Producer::new(&OpenConnection, initial_encapsulation_sequence_number)`: the caller picks the
   starting number (random in the example), which keeps the type deterministic and testable.
@@ -95,7 +126,7 @@ Module docs listing the five stages above, in order, with the module that implem
   * addresses the packet with the O->T connection ID from the reply.
 * `period() -> Duration`: the O->T actual packet interval.
 
-### Stage 3b — `src/consume.rs`
+### Stage 3b — `src/implicit/consume.rs`
 
 * `Consumer::new(&OpenConnection, established_at: Instant)`.
 * `accept(&mut self, &IoPacket, from: SocketAddr, now: Instant) -> Result<Input, Discarded>`,
@@ -116,27 +147,28 @@ Module docs listing the five stages above, in order, with the module that implem
   multiplier × T->O actual packet interval. Computed in `u64` / `Duration` (512 × 10 s overflows
   `u32` microseconds).
 
-### Stage 4 — `src/close.rs`
+### Stage 4 — `src/implicit/close.rs`
 
 * `forward_close(&mut Session, &OpenConnection) -> Result<(), CloseError>`: a
   `ForwardCloseRequest` with the open request's connection triad, connection path, priority/time
   tick and timeout ticks, sent with `RequestObjectAssembly::new_forward_close`.
 
-### UDP — `src/udp.rs`
+### UDP — `src/implicit/udp.rs`
 
 * `bind_io_socket()`: `0.0.0.0:2222`, bound before the Forward_Open (adapters start producing as
   soon as they reply).
 * `send_io_packet(&UdpSocket, &IoPacket, SocketAddrV4)`,
   `recv_io_packet(&UdpSocket) -> (IoPacket, SocketAddr)`.
 
-### Example — `eipscanne_utils/examples/implicit-io/`
+### Example — `scanner/examples/implicit-io/`
 
 `main` is the stages in order: register, bind UDP, `forward_open`, then one `tokio::select!` loop
 over the O->T send timer, received packets and `consumer.deadline()`, printing input data, for a
 given number of cycles; then `forward_close` and `unregister`. A comment notes that production code
-may run the producer on its own task so a slow input handler cannot delay outputs. Flags: host,
-configuration / output / input instances, sizes, RPI, cycle count, `--large`. Defaults match the
-OpENer sample application (configuration 151, output 150, input 100, 32 bytes each).
+may run the producer on its own task so a slow input handler cannot delay outputs. Flags (all three
+examples use `clap`): host, configuration / output / input instances, sizes, RPI, cycle count,
+`--large`. Defaults match the OpENer sample application (configuration 151, output 150, input
+100, 32 bytes each).
 
 ### Documentation
 
@@ -165,8 +197,11 @@ OpENer sample application (configuration 151, output 150, input 100, 32 bytes ea
 ## Verification
 
 ```
-cargo fmt --all --check && cargo clippy --workspace --all-targets && cargo test --workspace && cargo test -p eipscanne_rs --features adapter
+cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test -p eipscanne_rs --features adapter
 ```
+
+(`cargo test` and `cargo clippy` cover both default members; `--workspace` adds only
+`hex_test_macros`, which has no tests.)
 
 Against the OpENer container from `tests/integration`: `implicit-io` opens the connection,
 exchanges data for the requested number of cycles (OpENer echoes output assembly 150 into input

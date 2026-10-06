@@ -1,5 +1,7 @@
 [workspace]
-members = ["hex_test_macros", "eipscanne_utils"]
+members = ["hex_test_macros", "scanner"]
+# `cargo run --example`, `cargo test` and friends cover the library and the scanner without `-p`
+default-members = [".", "scanner"]
 
 [package]
 name = "eipscanne_rs"

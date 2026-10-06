@@ -22,7 +22,7 @@ New workspace crate `eds_parser/` (deps `pest`, `pest_derive`):
   `[Assembly]` (`AssemN`: name, path, size, descriptor), `[Connection Manager]` (`ConnectionN`:
   trigger/transport mask, connection parameter mask, O->T / T->O RPI, size and format, config
   entries, name, help, path). Empty sizes/RPIs resolve through the referenced `AssemN` / `ParamN`.
-* `bridge.rs` (depends on `eipscanne_utils`): `ConnectionN` → `ConnectionConfig`: transport
+* `bridge.rs` (depends on `scanner`): `ConnectionN` → `ConnectionConfig`: transport
   class and trigger; per direction the connection point, data size (EDS sizes exclude the sequence
   count and real-time header), requested packet interval, real-time format, connection type,
   priority and fixed/variable size; the configuration instance from the path string, with

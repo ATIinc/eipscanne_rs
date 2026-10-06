@@ -182,20 +182,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 
 [[package]]
-name = "eipscanne-utils"
-version = "0.1.0"
-dependencies = [
- "bilge",
- "binrw",
- "clap",
- "eipscanne_rs",
- "hex-test-macros",
- "pretty_assertions",
- "rand",
- "tokio",
-]
-
-[[package]]
 name = "eipscanne_rs"
 version = "0.1.0"
 dependencies = [
@@ -396,6 +382,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 dependencies = [
  "getrandom",
+]
+
+[[package]]
+name = "scanner"
+version = "0.1.0"
+dependencies = [
+ "bilge",
+ "binrw",
+ "clap",
+ "eipscanne_rs",
+ "hex-test-macros",
+ "pretty_assertions",
+ "rand",
+ "tokio",
 ]
 
 [[package]]

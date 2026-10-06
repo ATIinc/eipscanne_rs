@@ -1,9 +1,9 @@
 [package]
-name = "eipscanne-utils"
+name = "scanner"
 version = "0.1.0"
 edition = "2024"
 publish = false
-description = "Reference scaffolding around eipscanne_rs: sessions, opening a class 1 connection, exchanging I/O, and the examples"
+description = "The scanner side built on eipscanne_rs: sessions, explicit requests, class 1 I/O connections, and the examples"
 
 [dependencies]
 eipscanne_rs = { path = ".." }

@@ -15,7 +15,7 @@ use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::config::{ConfigError, ConnectionConfig};
+use crate::implicit::config::{ConfigError, ConnectionConfig};
 use crate::session::{Session, SessionError};
 
 /// An open connection: what was asked for, what the adapter answered, and where the outputs go.

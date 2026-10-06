@@ -1,7 +1,7 @@
-//! Stages 1 and 5: the encapsulation session over TCP port 44818.
+//! The encapsulation session over TCP port 44818, shared by explicit and implicit messaging.
 //!
-//! Every explicit message of a connection's life (Forward_Open, Forward_Close) travels inside this
-//! session, so it is opened first and closed last.
+//! Every explicit request travels inside the session, and so do the Forward_Open and
+//! Forward_Close that bracket an I/O connection, so it is opened first and closed last.
 
 use std::fmt;
 use std::io::Cursor;
@@ -11,7 +11,6 @@ use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 
-use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::EncapsStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
@@ -39,8 +38,6 @@ pub enum SessionError {
     Status(EncapsStatusCode),
     /// The adapter's address is not an IPv4 address, which is all I/O connections support
     NotIpv4(IpAddr),
-    /// A reply that should have carried a Message Router response with data did not
-    NoResponseData,
 }
 
 // ======= Start of Session impl ========
@@ -106,25 +103,6 @@ impl Session {
         Ok(EnIpPacket::read_response(&mut Cursor::new(&bytes))?)
     }
 
-    /// Reads one reply and decodes the data of its Message Router response as a `T`
-    pub async fn read_typed_reply<T>(&mut self) -> Result<(EnIpPacket, T), SessionError>
-    where
-        T: for<'a> BinRead<Args<'a> = ()> + CipData,
-    {
-        let reply = self.read_reply().await?;
-
-        let Some(response) = reply.response() else {
-            return Err(SessionError::NoResponseData);
-        };
-        // A reply read from the wire always holds its data raw
-        let CipDataOpt::Raw(raw) = &response.response_data.data else {
-            return Err(SessionError::NoResponseData);
-        };
-        let typed = T::read_le(&mut Cursor::new(raw))?;
-
-        Ok((reply, typed))
-    }
-
     /// Stage 5: tells the adapter the session is over and closes the connection
     pub async fn unregister(mut self) -> Result<(), SessionError> {
         self.send(&RequestObjectAssembly::new_unregistration(
@@ -152,9 +130,6 @@ impl fmt::Display for SessionError {
             }
             SessionError::NotIpv4(address) => {
                 write!(f, "the adapter's address {address} is not an IPv4 address")
-            }
-            SessionError::NoResponseData => {
-                write!(f, "the reply carried no Message Router response data")
             }
         }
     }

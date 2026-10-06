@@ -9,7 +9,7 @@ point. Update the **Status** line of a phase when it changes.
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | In review |
 | 2 | [Connection Manager packets](02-connection-manager-packets.md) | Implemented, awaiting review |
 | 3 | [Class 1 I/O packets](03-class1-io-packets.md) | Delivered with phase 2 (PR #4) |
-| 4 | [`eipscanne_utils` crate: open a connection and exchange I/O](04-utils-crate.md) | Implemented, awaiting review |
+| 4 | [`scanner` crate: open a connection and exchange I/O](04-scanner-crate.md) | Implemented, awaiting review |
 | 5 | [EDS parser crate](05-eds-parser.md) | Not started |
 | 6 | [Safety System validation](06-safety-system-validation.md) | Not started |
 
@@ -26,8 +26,9 @@ point. Update the **Status** line of a phase when it changes.
 
 * **Packets only in the library.** `eipscanne_rs` stays a packet (de)serialization library built
   on `binrw` + `bilge`. Sessions, sockets, timers, connection state and the examples live in the
-  `eipscanne_utils` workspace crate (phase 4), organized by protocol stage so it reads as a
-  reference for production code.
+  `scanner` workspace crate (phase 4): the shared `session`, then `explicit` and `implicit`
+  messaging kept apart, the latter organized by protocol stage, so it reads as a reference for
+  production code.
 * **Application data is declared by the caller.** Assemblies, configuration data and other
   device-specific payloads are plain `binrw` structs in the caller's code (see `examples/`) and are
   passed in as `CipData`; the library frames them but never models their content. Keep the protocol

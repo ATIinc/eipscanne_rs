@@ -96,7 +96,7 @@ _NOTES_:
 
 1. Run the `read-identity` example, which registers a session with the Ethernet/IP adapter and then requests its identity
     * `cd /workspaces/eipscanne_rs`
-    * `cargo run -p eipscanne-utils --example read-identity -- 172.28.0.10`
+    * `cargo run --example read-identity -- --host 172.28.0.10`
 
 
 ## Running the implicit messaging example against OpENer
@@ -112,7 +112,7 @@ output packet.
 1. Run the example with the adapter's address; the defaults (configuration assembly 151, output
    assembly 150, input assembly 100, 32 bytes each, a 1 s packet interval, 10 cycles) match the
    OpENer sample application
-    * `cargo run -p eipscanne-utils --example implicit-io -- --host 172.28.0.10`
+    * `cargo run --example implicit-io -- --host 172.28.0.10`
     * `--rpi 100 --cycles 50` for a faster exchange, `--large` for a Large_Forward_Open
 1. Expected output: the O->T and T->O connection IDs and packet intervals the adapter granted, one
    `SENT` line per cycle and one `RECEIVED` line per input packet carrying the same bytes, then

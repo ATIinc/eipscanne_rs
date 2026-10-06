@@ -39,13 +39,11 @@ use eipscanne_rs::eip::io_packet::IoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 
-use eipscanne_utils::close::forward_close;
-use eipscanne_utils::config::{ConnectionConfig, DirectionConfig};
-use eipscanne_utils::consume::Consumer;
-use eipscanne_utils::open::forward_open;
-use eipscanne_utils::produce::Producer;
-use eipscanne_utils::session::Session;
-use eipscanne_utils::udp::{recv_io_packet, send_io_packet};
+use scanner::implicit::{
+    ConnectionConfig, Consumer, DirectionConfig, Producer, forward_close, forward_open,
+    recv_io_packet, send_io_packet,
+};
+use scanner::session::Session;
 
 const SESSION_HANDLE: CipUdint = 0x0000_0042;
 const O2T_NETWORK_CONNECTION_ID: CipUdint = 0xa1b2_c3d4;

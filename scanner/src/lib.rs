@@ -1,33 +1,23 @@
-//! Reference scaffolding around `eipscanne_rs`: how to open a class 1 (implicit messaging)
-//! connection to an adapter, exchange cyclic I/O with it and close it again. The library stays
-//! packet (de)serialization only; everything with a socket, a timer or state lives here, one
-//! module per stage of the protocol, so production code can read it top to bottom and reuse the
-//! parts it needs.
+//! The scanner side of EtherNet/IP, built on `eipscanne_rs`: how to talk to an adapter, in code
+//! a person can read top to bottom. The library stays packet (de)serialization only; everything
+//! with a socket, a timer or state lives here, so production code can use it as a reference and
+//! reuse the parts it needs.
 //!
 //! ```text
-//! Stage              What happens on the wire                                 Module
-//! -----------------  -------------------------------------------------------  ---------
-//! 1. Session         TCP 44818: RegisterSession                      -> Session   session
-//! 2. Open            SendRRData(Forward_Open), read the reply -> OpenConnection   open
-//! 3. Exchange        UDP 2222, two independent directions:                       udp
-//!      3a. Produce     O->T: one packet every O->T interval (the outputs)         produce
-//!      3b. Consume     T->O: screen, decode, watch the timeout (the inputs)       consume
-//! 4. Close           SendRRData(Forward_Close), read the reply                   close
-//! 5. End session     UnregisterSession                                           session
+//! session     The encapsulation session over TCP 44818 (RegisterSession ... UnregisterSession),
+//!             shared by both kinds of messaging
+//! explicit    Explicit (unconnected) messaging: one request, one reply, e.g. reading the
+//!             Identity object or an assembly
+//! implicit    Implicit messaging: a class 1 I/O connection (Forward_Open, cyclic I/O over
+//!             UDP 2222, Forward_Close), one submodule per stage
 //! ```
 //!
-//! What the caller decides before stage 2 is a [`config::ConnectionConfig`]. The sending and the
-//! receiving direction of stage 3 share no state, so they are two types: a [`produce::Producer`]
-//! and a [`consume::Consumer`]. Neither touches the network; only `session`, `open`, `close`,
-//! `udp` and the caller's loop do (see the `implicit-io` example).
+//! The `read-identity` and `write-teknic-io` examples use `session` and `explicit`; the
+//! `implicit-io` example uses `session` and `implicit`.
 
-pub mod close;
-pub mod config;
-pub mod consume;
-pub mod open;
-pub mod produce;
+pub mod explicit;
+pub mod implicit;
 pub mod session;
-pub mod udp;
 
 /// One open connection to build the producer and consumer tests on
 #[cfg(test)]
@@ -43,8 +33,8 @@ pub(crate) mod test_support {
     use eipscanne_rs::cip::types::CipUdint;
     use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 
-    use crate::config::{ConnectionConfig, DirectionConfig};
-    use crate::open::OpenConnection;
+    use crate::implicit::config::{ConnectionConfig, DirectionConfig};
+    use crate::implicit::open::OpenConnection;
 
     pub const TARGET_IP: Ipv4Addr = Ipv4Addr::new(172, 28, 0, 10);
     /// The connection IDs of the library's I/O packet tests

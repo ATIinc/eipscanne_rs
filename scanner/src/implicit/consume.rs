@@ -19,7 +19,7 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::IoPacket;
 
-use crate::open::OpenConnection;
+use crate::implicit::open::OpenConnection;
 
 /// Before the first packet the adapter gets at least this long, whatever the packet interval
 const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);

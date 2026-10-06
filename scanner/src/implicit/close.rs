@@ -9,7 +9,7 @@ use eipscanne_rs::cip::connection_manager::response::{
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::open::OpenConnection;
+use crate::implicit::open::OpenConnection;
 use crate::session::{Session, SessionError};
 
 /// Why a connection could not be closed cleanly. The adapter drops the connection on its own

@@ -16,13 +16,11 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use eipscanne_utils::close::forward_close;
-use eipscanne_utils::config::{ConnectionConfig, DirectionConfig};
-use eipscanne_utils::consume::Consumer;
-use eipscanne_utils::open::forward_open;
-use eipscanne_utils::produce::Producer;
-use eipscanne_utils::session::Session;
-use eipscanne_utils::udp::{bind_io_socket, recv_io_packet, send_io_packet};
+use scanner::implicit::{
+    ConnectionConfig, Consumer, DirectionConfig, Producer, bind_io_socket, forward_close,
+    forward_open, recv_io_packet, send_io_packet,
+};
+use scanner::session::Session;
 
 /// Who this scanner says it is in the Forward_Open; the adapter matches the Forward_Close
 /// against the same values

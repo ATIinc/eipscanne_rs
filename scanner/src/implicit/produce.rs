@@ -14,7 +14,7 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::IoPacket;
 
-use crate::open::OpenConnection;
+use crate::implicit::open::OpenConnection;
 
 /// Numbers and frames the output packets of one connection
 #[derive(Debug)]
