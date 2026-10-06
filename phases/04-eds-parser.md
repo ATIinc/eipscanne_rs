@@ -106,7 +106,7 @@ wrong form; an unknown `ParamN` / `AssemN`. Every message names the entry
 (`Connection1: O->T size and format are both empty`). `BridgeError` names the connection and the
 unsupported value.
 
-### Example — `eds_parser/examples/eds-implicit-io/main.rs`
+### Example — `eds_parser/examples/eds-implicit-io.rs`
 
 The stages of `implicit-io`, with the connection settings coming from an EDS instead of flags.
 

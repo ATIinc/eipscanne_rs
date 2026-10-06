@@ -3,7 +3,8 @@
 ## Goal
 
 Typed `binrw` + `bilge` packets for the Connection Manager services used to open and close a class 1
-connection, sent through the existing explicit-messaging path (`SendRRData` to class 6, instance 1).
+connection, sent through the existing explicit-messaging path (`SendRRData` to class 6, instance 1,
+addressed with 8-bit segments `20 06 24 01`).
 
 ## Scope
 
@@ -31,7 +32,9 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
   (connection serial number, originator vendor ID, originator serial number; in every request and
   reply, and what a Forward_Close is matched against) and `UnsuccessfulResponse`, the reply data
   of any rejected request: the triad plus the remaining path size and reserved byte that only a
-  routing error carries (optional fields, read when the bytes are there).
+  routing error carries. All three are optional, read when the bytes are there: a request the
+  Message Router refuses before the Connection Manager sees it (a path segment error, for one)
+  comes back with no data at all.
 * `forward_open.rs` — `ForwardOpenRequest` (one struct for 0x54 and 0x5B, built field by field
   like every other packet; `service_code()` picks the service from the width of the O->T
   parameters, so both directions use the same case; the Connection Path Size byte is derived from
@@ -55,7 +58,12 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
 * `src/object_assembly.rs` — `RequestObjectAssembly::new_forward_open` (sends Forward_Open or
   Large_Forward_Open depending on the request) and `new_forward_close`, both addressed to the
   Connection Manager through the `CONNECTION_MANAGER_CLASS_ID` / `CONNECTION_MANAGER_INSTANCE_ID`
-  constants of `src/cip/object_ids.rs`.
+  constants of `src/cip/object_ids.rs`, as 8-bit segments (`CipPath::new_u8`: `20 06 24 01`).
+  Both segment widths are valid for these values, but the Teknic IO-HUB-4-E refuses a 16-bit
+  request path (`21 00 06 00 25 00 01 00`) with a path segment error.
+* `ResponseStatusCode` and `ConnectionManagerExtendedStatus` display as words with their code
+  (`path segment error (0x04)`, `connection in use or duplicate forward open (0x0100)`), for error
+  messages.
 * The `CipData` blanket impl (`src/cip/message/data.rs`) no longer requires `BinRead` with empty
   arguments: `write_to` only writes, and `ForwardOpenRequest` reads with a `large` argument. Every
   type that satisfied the bound before still does.
@@ -116,8 +124,9 @@ encapsulated packet for the connection the OpENer sample application accepts (pa
 assemblies, a 1 s requested packet interval, class 1, point-to-point, scheduled priority): the
 Forward_Open, Large_Forward_Open and Forward_Close requests (written, read back and parsed into the
 typed request), the Forward_Open and Forward_Close success replies (read, parsed into the typed
-reply and written back) and the rejected Forward_Open reply (read and parsed into `Unsuccessful`,
-its general and extended status read from the Message Router response). The dissection comment of
+reply and written back), the rejected Forward_Open reply (read and parsed into `Unsuccessful`,
+its general and extended status read from the Message Router response), and the path segment
+error a Teknic IO-HUB-4-E returned for a 16-bit request path (captured; no reply data). The dissection comment of
 every packet is generated with
 `scripts/dissect.sh` (tshark), a reply behind its request (`--request`) because Wireshark only names
 the service of a reply once it has seen the request.
