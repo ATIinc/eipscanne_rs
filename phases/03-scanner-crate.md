@@ -18,7 +18,7 @@ scanner/src/implicit/{config,open,produce,consume,close,udp}.rs
 ```
 
 Explicit and implicit messaging are kept apart so it is clear which functions each one needs: the
-`read-identity` and `write-teknic-io` examples import `session` and `explicit`, the `implicit-io`
+`read-identity` and `write-clearlink-io` examples import `session` and `explicit`, the `implicit-io`
 example imports `session` and `implicit`. The Forward_Open and Forward_Close are unconnected
 messages, but they exist only to bracket an I/O connection, so they sit under `implicit`.
 
@@ -52,11 +52,11 @@ give packets and verdicts out.
 * New crate `scanner/` (package `scanner`, not published; the name is taken on crates.io, so
   publishing it would mean renaming), depending on `eipscanne_rs`, `tokio`, `binrw` and `bilge`.
 * All examples move into the new crate (`scanner/examples/`): `read-identity`,
-  `write-teknic-io` and the new `implicit-io`. `examples/stream_utils.rs` and
+  `write-clearlink-io` and the new `implicit-io`. `examples/stream_utils.rs` and
   `examples/write-teknic-io/duplicated_stream_utils.rs` are deleted in favour of `session.rs`.
   The library then has no dependency on its utilities (no dev-dependency cycle), and `tokio` and
   `clap` leave its dev-dependencies. The example tests (`clearlink_config.rs`,
-  `clearlink_output.rs`) move unchanged and keep their bytes.
+  `clearlink_output.rs`) move unchanged to `scanner/tests/clearlink/` and keep their bytes.
 
 ### `src/lib.rs`
 

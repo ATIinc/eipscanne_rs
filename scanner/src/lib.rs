@@ -12,7 +12,7 @@
 //!             UDP 2222, Forward_Close), one submodule per stage
 //! ```
 //!
-//! The `read-identity` and `write-teknic-io` examples use `session` and `explicit`; the
+//! The `read-identity` and `write-clearlink-io` examples use `session` and `explicit`; the
 //! `implicit-io` example uses `session` and `implicit`.
 
 pub mod explicit;
