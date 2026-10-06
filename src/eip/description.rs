@@ -10,9 +10,14 @@ use binrw::{
 };
 
 use crate::cip::message::CipMessage;
+use crate::cip::message::data::CipDataOpt;
 use crate::cip::types::{CipUint, CipUsint};
 
+use super::io_packet::{SEQUENCED_ADDRESS_LENGTH, SequencedAddress};
 use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
+
+/// Length of the data of a Sequenced Address Item: the connection ID and the encapsulation
+/// sequence number
 
 #[binrw]
 #[brw(little)]
@@ -55,6 +60,15 @@ pub enum CommonPacketItem {
     /// I/O data to
     T2OSockAddrInfo(SockaddrInfo),
 
+    /// Sequenced Address Item: the connection an I/O packet belongs to and the packet's number
+    /// on that connection
+    SequencedAddressItem(SequencedAddress),
+
+    /// Connected Data Item: the data of an I/O packet. Always raw when read, because its layout
+    /// (sequence count, run/idle header, application data) depends on the connection it belongs
+    /// to; `IoData` decodes it once the connection is known
+    ConnectedDataItem(CipDataOpt),
+
     /// Any other item: the raw data is kept so the packet can be re-serialized unchanged
     Unknown {
         type_id: CommonPacketItemId,
@@ -71,6 +85,8 @@ impl CommonPacketItem {
             CommonPacketItem::UnconnectedDataItem(_) => CommonPacketItemId::UnconnectedDataItem,
             CommonPacketItem::O2TSockAddrInfo(_) => CommonPacketItemId::O2TSockAddrInfo,
             CommonPacketItem::T2OSockAddrInfo(_) => CommonPacketItemId::T2OSockAddrInfo,
+            CommonPacketItem::SequencedAddressItem(_) => CommonPacketItemId::SequencedAddressItem,
+            CommonPacketItem::ConnectedDataItem(_) => CommonPacketItemId::ConnectedDataItem,
             CommonPacketItem::Unknown { type_id, .. } => *type_id,
         }
     }
@@ -97,6 +113,19 @@ impl CommonPacketItem {
                 SockaddrInfo::read_options(&mut data_reader, endian, ())
                     .ok()
                     .map(CommonPacketItem::T2OSockAddrInfo)
+            }
+            CommonPacketItemId::SequencedAddressItem
+                if packet_length == SEQUENCED_ADDRESS_LENGTH =>
+            {
+                SequencedAddress::read_options(&mut data_reader, endian, ())
+                    .ok()
+                    .map(CommonPacketItem::SequencedAddressItem)
+            }
+            // Always raw: how the data is laid out is only known once the connection is looked up
+            CommonPacketItemId::ConnectedDataItem => {
+                CipDataOpt::read_options(&mut data_reader, endian, (packet_length,))
+                    .ok()
+                    .map(CommonPacketItem::ConnectedDataItem)
             }
             _ => None,
         }
@@ -150,6 +179,13 @@ impl BinWrite for CommonPacketItem {
             }
             CommonPacketItem::O2TSockAddrInfo(info) | CommonPacketItem::T2OSockAddrInfo(info) => {
                 info.write_options(&mut data_writer, endian, ())?
+            }
+            CommonPacketItem::SequencedAddressItem(address) => {
+                address.write_options(&mut data_writer, endian, ())?
+            }
+            // The write side of `CipDataOpt` ignores its length argument
+            CommonPacketItem::ConnectedDataItem(item_data) => {
+                item_data.write_options(&mut data_writer, endian, (0,))?
             }
             CommonPacketItem::Unknown { data: raw_data, .. } => data_writer.write_all(raw_data)?,
         }

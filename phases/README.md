@@ -8,7 +8,7 @@ point. Update the **Status** line of a phase when it changes.
 |---|---|---|
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | In review |
 | 2 | [Connection Manager packets](02-connection-manager-packets.md) | Implemented, awaiting review |
-| 3 | [Class 1 I/O packets](03-class1-io-packets.md) | Not started |
+| 3 | [Class 1 I/O packets](03-class1-io-packets.md) | Delivered with phase 2 (PR #4) |
 | 4 | [I/O connection state](04-io-connection-state.md) | Not started |
 | 5 | [Socket utilities and implicit-io example](05-socket-utilities-and-example.md) | Not started |
 | 6 | [EDS parser crate](06-eds-parser.md) | Not started |
