@@ -9,18 +9,66 @@ use scanner::session::Session;
 
 // The ClearLink assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
-#[path = "../../assemblies"]
+#[path = "../assemblies"]
 mod assemblies {
     pub mod clearlink;
 }
-mod cli_config;
 
 use assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
-use assemblies::clearlink::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
-use cli_config::{CliArgs, set_io_data};
+use assemblies::clearlink::output::{IOOutputData, OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 
 /// The ClearLink to talk to unless one is given on the command line
 const DEFAULT_ADAPTER_IP: &str = "172.31.19.10";
+
+#[derive(Parser)]
+struct OutputValue {
+    /// Turns the output on
+    #[arg(
+        long,
+        required = true,
+        conflicts_with = "off",
+        conflicts_with = "pwm_value"
+    )]
+    on: bool,
+
+    /// Turns the output off
+    #[arg(
+        long,
+        required = true,
+        conflicts_with = "on",
+        conflicts_with = "pwm_value"
+    )]
+    off: bool,
+
+    /// Sets the output value to the specified number between 0 and 255 (inclusive)
+    #[arg(
+        long = "pwm",
+        required = true,
+        conflicts_with = "on",
+        conflicts_with = "off"
+    )]
+    pwm_value: Option<u8>,
+}
+
+/// Sets the value of a digital output on a Teknic ClearLink controller
+#[derive(Parser)]
+#[command(
+    version,
+    about,
+    long_about = "Used to set the value of a digital output on a Teknic ClearLink controller"
+)]
+struct CliArgs {
+    /// IP address of the ClearLink
+    #[arg(long)]
+    host: Option<String>,
+
+    /// The digital output to set
+    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..5))]
+    index: u8,
+
+    #[command(flatten)]
+    output_value: OutputValue,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -29,6 +77,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .host
         .clone()
         .unwrap_or_else(|| DEFAULT_ADAPTER_IP.to_string());
+
+    // The two assemblies this example talks to
+    let config_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        CONFIG_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+    let output_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        OUTPUT_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
@@ -39,11 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING - SET config");
     let _config_success_response = send_request(
         &mut session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            CONFIG_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
+        config_assembly,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(ConfigAssemblyObject::default())),
     )
@@ -58,11 +114,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_assembly_reply = send_request(
         &mut session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            OUTPUT_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
+        output_assembly.clone(),
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -86,11 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _set_digital_io_success_response = send_request(
         &mut session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            OUTPUT_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
+        output_assembly,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(output_assembly_object)),
     )
@@ -106,4 +154,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ^^^^^^^^^ UnRegister the session ^^^^^^^^^^^^
 
     Ok(())
+}
+
+/// Turns the chosen output on or off, or sets its PWM duty cycle
+fn set_io_data(io_output_data: &mut IOOutputData, index: usize, output_value: OutputValue) {
+    match output_value {
+        // On and Off are mutually exclusive so only one needs to be checked
+        OutputValue {
+            on: is_on,
+            off: _,
+            pwm_value: None,
+        } => {
+            io_output_data.set_digital_output(index, is_on);
+        }
+        OutputValue {
+            on: _,
+            off: _,
+            pwm_value: Some(pwm),
+        } => {
+            io_output_data.set_digital_pwm(index, pwm);
+        }
+    }
 }

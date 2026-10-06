@@ -26,13 +26,13 @@ in `write-teknic-io` (they also run as part of `cargo test --workspace`).
 | `io-hub-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
 
-Device assemblies that more than one example may use live outside the library in
-`scanner/assemblies/`: `clearlink.rs` (config, input, output) and `io_hub.rs` (input, output), each
-with a directory of the same name. An example that needs them declares
-`#[path = "../../assemblies"] mod assemblies { pub mod clearlink; }` and imports
-`assemblies::clearlink::...`. Other examples keep
-their device types next to their `main.rs`. Application data is always declared by the caller as
-plain `binrw` structs; the library never models it.
+Every example is a single file. The device assemblies they use live outside the library in
+`scanner/assemblies/`: `clearlink.rs` (config, input, output), `io_hub.rs` (input, output), each
+with a directory of the same name, and `nitra.rs`. An example that needs them declares
+`#[path = "../assemblies"] mod assemblies { pub mod clearlink; }` and imports
+`assemblies::clearlink::...`. Application data is always declared by the caller as plain `binrw`
+structs; the library never models it. Each request is written out where it happens: the assembly
+paths are built once at the top of `main` and passed to `send_request`.
 
 ### read-identity
 
@@ -79,26 +79,27 @@ Energizes or releases solenoid valves on a Nitra EtherNet/IP pneumatic valve man
 1. Registers a session
 1. Reads the status byte (assembly 101)
 1. Writes the 16 valve bits (assembly 100); `--pulse <ms>` writes them on, waits, and writes
-   them all off again
+   them all off again (Ctrl+C during the wait releases them early)
 1. Unregisters the session
 
 ### clearlink-homing
 
-Homes one motor of a Teknic ClearLink over explicit messaging. This moves a real motor, so
-`--host` is required and the motor is disabled again however the run ends (error or Ctrl+C).
+Homes one motor of a Teknic ClearLink over explicit messaging, top to bottom like the other
+explicit examples. This moves a real motor, so `--host` is required.
 
 * `cargo run --example clearlink-homing -- --host 172.31.19.14 --motor 1 --home-sensor 6`
 * `--home-sensor -1` (the default) homes against a hard stop; `--velocity` and `--acceleration`
-  set the move, `--poll-ms` and `--timeout-s` the polling
+  set the move, `--timeout-s` how long the whole homing may take
 
 1. Registers a session and reads the output assembly, so writes change only the motor being homed
-1. Clears shutdowns and a motor fault if the input assembly reports any (edge-triggered
-   handshakes, each acknowledged through the input assembly)
+1. Reads the inputs and, if shutdowns or a motor fault are present, raises Clear Alerts and Clear
+   Motor Fault briefly and lowers them again
 1. Writes the configuration assembly with homing enabled and the home sensor connector
-1. Enables the motor and waits for `enabled`, then `ready_to_home`
+1. Enables the motor and waits for `ready_to_home`
 1. Starts the homing move (homing + load velocity move flags, jog velocity, limits), waits for
    the acknowledgement, clears the flags, waits for `has_homed`
-1. Disables the motor and unregisters the session
+1. Disables the motor, however steps 4 and 5 ended (done, failed or Ctrl+C), and unregisters the
+   session
 
 ### io-hub-homing
 
@@ -117,7 +118,8 @@ rejected command's AOI error code.
 1. Enables the motor
 1. Sends the homing command(s), each with the next move number
 1. Reads the inputs every 500 ms, printing the status, until `has_homed` or `--timeout-s`
-1. Disables the motor and unregisters the session
+1. Disables the motor, however steps 3 to 5 ended (done, failed or Ctrl+C), and unregisters the
+   session
 
 ### implicit-io
 
@@ -146,6 +148,7 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
       discarded
     * `Consumer::deadline` passes: no input packet arrived within timeout multiplier × packet
       interval, the connection is considered timed out and the loop ends
+    * Ctrl+C: the loop ends early; the connection is still closed and the session unregistered
 1. **Close**: sends the Forward_Close matching the Forward_Open (`forward_close`)
 1. **End session**: unregisters the session
 

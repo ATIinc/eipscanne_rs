@@ -1,6 +1,7 @@
 //! Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging: register a
 //! session, clear a shutdown if one is present, enable the motor, send the homing command, read
-//! the inputs until the motor reports it has homed, then disable the motor again.
+//! the inputs until the motor reports it has homed, then disable the motor again. The motor is
+//! disabled however the motion ends: homed, timed out, failed or stopped with Ctrl+C.
 //!
 //! `--repeat N` sends N homing commands back to back, each before the previous one has finished,
 //! which reproduces a firmware bug: depending on the version the motor cancels the active homing
@@ -24,7 +25,7 @@ use scanner::session::Session;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
-#[path = "../../assemblies"]
+#[path = "../assemblies"]
 mod assemblies {
     pub mod io_hub;
 }
@@ -66,6 +67,18 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
+    // The two assemblies this example talks to
+    let input_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        INPUT_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+    let output_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        OUTPUT_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
     let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
@@ -74,7 +87,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut outputs = OutputAssemblyHub4E::default();
 
     // ========= Clear a shutdown, if one is present ============
-    let inputs = read_inputs(&mut session).await?;
+    let reply = send_request(
+        &mut session,
+        input_assembly.clone(),
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
+    let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
     if inputs
         .motor_input(args.motor)
         .statusword
@@ -83,108 +103,130 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("REQUESTING - SET shutdown reset");
         let motor = outputs.motor_output_mut(args.motor);
         motor.controlword.set_shutdown_reset(true);
-        write_outputs(&mut session, &outputs).await?;
+        send_request(
+            &mut session,
+            output_assembly.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
         tokio::time::sleep(SHUTDOWN_RESET_TIME).await;
 
         // Lowered again so the next reset has a rising edge
         let motor = outputs.motor_output_mut(args.motor);
         motor.controlword.set_shutdown_reset(false);
-        write_outputs(&mut session, &outputs).await?;
+        send_request(
+            &mut session,
+            output_assembly.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
     }
 
-    // ========= Enable the motor ============
-    println!("REQUESTING - SET enable motor {}", args.motor);
-    outputs
-        .motor_output_mut(args.motor)
-        .controlword
-        .set_enable(true);
-    write_outputs(&mut session, &outputs).await?;
-
-    // ========= Send the homing command(s) ============
-    // The hub acts on a move when its move number changes, so each command takes the next one
-    let inputs = read_inputs(&mut session).await?;
-    let mut move_number = inputs.motor_input(args.motor).move_number_ack;
-    for i in 1..=args.repeat {
-        move_number = move_number.wrapping_add(1);
+    // The motion steps run until they finish, fail or Ctrl+C is pressed; the motor is disabled
+    // below in every case
+    let homing = async {
+        // ========= Enable the motor ============
+        println!("REQUESTING - SET enable motor {}", args.motor);
         outputs
             .motor_output_mut(args.motor)
-            .command_move(MoveType::HomingMove, move_number);
-        write_outputs(&mut session, &outputs).await?;
-        println!(
-            "REQUESTING - HOMING move {move_number} ({i}/{})",
-            args.repeat
-        );
-        tokio::time::sleep(Duration::from_millis(args.delay_ms)).await;
+            .controlword
+            .set_enable(true);
+        send_request(
+            &mut session,
+            output_assembly.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
+
+        // ========= Send the homing command(s) ============
+        // The hub acts on a move when its move number changes, so each command takes the next one
+        let reply = send_request(
+            &mut session,
+            input_assembly.clone(),
+            ServiceCode::GetAttributeSingle,
+            None,
+        )
+        .await?;
+        let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
+        let mut move_number = inputs.motor_input(args.motor).move_number_ack;
+        for i in 1..=args.repeat {
+            move_number = move_number.wrapping_add(1);
+            outputs
+                .motor_output_mut(args.motor)
+                .command_move(MoveType::HomingMove, move_number);
+            send_request(
+                &mut session,
+                output_assembly.clone(),
+                ServiceCode::SetAttributeSingle,
+                Some(Box::new(outputs.clone())),
+            )
+            .await?;
+            println!(
+                "REQUESTING - HOMING move {move_number} ({i}/{})",
+                args.repeat
+            );
+            tokio::time::sleep(Duration::from_millis(args.delay_ms)).await;
+        }
+
+        // ========= Wait for the motor to home ============
+        let deadline = Instant::now() + Duration::from_secs(args.timeout_s);
+        loop {
+            let reply = send_request(
+                &mut session,
+                input_assembly.clone(),
+                ServiceCode::GetAttributeSingle,
+                None,
+            )
+            .await?;
+            let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
+            let motor = inputs.motor_input(args.motor);
+            print_status(motor);
+
+            if motor.statusword.has_homed() {
+                println!("HOMED");
+                break;
+            }
+            if Instant::now() >= deadline {
+                println!("NOT HOMED within {} s of the last command", args.timeout_s);
+                break;
+            }
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+        Ok::<(), Box<dyn std::error::Error>>(())
+    };
+    let outcome = tokio::select! {
+        result = homing => result,
+        _ = tokio::signal::ctrl_c() => {
+            println!("Ctrl+C: stopping");
+            Ok(())
+        }
+    };
+    if let Err(error) = &outcome {
+        eprintln!("homing failed: {error}");
     }
 
-    // ========= Wait for the motor to home ============
-    let deadline = Instant::now() + Duration::from_secs(args.timeout_s);
-    loop {
-        let inputs = read_inputs(&mut session).await?;
-        let motor = inputs.motor_input(args.motor);
-        print_status(motor);
-
-        if motor.statusword.has_homed() {
-            println!("HOMED");
-            break;
-        }
-        if Instant::now() >= deadline {
-            println!("NOT HOMED within {} s of the last command", args.timeout_s);
-            break;
-        }
-        tokio::time::sleep(POLL_INTERVAL).await;
-    }
-
-    // ========= Disable the motor ============
+    // ========= Disable the motor (always) ============
     println!("REQUESTING - SET disable motor {}", args.motor);
     outputs
         .motor_output_mut(args.motor)
         .controlword
         .set_enable(false);
-    write_outputs(&mut session, &outputs).await?;
+    send_request(
+        &mut session,
+        output_assembly,
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(outputs)),
+    )
+    .await?;
 
     // ========= UnRegister the session ============
     println!("REQUESTING - UN REGISTER session");
     session.unregister().await?;
 
-    Ok(())
-}
-
-/// Get_Attribute_Single on the input assembly
-async fn read_inputs(
-    session: &mut Session,
-) -> Result<InputAssemblyHub4E, Box<dyn std::error::Error>> {
-    let reply = send_request(
-        session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            INPUT_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
-        ServiceCode::GetAttributeSingle,
-        None,
-    )
-    .await?;
-    Ok(decode_reply(&reply)?)
-}
-
-/// Set_Attribute_Single on the output assembly
-async fn write_outputs(
-    session: &mut Session,
-    outputs: &OutputAssemblyHub4E,
-) -> Result<(), Box<dyn std::error::Error>> {
-    send_request(
-        session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            OUTPUT_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
-        ServiceCode::SetAttributeSingle,
-        Some(Box::new(outputs.clone())),
-    )
-    .await?;
-    Ok(())
+    outcome
 }
 
 /// The status bits that tell how homing is going, on one line

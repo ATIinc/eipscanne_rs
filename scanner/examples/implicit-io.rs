@@ -144,6 +144,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut send_timer = tokio::time::interval(producer.period());
     let mut outputs = vec![0u8; usize::from(args.output_size)];
     let mut cycle: u32 = 0;
+    // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
+    // Ctrl+C ends the exchange and the connection is still closed below
+    let ctrl_c = tokio::signal::ctrl_c();
+    tokio::pin!(ctrl_c);
     loop {
         tokio::select! {
             _ = send_timer.tick() => {
@@ -174,6 +178,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             _ = tokio::time::sleep_until(tokio::time::Instant::from_std(consumer.deadline())) => {
                 eprintln!("the connection timed out: no input packet in time");
+                break;
+            }
+
+            _ = &mut ctrl_c => {
+                println!("Ctrl+C: stopping");
                 break;
             }
         }
