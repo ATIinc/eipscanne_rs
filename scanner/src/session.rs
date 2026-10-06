@@ -16,6 +16,13 @@ use eipscanne_rs::eip::command::EncapsStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
+/// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet the session sends or reads
+/// is printed to stderr as hex (`REQUEST 6f 00 ...`, `REPLY 6f 00 ...`), ready for
+/// `scripts/dissect.sh`. This is how Claude sees a session's traffic where it cannot capture
+/// packets (the devcontainer has no capture permission):
+/// `EIP_DUMP=1 cargo run --example io-hub-implicit -- ...`
+const DUMP_VARIABLE: &str = "EIP_DUMP";
+
 /// Size of the encapsulation header on the wire: command, length, session handle, status, sender
 /// context and options
 const ENCAPSULATION_HEADER_LEN: usize = 24;
@@ -79,6 +86,7 @@ impl Session {
     pub async fn send(&mut self, packet: &EnIpPacket) -> Result<(), SessionError> {
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes)?;
+        dump_if_requested("REQUEST", bytes.get_ref());
         self.stream.write_all(bytes.get_ref()).await?;
         Ok(())
     }
@@ -95,6 +103,8 @@ impl Session {
         self.stream
             .read_exact(&mut bytes[ENCAPSULATION_HEADER_LEN..])
             .await?;
+
+        dump_if_requested("REPLY", &bytes);
 
         if header.status_code != EncapsStatusCode::Success {
             return Err(SessionError::Status(header.status_code));
@@ -158,3 +168,12 @@ impl From<binrw::Error> for SessionError {
 }
 
 // ^^^^^^^^ End of SessionError impl ^^^^^^^^
+
+/// Prints `bytes` as hex after `direction` when `EIP_DUMP` is set (see `DUMP_VARIABLE`)
+fn dump_if_requested(direction: &str, bytes: &[u8]) {
+    if std::env::var_os(DUMP_VARIABLE).is_none() {
+        return;
+    }
+    let hex: Vec<String> = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    eprintln!("{direction} {}", hex.join(" "));
+}

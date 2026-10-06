@@ -90,7 +90,7 @@ fn test_serialize_forward_close_request() {
     EtherNet/IP (Industrial Protocol), Session: 0x00000003, Send RR Data
         Encapsulation Header
             Command: Send RR Data (0x006f)
-            Length: 46
+            Length: 42
             Session Handle: 0x00000003
             Status: Success (0x00000000)
             Sender Context: 0000000000000000
@@ -102,23 +102,23 @@ fn test_serialize_forward_close_request() {
                 Type ID: Null Address Item (0x0000)
                     Length: 0
                 Type ID: Unconnected Data Item (0x00b2)
-                    Length: 30
+                    Length: 26
     Common Industrial Protocol
         Service: Unknown Service (0x4e) (Request)
             0... .... = Request/Response: Request (0x0)
             .100 1110 = Service: Unknown (0x4e)
-        Request Path Size: 4 words
-        Request Path: Connection Manager, Instance: 0x0001
-            Path Segment: 0x21 (16-Bit Class Segment)
+        Request Path Size: 2 words
+        Request Path: Connection Manager, Instance: 0x01
+            Path Segment: 0x20 (8-Bit Class Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 00.. = Logical Segment Type: Class ID (0)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Class: Connection Manager (0x0006)
-            Path Segment: 0x25 (16-Bit Instance Segment)
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Class: Connection Manager (0x06)
+            Path Segment: 0x24 (8-Bit Instance Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 01.. = Logical Segment Type: Instance ID (1)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Instance: 0x0001
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Instance: 0x01
     CIP Connection Manager
         Service: Forward Close (Request)
             0... .... = Request/Response: Request (0x0)
@@ -156,18 +156,18 @@ fn test_serialize_forward_close_request() {
                     Connection Point: 0x64
 
     Hex Dump:
-    0000   6f 00 2e 00 03 00 00 00 00 00 00 00 00 00 00 00
+    0000   6f 00 2a 00 03 00 00 00 00 00 00 00 00 00 00 00
     0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-    0020   00 00 00 00 b2 00 1e 00 4e 04 21 00 06 00 25 00
-    0030   01 00 0a 05 01 00 56 01 45 23 01 00 04 00 20 04
-    0040   24 97 2c 96 2c 64
+    0020   00 00 00 00 b2 00 1a 00 4e 02 20 06 24 01 0a 05
+    0030   01 00 56 01 45 23 01 00 04 00 20 04 24 97 2c 96
+    0040   2c 64
     */
     let expected_byte_array: Vec<CipByte> = vec![
-        0x6f, 0x00, 0x2e, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x6f, 0x00, 0x2a, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x1e, 0x00, 0x4e, 0x04, 0x21, 0x00, 0x06,
-        0x00, 0x25, 0x00, 0x01, 0x00, 0x0a, 0x05, 0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00,
-        0x04, 0x00, 0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x1a, 0x00, 0x4e, 0x02, 0x20, 0x06, 0x24,
+        0x01, 0x0a, 0x05, 0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00, 0x04, 0x00, 0x20, 0x04,
+        0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
     ];
 
     let request = sample_request();
@@ -175,7 +175,7 @@ fn test_serialize_forward_close_request() {
     let expected_request_object = RequestObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: Some(46),
+            length: Some(42),
             session_handle: CLEARLINK_IO_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
@@ -187,8 +187,8 @@ fn test_serialize_forward_close_request() {
             MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::ForwardClose),
                 request_data: RequestData {
-                    total_word_size: 4,
-                    cip_path: CipPath::new(
+                    total_word_size: 2,
+                    cip_path: CipPath::new_u8(
                         CONNECTION_MANAGER_CLASS_ID,
                         CONNECTION_MANAGER_INSTANCE_ID,
                     ),

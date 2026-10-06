@@ -1,4 +1,7 @@
-use binrw::binrw;
+use std::fmt;
+use std::io::Cursor;
+
+use binrw::{BinWrite, binrw};
 
 use crate::cip::{
     message::{
@@ -107,6 +110,36 @@ pub enum ResponseStatusCode {
     #[brw(magic = 0x2Bu8)]
     UnknownModbusError,
     Unknown(CipUsint),
+}
+
+// ======= Start of ResponseStatusCode impl ========
+
+/// The status in words with its code: `path segment error (0x04)`
+impl fmt::Display for ResponseStatusCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut code = Cursor::new(Vec::new());
+        // Every variant, `Unknown` included, writes its one-byte code
+        self.write_le(&mut code).map_err(|_| fmt::Error)?;
+        let code = code.into_inner()[0];
+        match self {
+            ResponseStatusCode::Unknown(_) => write!(f, "unknown general status ({code:#04x})"),
+            _ => write!(f, "{} ({code:#04x})", variant_words(&format!("{self:?}"))),
+        }
+    }
+}
+
+// ^^^^^^^^ End of ResponseStatusCode impl ^^^^^^^^
+
+/// A variant name in lowercase words: `PathSegmentError` -> `path segment error`
+pub(crate) fn variant_words(name: &str) -> String {
+    let mut words = String::new();
+    for (index, character) in name.chars().enumerate() {
+        if character.is_uppercase() && index > 0 {
+            words.push(' ');
+        }
+        words.push(character.to_ascii_lowercase());
+    }
+    words
 }
 
 #[binrw]

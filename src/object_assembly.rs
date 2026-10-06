@@ -48,7 +48,7 @@ impl RequestObjectAssembly {
         let service_code = request.service_code();
         Self::new_service_request(
             session_handle,
-            CipPath::new(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
+            CipPath::new_u8(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
             service_code,
             Some(Box::new(request)),
         )
@@ -57,7 +57,7 @@ impl RequestObjectAssembly {
     pub fn new_forward_close(session_handle: CipUdint, request: ForwardCloseRequest) -> Self {
         Self::new_service_request(
             session_handle,
-            CipPath::new(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
+            CipPath::new_u8(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
             ServiceCode::ForwardClose,
             Some(Box::new(request)),
         )

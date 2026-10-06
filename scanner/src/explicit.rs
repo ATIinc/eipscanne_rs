@@ -107,14 +107,14 @@ impl fmt::Display for ExplicitError {
                 general_status,
                 additional_status,
             } if additional_status.is_empty() => {
-                write!(f, "the adapter answered with status {general_status:?}")
+                write!(f, "the adapter answered with status {general_status}")
             }
             ExplicitError::Status {
                 general_status,
                 additional_status,
             } => write!(
                 f,
-                "the adapter answered with status {general_status:?}, additional status {additional_status:#06x?}"
+                "the adapter answered with status {general_status}, additional status {additional_status:#06x?}"
             ),
             ExplicitError::Parse(error) => write!(f, "the reply's data did not decode: {error}"),
         }
