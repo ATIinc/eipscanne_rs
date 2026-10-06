@@ -57,6 +57,10 @@ give packets and verdicts out.
   The library then has no dependency on its utilities (no dev-dependency cycle), and `tokio` and
   `clap` leave its dev-dependencies. The example tests (`clearlink_config.rs`,
   `clearlink_output.rs`) move unchanged to `scanner/tests/clearlink/` and keep their bytes.
+* Three explicit examples are ported from older branches: `write-nitra-io`, `clearlink-homing` and
+  `io-hub-homing`. Every example is a single file that reads top to bottom and handles Ctrl+C. The
+  device assemblies live outside the library in `scanner/assemblies/` (`clearlink`, `io_hub`,
+  `nitra`), which an example includes with `#[path = "../assemblies"]`.
 
 ### `src/lib.rs`
 
@@ -74,6 +78,9 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
   is an error.
 * `peer_ip()`: the adapter's IP address, needed by stages 2 and 3b.
 * `unregister(self)`: send UnregisterSession and drop the stream.
+* A hack for Claude: with `EIP_DUMP` set, every packet the session sends or reads is printed to
+  stderr as hex, ready for `scripts/dissect.sh`. This is how the traffic is seen where packets
+  cannot be captured (the devcontainer).
 
 ### Explicit messaging — `src/explicit.rs`
 
@@ -104,7 +111,8 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
   `ConnectionManagerResponse::from_message_router_response`.
 * `OpenError::Rejected { general_status, extended_status }` for an `Unsuccessful` reply (extended
   status from `ConnectionManagerExtendedStatus::from_additional_status`), plus I/O and parse
-  errors.
+  errors. Rejections print the statuses in words (`the adapter rejected the Forward_Open: path
+  segment error (0x04)`), and so do `CloseError` and `ExplicitError`.
 * `OpenConnection { config, request, response, target_ip, o2t_endpoint }`: everything stages 3
   and 4 need, kept as the typed packets instead of copied fields.
 * Where outputs are sent (`o2t_endpoint`): the O->T Sockaddr Info item of the reply if present
@@ -122,6 +130,8 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
     (a resend of unchanged data keeps the count);
   * adds the run/idle header when the O->T real-time format is the 32-bit header;
   * addresses the packet with the O->T connection ID from the reply.
+* `next_packet_from(&T, run) -> Result<IoPacket, OutputsError>`: the same with the outputs given
+  as a caller's `binrw` assembly (the struct the explicit side sends), encoded first.
 * `period() -> Duration`: the O->T actual packet interval.
 
 ### Stage 3b — `src/implicit/consume.rs`
@@ -140,6 +150,8 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
      T->O size (`Discarded::Malformed`, `Discarded::WrongSize`).
 * Only accepted packets move the timeout. `Input { data, run_idle, new_data }`: `new_data` is false
   when the CIP sequence count equals the previous accepted packet's.
+* `Input::decode::<T>()`: the data decoded as a caller's `binrw` assembly, the implicit counterpart
+  of `decode_reply`; every byte must belong to `T`.
 * `deadline() -> Instant`: before the first accepted packet, `established_at` plus the larger of
   10 s and multiplier × T->O actual packet interval; afterwards, the last accepted packet plus
   multiplier × T->O actual packet interval. Computed in `u64` / `Duration` (512 × 10 s overflows
@@ -158,7 +170,7 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
 * `send_io_packet(&UdpSocket, &IoPacket, SocketAddrV4)`,
   `recv_io_packet(&UdpSocket) -> (IoPacket, SocketAddr)`.
 
-### Example — `scanner/examples/implicit-io/`
+### Example — `scanner/examples/implicit-io.rs`
 
 `main` is the stages in order: register, bind UDP, `forward_open`, then one `tokio::select!` loop
 over the O->T send timer, received packets and `consumer.deadline()`, printing input data, for a
@@ -183,7 +195,9 @@ examples use `clap`): host, configuration / output / input instances, sizes, RPI
 
 * Unit tests in `produce.rs` and `consume.rs` for every rule above: each discard reason, first
   packet with any sequence number, sequence number rollover, the allowed gap for small and large
-  multipliers, CIP sequence count on unchanged and changed data, both timeout formulas.
+  multipliers, CIP sequence count on unchanged and changed data, both timeout formulas; typed
+  inputs and outputs (`Input::decode` with bytes left over, `next_packet_from` against the same
+  bytes and with a wrong size).
 * `config.rs`: the request built from the OpENer defaults has the bytes of the phase 2
   Forward_Open test.
 * `open.rs`: endpoint resolution with no Sockaddr Info, with `0.0.0.0`, and with an address.
