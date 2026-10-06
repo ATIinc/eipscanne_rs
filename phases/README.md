@@ -11,7 +11,7 @@ the only edit a later phase makes here is filling in its pull request number bel
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | #3 (`feat/SW-4573-1-explicit-groundwork`) |
 | 2 | [Connection Manager packets and class 1 I/O packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
 | 3 | [`scanner` crate: open a connection and exchange I/O](03-scanner-crate.md) | #5 (`feat/SW-4573-4-utils-crate`) |
-| 4 | [EDS parser crate and `eds-implicit-io` example](04-eds-parser.md) | not yet opened |
+| 4 | [EDS parser crate and `eds-implicit-io` example](04-eds-parser.md) | #7 (`feat/SW-4573-eds-parser`) |
 | 5 | [Safety System validation](05-safety-system-validation.md) | not yet opened |
 
 ## How the stack works
