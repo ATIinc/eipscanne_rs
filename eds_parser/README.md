@@ -49,7 +49,8 @@ cargo run --example eds-implicit-io -- --eds eds_parser/tests/fixtures/sample_ad
 Flags: `--eds <file>`, `--connection <ConnectionN or name>` (default: the first exclusive-owner
 connection), `--host`, `--cycles`, `--large`, `--run`. The outputs are zeros and the scanner stays
 idle unless `--run` is given, because an output assembly may drive real outputs; with a modeless
-O->T direction idle cannot be signalled, so the example refuses to start without `--run`.
+O->T direction idle cannot be signalled, so the example refuses to start without `--run`. Ctrl+C
+ends the exchange early; the connection is still closed and the session unregistered.
 
 ## Tests
 

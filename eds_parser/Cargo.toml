@@ -17,10 +17,6 @@ pest_derive = "2"
 # Used by the example only
 clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"
-tokio = { version = "1.53.2", features = ["net", "rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.53.2", features = ["net", "rt-multi-thread", "macros", "time", "signal"] }
 binrw = "0.15.2"
 hex-test-macros = { version = "0.1.0", path = "../hex_test_macros" }
-
-[[example]]
-name = "eds-implicit-io"
-path = "examples/eds-implicit-io/main.rs"
