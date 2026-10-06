@@ -2,16 +2,18 @@
 
 Implicit (class 1 cyclic I/O) messaging is being added to `eipscanne_rs` as a stack of small pull
 requests. Each phase has its own document in this directory so the work can be picked up again at any
-point. Update the **Status** line of a phase when it changes.
+point. The whole plan lives on the first branch of the stack and is merged down into the later ones,
+so no later phase changes it; a phase's status is its pull request (review state, merge state), and
+the only edit a later phase makes here is filling in its pull request number below.
 
-| Phase | Document | Status |
+| Phase | Document | Pull request |
 |---|---|---|
-| 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | In review |
-| 2 | [Connection Manager packets](02-connection-manager-packets.md) | Implemented, awaiting review |
-| 3 | [Class 1 I/O packets](03-class1-io-packets.md) | Delivered with phase 2 (PR #4) |
-| 4 | [`scanner` crate: open a connection and exchange I/O](04-scanner-crate.md) | Implemented, awaiting review |
-| 5 | [EDS parser crate](05-eds-parser.md) | Not started |
-| 6 | [Safety System validation](06-safety-system-validation.md) | Not started |
+| 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | #3 (`feat/SW-4573-1-explicit-groundwork`) |
+| 2 | [Connection Manager packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
+| 3 | [Class 1 I/O packets](03-class1-io-packets.md) | #4, delivered with phase 2 |
+| 4 | [`scanner` crate: open a connection and exchange I/O](04-scanner-crate.md) | #5 (`feat/SW-4573-4-utils-crate`) |
+| 5 | [EDS parser crate](05-eds-parser.md) | not yet opened |
+| 6 | [Safety System validation](06-safety-system-validation.md) | not yet opened |
 
 ## How the stack works
 

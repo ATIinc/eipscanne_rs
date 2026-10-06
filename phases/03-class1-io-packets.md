@@ -1,7 +1,5 @@
 # Phase 3 — class 1 I/O packets
 
-**Status:** Delivered with phase 2 (PR #4, branch `feat/SW-4573-2-connection-manager`)
-
 ## Goal
 
 The UDP payload exchanged on port 2222 once a connection is open.

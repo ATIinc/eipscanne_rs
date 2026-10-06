@@ -1,7 +1,5 @@
 # Phase 4 — `scanner` crate: open a connection and exchange I/O
 
-**Status:** Implemented, awaiting review (verified on loopback against a fake adapter; the OpENer run is still to do, see Verification)
-
 ## Goal
 
 Open a class 1 connection to a real adapter, exchange cyclic I/O with it and close it again, in code

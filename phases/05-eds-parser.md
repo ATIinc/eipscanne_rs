@@ -1,7 +1,5 @@
 # Phase 5 — EDS parser crate
 
-**Status:** Not started
-
 ## Goal
 
 Derive the `ConnectionConfig` of phase 4 from a device's EDS file instead of typing it by hand.

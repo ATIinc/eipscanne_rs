@@ -1,7 +1,5 @@
 # Phase 2 — Connection Manager packets
 
-**Status:** Implemented, awaiting review (branch `feat/SW-4573-2-connection-manager`)
-
 ## Goal
 
 Typed `binrw` + `bilge` packets for the Connection Manager services used to open and close a class 1

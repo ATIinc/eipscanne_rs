@@ -1,7 +1,5 @@
 # Phase 1 — explicit-messaging groundwork
 
-**Status:** In review (branch `feat/SW-4573-1-explicit-groundwork`)
-
 ## Goal
 
 Generalize the explicit-messaging code so the Connection Manager traffic of the next phases fits

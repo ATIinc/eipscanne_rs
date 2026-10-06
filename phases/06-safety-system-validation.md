@@ -1,7 +1,5 @@
 # Phase 6 — Safety System validation
 
-**Status:** Not started (waiting for the device EDS and network access)
-
 ## Goal
 
 Prove the stack against the real target of SW-4573.
