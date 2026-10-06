@@ -6,7 +6,7 @@ use binrw::{
 
 use crate::cip::types::{CipUdint, CipUint};
 
-use super::description::{CommonPacketDescriptor, CommonPacketItemId};
+use super::description::{CipMessage, CommonPacketItem};
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -40,75 +40,57 @@ pub enum EncapsStatusCode {
     UnsupportedProtocolVersion = 0x0069,
 }
 
-/// Number of Common Packet Format items that every SendRRData packet carries: the address item and the data item
-pub const BASE_ITEM_COUNT: CipUint = 2;
-
-/// Values that are only known once the data following the command specific data has been serialized:
-/// `(unconnected_data_length, trailing_items_length, item_count)`
-///
-/// * `unconnected_data_length`: length of the Unconnected Data Item (the CIP message)
-/// * `trailing_items_length`: length of every item written after the CIP message
-/// * `item_count`: total number of items in the Common Packet Format
-pub type PacketWriteArgs = (u16, u16, u16);
-
-#[binrw::writer(writer: writer, endian)]
-fn item_count_writer(obj: &CipUint, provided_item_count: u16) -> binrw::BinResult<()> {
-    // Without a provided count (e.g. when the struct is written on its own) keep the field value
-    if provided_item_count == 0 {
-        return obj.write_options(writer, endian, ());
-    }
-
-    provided_item_count.write_options(writer, endian, ())
-}
-
+/// Command specific data of a SendRRData packet: the interface handle, the timeout and the Common
+/// Packet Format (the item count followed by the items).
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-#[bw(import(unconnected_data_length: u16, _trailing_items_length: u16, provided_item_count: u16))]
-pub struct RRPacketData {
+pub struct RRPacketData<M: CipMessage> {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
 
     // Read from the wire; written from the number of items actually serialized
-    #[bw(args(provided_item_count), write_with = item_count_writer)]
-    pub item_count: CipUint,
-    pub empty_data_packet: CommonPacketDescriptor,
+    #[br(temp)]
+    #[bw(calc = items.len() as CipUint)]
+    item_count: CipUint,
 
-    #[bw(args(Some(unconnected_data_length)))]
-    pub unconnected_data_packet: CommonPacketDescriptor,
+    #[br(count = item_count)]
+    pub items: Vec<CommonPacketItem<M>>,
 }
 
 // ======= Start of RRPacketData impl ========
 
-impl RRPacketData {
-    /// WARNING: Exposed only for testing. All normal declarations should be made with Self::new(...)
-    pub fn test_with_size(
+impl<M: CipMessage> RRPacketData<M> {
+    pub fn new(
         interface_handle: CipUdint,
         timeout: CipUint,
-        unconnected_length: Option<u16>,
+        items: Vec<CommonPacketItem<M>>,
     ) -> Self {
         RRPacketData {
             interface_handle,
             timeout,
-            item_count: BASE_ITEM_COUNT,
-            empty_data_packet: CommonPacketDescriptor {
-                type_id: CommonPacketItemId::NullAddr,
-                packet_length: Some(0),
-            },
-            unconnected_data_packet: CommonPacketDescriptor {
-                type_id: CommonPacketItemId::UnconnectedMessage,
-                packet_length: unconnected_length,
-            },
+            items,
         }
     }
 
-    pub fn new(interface_handle: CipUdint, timeout: CipUint) -> Self {
-        Self::test_with_size(interface_handle, timeout, None)
+    /// An unconnected message: the Null Address Item followed by the Unconnected Data Item
+    pub fn new_unconnected(interface_handle: CipUdint, timeout: CipUint, message: M) -> Self {
+        Self::new(
+            interface_handle,
+            timeout,
+            vec![
+                CommonPacketItem::NullAddress,
+                CommonPacketItem::UnconnectedData(message),
+            ],
+        )
     }
 
-    /// Number of items that follow the data item
-    pub fn additional_item_count(&self) -> usize {
-        self.item_count.saturating_sub(BASE_ITEM_COUNT) as usize
+    /// The CIP message carried by the Unconnected Data Item, if any
+    pub fn cip_message(&self) -> Option<&M> {
+        self.items.iter().find_map(|item| match item {
+            CommonPacketItem::UnconnectedData(message) => Some(message),
+            _ => None,
+        })
     }
 }
 
@@ -126,8 +108,7 @@ pub struct RegisterData {
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 #[br(import(command_type: EnIpCommand))]
-#[bw(import(unconnected_data_length: u16, trailing_items_length: u16, item_count: u16))]
-pub enum CommandSpecificData {
+pub enum CommandSpecificData<M: CipMessage> {
     #[br(pre_assert(command_type == EnIpCommand::UnRegisterSession))]
     UnregisterSession,
 
@@ -135,16 +116,13 @@ pub enum CommandSpecificData {
     RegisterSession(RegisterData),
 
     #[br(pre_assert(command_type == EnIpCommand::SendRrData))]
-    SendRrData(
-        #[bw(args(unconnected_data_length, trailing_items_length, item_count))] RRPacketData,
-    ),
-    /*  When reading -- make sure the provided command_type matches.
-    When writing -- make sure the packet lengths are passed on */
+    SendRrData(RRPacketData<M>),
+    /*  When reading -- make sure the provided command_type matches */
 }
 
 // ======= Start of CommandSpecificData impl ========
 
-impl CommandSpecificData {
+impl<M: CipMessage> CommandSpecificData<M> {
     pub fn new_registration() -> Self {
         Self::RegisterSession(RegisterData {
             protocol_version: 1,
@@ -152,15 +130,19 @@ impl CommandSpecificData {
         })
     }
 
-    pub fn new_request(interface_handle: CipUdint, timeout: CipUint) -> Self {
-        Self::SendRrData(RRPacketData::new(interface_handle, timeout))
+    pub fn new_request(interface_handle: CipUdint, timeout: CipUint, message: M) -> Self {
+        Self::SendRrData(RRPacketData::new_unconnected(
+            interface_handle,
+            timeout,
+            message,
+        ))
     }
 
-    /// Number of Common Packet Format items that follow the data item (0 for commands without one)
-    pub fn additional_item_count(&self) -> usize {
+    /// The Common Packet Format items (empty for commands without them)
+    pub fn items(&self) -> &[CommonPacketItem<M>] {
         match self {
-            CommandSpecificData::SendRrData(rr_data) => rr_data.additional_item_count(),
-            _ => 0,
+            CommandSpecificData::SendRrData(rr_data) => &rr_data.items,
+            _ => &[],
         }
     }
 }

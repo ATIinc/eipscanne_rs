@@ -40,27 +40,35 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
     next);
   * `LogicalPathSegment` rejects bytes whose segment type is not "logical" instead of
     misinterpreting them.
-* **Common Packet Format** — `src/eip/description.rs`, `src/eip/command.rs`,
-  `src/object_assembly.rs`:
+* **Common Packet Format** — `src/eip/description.rs`, `src/eip/command.rs`, `src/eip/packet.rs`,
+  `src/object_assembly.rs`. Every address and data item of a packet is modelled the same way, as an
+  item of one list:
   * `CommonPacketItemId` keeps unknown IDs (`Unknown(u16)`) so unexpected items are skipped by
     length instead of failing the packet;
-  * `CommonPacketItem` / `CommonPacketItemData`: a typed item (descriptor + data) for the items
-    that follow the address and data items — O->T and T->O Sockaddr Info plus a raw fallback;
+  * `CommonPacketItem<M>`: one enum for every item — Null Address, Unconnected Data (carrying the
+    CIP message `M`), O->T and T->O Sockaddr Info, and a raw `Unknown` fallback. The Type ID and
+    Length are derived from the variant on write; an item whose data does not fit its variant
+    (including an unparsable CIP message) is read as `Unknown` and re-serialized unchanged;
+  * `CipMessage`: the bound on `M` (read with the item length, written without arguments), met by
+    `MessageRouterRequest` and `MessageRouterResponse`;
   * `src/eip/sockaddr.rs` (implicit-messaging only): `SockaddrInfo` (family, port, address in big
     endian; zero padding) with conversions from and to `SocketAddrV4`, and the Sockaddr Info item
     constructors;
-  * `RRPacketData::item_count` is a real field now; on write it is derived from the number of items
-    actually serialized;
-  * `RequestObjectAssembly` / `ResponseObjectAssembly` carry `additional_items` after the CIP
-    message, and the write path serializes the CIP message and the trailing items separately so the
-    encapsulation length and the Unconnected Data Item length stay correct (the write arguments
-    threaded through `EnIpPacketDescription` → `CommandSpecificData` → `RRPacketData` are now
-    `(unconnected_data_length, trailing_items_length, item_count)`).
+  * `RRPacketData<M>` holds the interface handle, the timeout and `items`; the item count is read
+    from the wire and written from `items.len()`. `CommonPacketDescriptor`, `BASE_ITEM_COUNT` and
+    the length write arguments are gone;
+  * `EnIpPacket<M>` (was `EnIpPacketDescription`) is the whole packet: header plus command specific
+    data; the header length is computed on write. `RequestObjectAssembly` / `ResponseObjectAssembly`
+    are aliases for `EnIpPacket<MessageRouterRequest>` / `EnIpPacket<MessageRouterResponse>`, with
+    `cip_message()`, `items()`, `sockaddr_info_items()` and `with_item()`.
 * **README** — "Related projects" section.
 
 ## Tests
 
-* Existing suites unchanged apart from the new struct literal fields.
+* Existing suites keep their expected bytes; struct literals now build the item list
+  (`RRPacketData::new_unconnected`, `RequestObjectAssembly::new_send_rr_data`). Tests that
+  serialized or read only the header and command specific data now include the Unconnected Data
+  Item data from the same capture, since it is part of the packet.
 * `tests/test_common_packet.rs` — Sockaddr Info byte order, Sockaddr Info items, unknown items,
   a reply with three items round-tripped byte-for-byte.
 * `tests/test_epath.rs` — assembly connection path, 16-bit class/instance path, data segment,

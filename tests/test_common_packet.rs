@@ -13,12 +13,13 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
-use eipscanne_rs::eip::description::{
-    CommonPacketDescriptor, CommonPacketItem, CommonPacketItemData, CommonPacketItemId,
-};
-use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::eip::description::{CommonPacketItem, CommonPacketItemId};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
+
+/// Items of a response packet
+type ResponseItem = CommonPacketItem<MessageRouterResponse>;
 
 fn sample_address() -> SocketAddrV4 {
     SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 10), 0x08AE)
@@ -69,7 +70,7 @@ fn test_serialize_t2o_sockaddr_info_item() {
         0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let item = CommonPacketItem::new_t2o_sockaddr_info(sample_address());
+    let item = ResponseItem::new_t2o_sockaddr_info(sample_address());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
@@ -79,7 +80,7 @@ fn test_serialize_t2o_sockaddr_info_item() {
 
     let byte_cursor = std::io::Cursor::new(expected_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let deserialized = CommonPacketItem::read(&mut buf_reader).unwrap();
+    let deserialized = ResponseItem::read(&mut buf_reader).unwrap();
 
     assert_eq!(deserialized, item);
     assert_eq!(
@@ -96,16 +97,13 @@ fn test_unknown_item_is_kept_as_raw_bytes() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let item = CommonPacketItem::read(&mut buf_reader).unwrap();
+    let item = ResponseItem::read(&mut buf_reader).unwrap();
 
     assert_eq!(
         item,
-        CommonPacketItem {
-            descriptor: CommonPacketDescriptor {
-                type_id: CommonPacketItemId::Unknown(0x1234),
-                packet_length: Some(3),
-            },
-            data: CommonPacketItemData::Unknown(vec![0xaa, 0xbb, 0xcc]),
+        ResponseItem::Unknown {
+            type_id: CommonPacketItemId::Unknown(0x1234),
+            data: vec![0xaa, 0xbb, 0xcc],
         }
     );
     assert!(item.sockaddr_info().is_none());
@@ -165,39 +163,31 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
     ];
 
     let expected_response = ResponseObjectAssembly {
-        packet_description: EnIpPacketDescription {
-            header: EncapsulationHeader {
-                command: EnIpCommand::SendRrData,
-                length: Some(40),
-                session_handle: 0x3,
-                status_code: EncapsStatusCode::Success,
-                sender_context: [0x0; 8],
-                options: 0x0,
-            },
-            command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                interface_handle: 0x0,
-                timeout: 0,
-                item_count: 3,
-                empty_data_packet: CommonPacketDescriptor {
-                    type_id: CommonPacketItemId::NullAddr,
-                    packet_length: Some(0),
-                },
-                unconnected_data_packet: CommonPacketDescriptor {
-                    type_id: CommonPacketItemId::UnconnectedMessage,
-                    packet_length: Some(4),
-                },
-            }),
+        header: EncapsulationHeader {
+            command: EnIpCommand::SendRrData,
+            length: Some(40),
+            session_handle: 0x3,
+            status_code: EncapsStatusCode::Success,
+            sender_context: [0x0; 8],
+            options: 0x0,
         },
-        cip_message: Some(MessageRouterResponse {
-            service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
-            response_data: ResponseData {
-                status: ResponseStatusCode::Success,
-                additional_status_size: 0,
-                additional_status: vec![],
-                data: CipDataOpt::Raw(vec![]),
-            },
-        }),
-        additional_items: vec![CommonPacketItem::new_o2t_sockaddr_info(sample_address())],
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(
+            0x0,
+            0,
+            vec![
+                CommonPacketItem::NullAddress,
+                CommonPacketItem::UnconnectedData(MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Raw(vec![]),
+                    },
+                }),
+                CommonPacketItem::new_o2t_sockaddr_info(sample_address()),
+            ],
+        )),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());

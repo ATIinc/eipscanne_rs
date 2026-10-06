@@ -7,10 +7,9 @@ use binrw::{
 
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, PacketWriteArgs, RegisterData,
-};
+use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
 use super::constants as eip_constants;
+use super::description::{CipMessage, CommonPacketItem};
 
 #[binwrite]
 #[binread]
@@ -41,26 +40,28 @@ fn header_length_writer(obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()
 
 // ^^^^^^^^ End of EncapsulationHeader impl ^^^^^^^^
 
+/// A complete encapsulated packet: the encapsulation header followed by the command specific data
+/// (which, for SendRRData, carries the Common Packet Format items and with them the CIP message).
 #[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct EnIpPacketDescription {
+pub struct EnIpPacket<M: CipMessage> {
     pub header: EncapsulationHeader,
 
     #[br(args(header.command))]
-    pub command_specific_data: CommandSpecificData,
+    pub command_specific_data: CommandSpecificData<M>,
     /* Passes the command field of the header to the command_specific_data field for binary reading */
 }
 
-// ======= Start of EnIpPacketDescription impl ========
+// ======= Start of EnIpPacket impl ========
 
-impl EnIpPacketDescription {
+impl<M: CipMessage> EnIpPacket<M> {
     pub fn new(
         command: EnIpCommand,
         session_handle: CipUdint,
-        command_specific_data: CommandSpecificData,
+        command_specific_data: CommandSpecificData<M>,
     ) -> Self {
-        EnIpPacketDescription {
+        EnIpPacket {
             header: EncapsulationHeader {
                 command,
                 // will be calculated when serialized
@@ -74,79 +75,92 @@ impl EnIpPacketDescription {
         }
     }
 
-    pub fn new_registration_description() -> Self {
-        EnIpPacketDescription::new(
+    pub fn new_registration() -> Self {
+        EnIpPacket::new(
             EnIpCommand::RegisterSession,
             0,
-            CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0,
-            }),
+            CommandSpecificData::new_registration(),
         )
     }
 
-    pub fn new_unregistration_description(session_handle: CipUdint) -> Self {
-        EnIpPacketDescription::new(
+    pub fn new_unregistration(session_handle: CipUdint) -> Self {
+        EnIpPacket::new(
             EnIpCommand::UnRegisterSession,
             session_handle,
             CommandSpecificData::UnregisterSession,
         )
     }
 
-    pub fn new_cip_description(session_handle: CipUdint, timeout: CipUint) -> Self {
-        EnIpPacketDescription::new(
+    /// A SendRRData packet carrying `message` as an unconnected message
+    pub fn new_send_rr_data(session_handle: CipUdint, timeout: CipUint, message: M) -> Self {
+        EnIpPacket::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::new_request(0, timeout),
+            CommandSpecificData::new_request(0, timeout, message),
         )
+    }
+
+    /// The Common Packet Format items (empty for commands without them)
+    pub fn items(&self) -> &[CommonPacketItem<M>] {
+        self.command_specific_data.items()
+    }
+
+    /// The CIP message carried by the Unconnected Data Item, if any
+    pub fn cip_message(&self) -> Option<&M> {
+        match &self.command_specific_data {
+            CommandSpecificData::SendRrData(rr_data) => rr_data.cip_message(),
+            _ => None,
+        }
+    }
+
+    /// The Sockaddr Info items of the packet, if any
+    pub fn sockaddr_info_items(&self) -> impl Iterator<Item = &CommonPacketItem<M>> {
+        self.items()
+            .iter()
+            .filter(|item| item.sockaddr_info().is_some())
+    }
+
+    /// Appends a Common Packet Format item (e.g. a Sockaddr Info item) to a SendRRData packet.
+    /// Packets of other commands carry no items and are returned unchanged.
+    pub fn with_item(mut self, item: CommonPacketItem<M>) -> Self {
+        if let CommandSpecificData::SendRrData(ref mut rr_data) = self.command_specific_data {
+            rr_data.items.push(item);
+        }
+        self
     }
 }
 
-impl WriteEndian for EnIpPacketDescription {
+impl<M: CipMessage> WriteEndian for EnIpPacket<M> {
     const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
 }
 
-impl BinWrite for EnIpPacketDescription {
-    // The EnIpPacketDescription is passed the lengths of the data that follows it
-    type Args<'a> = PacketWriteArgs;
+impl<M: CipMessage> BinWrite for EnIpPacket<M> {
+    type Args<'a> = ();
 
     fn write_options<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         endian: binrw::Endian,
-        args: Self::Args<'_>,
+        _args: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `command_specific_data` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+        // Step 1: Serialize the `command_specific_data` field, its size is the Length of the header
+        let mut command_specific_data_buffer = Vec::new();
+        self.command_specific_data.write_options(
+            &mut std::io::Cursor::new(&mut command_specific_data_buffer),
+            endian,
+            (),
+        )?;
 
-        let data_write_result =
-            self.command_specific_data
-                .write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = data_write_result {
-            return Err(write_err);
-        };
-
-        // Step 2: Calculate the total data size after header
-        let (unconnected_data_length, trailing_items_length, _item_count) = args;
-        let full_proceeding_data_length =
-            (temp_buffer.len() as u16) + unconnected_data_length + trailing_items_length;
-
-        // Step 3: Write the full struct to the actual writer
-        if let Err(write_err) =
-            self.header
-                .write_options(writer, endian, (full_proceeding_data_length,))
-        {
-            return Err(write_err);
-        }
-
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
+        // Step 2: Write the header with the length, then the command specific data
+        self.header.write_options(
+            writer,
+            endian,
+            (command_specific_data_buffer.len() as CipUint,),
+        )?;
+        writer.write_all(&command_specific_data_buffer)?;
 
         Ok(())
     }
 }
 
-// ^^^^^^^^ End of EnIpPacketDescription impl ^^^^^^^^
+// ^^^^^^^^ End of EnIpPacket impl ^^^^^^^^

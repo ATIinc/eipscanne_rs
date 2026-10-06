@@ -6,7 +6,7 @@ use binrw::binrw;
 
 use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
 
-use super::description::{CommonPacketItem, CommonPacketItemData, CommonPacketItemId};
+use super::description::{CipMessage, CommonPacketItem};
 
 /// Length of the data carried by a Sockaddr Info item
 pub const SOCKADDR_INFO_LENGTH: u16 = 16;
@@ -62,28 +62,23 @@ impl From<SockaddrInfo> for SocketAddrV4 {
 
 // ======= Start of CommonPacketItem sockaddr impl ========
 
-impl CommonPacketItem {
+impl<M: CipMessage> CommonPacketItem<M> {
     /// Sockaddr Info describing where originator-to-target I/O data must be sent
     pub fn new_o2t_sockaddr_info(address: SocketAddrV4) -> Self {
-        Self::new(
-            CommonPacketItemId::O2TSockAddrInfo,
-            CommonPacketItemData::O2TSockAddrInfo(SockaddrInfo::new(address)),
-        )
+        CommonPacketItem::O2TSockAddrInfo(SockaddrInfo::new(address))
     }
 
     /// Sockaddr Info describing where target-to-originator I/O data must be sent
     pub fn new_t2o_sockaddr_info(address: SocketAddrV4) -> Self {
-        Self::new(
-            CommonPacketItemId::T2OSockAddrInfo,
-            CommonPacketItemData::T2OSockAddrInfo(SockaddrInfo::new(address)),
-        )
+        CommonPacketItem::T2OSockAddrInfo(SockaddrInfo::new(address))
     }
 
     pub fn sockaddr_info(&self) -> Option<&SockaddrInfo> {
-        match &self.data {
-            CommonPacketItemData::O2TSockAddrInfo(info)
-            | CommonPacketItemData::T2OSockAddrInfo(info) => Some(info),
-            CommonPacketItemData::Unknown(_) => None,
+        match self {
+            CommonPacketItem::O2TSockAddrInfo(info) | CommonPacketItem::T2OSockAddrInfo(info) => {
+                Some(info)
+            }
+            _ => None,
         }
     }
 }

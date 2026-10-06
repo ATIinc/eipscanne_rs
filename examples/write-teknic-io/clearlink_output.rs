@@ -168,7 +168,6 @@ mod tests {
     use eipscanne_rs::cip::message::request::RequestData;
     use pretty_assertions::assert_eq;
 
-    use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
     use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
     use hex_test_macros::prelude::*;
 
@@ -183,7 +182,7 @@ mod tests {
     use eipscanne_rs::eip::command::{
         CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
     };
-    use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+    use eipscanne_rs::eip::packet::EncapsulationHeader;
 
     use crate::clearlink_output::{
         DigitalOutputs, IOOutputData, MotorOutputData, OutputAssemblyObject, SerialAsciiOutputData,
@@ -373,14 +372,12 @@ mod tests {
             })),
         );
 
-        let set_digital_output_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
-            packet_description: EnIpPacketDescription::new_cip_description(
+        let set_digital_output_object =
+            eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
                 provided_session_handle,
                 0,
-            ),
-            additional_items: vec![],
-            cip_message: Some(set_digital_output_message),
-        };
+                set_digital_output_message,
+            );
 
         // Write the object_assembly binary data to the buffer
         let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -491,46 +488,38 @@ mod tests {
         ];
 
         let expected_output_assembly_response = ResponseObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(300),
-                    session_handle: 0x3,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x0; 8],
-                    options: 0x0,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                    item_count: 2,
-                    interface_handle: 0x0,
-                    timeout: 0,
-                    empty_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::NullAddr,
-                        packet_length: Some(0),
-                    },
-                    unconnected_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::UnconnectedMessage,
-                        packet_length: Some(284),
-                    },
-                }),
+            header: EncapsulationHeader {
+                command: EnIpCommand::SendRrData,
+                length: Some(300),
+                session_handle: 0x3,
+                status_code: EncapsStatusCode::Success,
+                sender_context: [0x0; 8],
+                options: 0x0,
             },
-            additional_items: vec![],
-            cip_message: Some(MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeSingle),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::Success,
-                    additional_status_size: 0,
-                    additional_status: vec![],
-                    data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
-                        io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::default()),
-                        motor0_output_data: MotorOutputData::new(),
-                        motor1_output_data: MotorOutputData::new(),
-                        motor2_output_data: MotorOutputData::new(),
-                        motor3_output_data: MotorOutputData::new(),
-                        serial_ascii_output_data: SerialAsciiOutputData::new(),
-                    })),
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+                0x0,
+                0,
+                MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(
+                        ServiceCode::GetAttributeSingle,
+                    ),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
+                            io_output_data: IOOutputData::new_digital_outputs(
+                                DigitalOutputs::default(),
+                            ),
+                            motor0_output_data: MotorOutputData::new(),
+                            motor1_output_data: MotorOutputData::new(),
+                            motor2_output_data: MotorOutputData::new(),
+                            motor3_output_data: MotorOutputData::new(),
+                            serial_ascii_output_data: SerialAsciiOutputData::new(),
+                        })),
+                    },
                 },
-            }),
+            )),
         };
 
         let byte_cursor = std::io::Cursor::new(raw_bytes);
@@ -578,62 +567,50 @@ mod tests {
         let request_object = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
         let expected_output_assembly_request = RequestObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    // NOTE: For some reason the serialized length is 300... But the Wireshark data said 300
-                    //  Could be an internal subtraction?
-                    length: Some(304),
-                    session_handle: 0x3,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x0; 8],
-                    options: 0x0,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                    item_count: 2,
-                    interface_handle: 0x0,
-                    timeout: 0,
-                    empty_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::NullAddr,
-                        packet_length: Some(0),
-                    },
-                    unconnected_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::UnconnectedMessage,
-                        // NOTE: For some reason the serialized length is 288... But the Wireshark data said 284
-                        //  Could be an internal subtraction?
-                        packet_length: Some(288),
-                    },
-                }),
+            header: EncapsulationHeader {
+                command: EnIpCommand::SendRrData,
+                // NOTE: For some reason the serialized length is 300... But the Wireshark data said 300
+                //  Could be an internal subtraction?
+                length: Some(304),
+                session_handle: 0x3,
+                status_code: EncapsStatusCode::Success,
+                sender_context: [0x0; 8],
+                options: 0x0,
             },
-            additional_items: vec![],
-            cip_message: Some(MessageRouterRequest {
-                service_container: ServiceContainer::new_request(ServiceCode::SetAttributeSingle),
-                request_data: RequestData::new(
-                    Some(0x3),
-                    CipPath::new_full(0x4, 0x70, 0x3),
-                    Some(Box::new(OutputAssemblyObject {
-                        io_output_data: IOOutputData {
-                            aop_value: 0x00, // 0x02
-                            dop_value: DigitalOutputs::default(),
-                            dop_pwm: [0x0; 6],
-                            ccio_output_data: 0x0,
-                            encoder_add_to_position: 0x0,
-                        },
-                        motor0_output_data: MotorOutputData::new(),
-                        motor1_output_data: MotorOutputData::new(),
-                        motor2_output_data: MotorOutputData::new(),
-                        motor3_output_data: MotorOutputData::new(),
-                        serial_ascii_output_data: SerialAsciiOutputData::new(),
-                    })),
-                ),
-            }),
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+                0x0,
+                0,
+                MessageRouterRequest {
+                    service_container: ServiceContainer::new_request(
+                        ServiceCode::SetAttributeSingle,
+                    ),
+                    request_data: RequestData::new(
+                        Some(0x3),
+                        CipPath::new_full(0x4, 0x70, 0x3),
+                        Some(Box::new(OutputAssemblyObject {
+                            io_output_data: IOOutputData {
+                                aop_value: 0x00, // 0x02
+                                dop_value: DigitalOutputs::default(),
+                                dop_pwm: [0x0; 6],
+                                ccio_output_data: 0x0,
+                                encoder_add_to_position: 0x0,
+                            },
+                            motor0_output_data: MotorOutputData::new(),
+                            motor1_output_data: MotorOutputData::new(),
+                            motor2_output_data: MotorOutputData::new(),
+                            motor3_output_data: MotorOutputData::new(),
+                            serial_ascii_output_data: SerialAsciiOutputData::new(),
+                        })),
+                    ),
+                },
+            )),
         };
 
         // Assert equality
         assert_eq!(request_object, expected_output_assembly_request);
         assert_eq!(
-            request_object.cip_message,
-            expected_output_assembly_request.cip_message
+            request_object.cip_message(),
+            expected_output_assembly_request.cip_message()
         );
     }
 }

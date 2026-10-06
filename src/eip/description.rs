@@ -1,6 +1,12 @@
+use std::io::{Cursor, Read, Seek, Write};
+
+use binrw::meta::{EndianKind, ReadEndian, WriteEndian};
 use binrw::{
+    BinRead, // trait for reading
+    BinResult,
     BinWrite, // trait for writing
-    binrw,    // #[binrw] attribute
+    Endian,
+    binrw, // #[binrw] attribute
 };
 
 use crate::cip::types::{CipUint, CipUsint};
@@ -34,98 +40,139 @@ pub enum CommonPacketItemId {
     Unknown(CipUint),
 }
 
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Copy, Clone)]
-#[bw(import(provided_packet_length: Option<u16>))]
-pub struct CommonPacketDescriptor {
-    pub type_id: CommonPacketItemId,
-
-    #[bw(args(provided_packet_length), write_with = descripter_length_writer)]
-    pub packet_length: Option<CipUint>,
-}
-
-// ======= Start of CommonPacketDescriptor impl ========
-
-#[binrw::writer(writer: writer, endian)]
-fn descripter_length_writer(obj: &Option<CipUint>, arg0: Option<u16>) -> binrw::BinResult<()> {
-    let write_value = arg0.unwrap_or(0);
-
-    // If there isn't an input argument size, then just write 0
-    if obj.is_some() && arg0 == Some(0) {
-        return obj.write_options(writer, endian, ());
-    }
-
-    // let write_value = arg0.unwrap_or(0);
-    write_value.write_options(writer, endian, ())
-}
-
-// ^^^^^^^^ End of CommonPacketDescriptor impl ^^^^^^^^
-
-/// The data of a Common Packet Format item, selected by the Type ID of its descriptor.
+/// A message carried by an Unconnected Data Item, e.g. a Message Router request or response.
 ///
-/// Only the items that may follow the address and data items of a packet are modelled; the
-/// address and data items themselves are handled by the command specific data and the object
-/// assemblies.
-#[binrw]
-#[brw(little)]
+/// Reading it takes the length of the item, since the message does not encode its own length.
+pub trait CipMessage:
+    'static + for<'a> BinRead<Args<'a> = (u16,)> + for<'a> BinWrite<Args<'a> = ()>
+{
+}
+
+impl<T> CipMessage for T where
+    T: 'static + for<'a> BinRead<Args<'a> = (u16,)> + for<'a> BinWrite<Args<'a> = ()>
+{
+}
+
+/// A Common Packet Format item: Type ID, Length and the data selected by the Type ID.
+///
+/// The Type ID and the Length are derived from the variant on write, so an item can never be built
+/// with a Type ID or Length that does not match its data. On read, an item whose data does not fit
+/// its variant (wrong length, unparsable message) is kept as `Unknown` with its raw data.
 #[derive(Debug, PartialEq, Clone)]
-#[br(import(type_id: CommonPacketItemId, packet_length: u16))]
-pub enum CommonPacketItemData {
-    #[br(pre_assert(
-        type_id == CommonPacketItemId::O2TSockAddrInfo && packet_length == SOCKADDR_INFO_LENGTH
-    ))]
+pub enum CommonPacketItem<M: CipMessage> {
+    /// Null Address Item: no data, used for unconnected messages
+    NullAddress,
+
+    /// Unconnected Data Item: the CIP message of a SendRRData packet
+    UnconnectedData(M),
+
     O2TSockAddrInfo(SockaddrInfo),
 
-    #[br(pre_assert(
-        type_id == CommonPacketItemId::T2OSockAddrInfo && packet_length == SOCKADDR_INFO_LENGTH
-    ))]
     T2OSockAddrInfo(SockaddrInfo),
 
     /// Any other item: the raw data is kept so the packet can be re-serialized unchanged
-    Unknown(#[br(count = packet_length)] Vec<CipUsint>),
-}
-
-// ======= Start of CommonPacketItemData impl ========
-
-impl CommonPacketItemData {
-    /// Number of data bytes of the item (the Length field of its descriptor)
-    pub fn byte_len(&self) -> u16 {
-        match self {
-            CommonPacketItemData::O2TSockAddrInfo(_) | CommonPacketItemData::T2OSockAddrInfo(_) => {
-                SOCKADDR_INFO_LENGTH
-            }
-            CommonPacketItemData::Unknown(data) => data.len() as u16,
-        }
-    }
-}
-
-// ^^^^^^^^ End of CommonPacketItemData impl ^^^^^^^^
-
-/// A complete Common Packet Format item (descriptor + data) that follows the address and data
-/// items of a packet, e.g. the Sockaddr Info items of a Forward_Open exchange.
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct CommonPacketItem {
-    #[bw(args(Some(data.byte_len())))]
-    pub descriptor: CommonPacketDescriptor,
-
-    #[br(args(descriptor.type_id, descriptor.packet_length.unwrap_or(0)))]
-    pub data: CommonPacketItemData,
+    Unknown {
+        type_id: CommonPacketItemId,
+        data: Vec<CipUsint>,
+    },
 }
 
 // ======= Start of CommonPacketItem impl ========
 
-impl CommonPacketItem {
-    pub fn new(type_id: CommonPacketItemId, data: CommonPacketItemData) -> Self {
-        CommonPacketItem {
-            descriptor: CommonPacketDescriptor {
-                type_id,
-                packet_length: Some(data.byte_len()),
-            },
-            data,
+impl<M: CipMessage> CommonPacketItem<M> {
+    pub fn type_id(&self) -> CommonPacketItemId {
+        match self {
+            CommonPacketItem::NullAddress => CommonPacketItemId::NullAddr,
+            CommonPacketItem::UnconnectedData(_) => CommonPacketItemId::UnconnectedMessage,
+            CommonPacketItem::O2TSockAddrInfo(_) => CommonPacketItemId::O2TSockAddrInfo,
+            CommonPacketItem::T2OSockAddrInfo(_) => CommonPacketItemId::T2OSockAddrInfo,
+            CommonPacketItem::Unknown { type_id, .. } => *type_id,
         }
+    }
+
+    /// Parses the data of an item into the variant selected by its Type ID
+    fn parse_data(type_id: CommonPacketItemId, data: &[CipUsint], endian: Endian) -> Option<Self> {
+        let packet_length = data.len() as CipUint;
+        let mut data_reader = Cursor::new(data);
+
+        match type_id {
+            CommonPacketItemId::NullAddr if data.is_empty() => Some(CommonPacketItem::NullAddress),
+            CommonPacketItemId::UnconnectedMessage => {
+                M::read_options(&mut data_reader, endian, (packet_length,))
+                    .ok()
+                    .map(CommonPacketItem::UnconnectedData)
+            }
+            CommonPacketItemId::O2TSockAddrInfo if packet_length == SOCKADDR_INFO_LENGTH => {
+                SockaddrInfo::read_options(&mut data_reader, endian, ())
+                    .ok()
+                    .map(CommonPacketItem::O2TSockAddrInfo)
+            }
+            CommonPacketItemId::T2OSockAddrInfo if packet_length == SOCKADDR_INFO_LENGTH => {
+                SockaddrInfo::read_options(&mut data_reader, endian, ())
+                    .ok()
+                    .map(CommonPacketItem::T2OSockAddrInfo)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl<M: CipMessage> ReadEndian for CommonPacketItem<M> {
+    const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
+}
+
+impl<M: CipMessage> WriteEndian for CommonPacketItem<M> {
+    const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
+}
+
+impl<M: CipMessage> BinRead for CommonPacketItem<M> {
+    type Args<'a> = ();
+
+    fn read_options<R: Read + Seek>(
+        reader: &mut R,
+        endian: Endian,
+        _args: Self::Args<'_>,
+    ) -> BinResult<Self> {
+        let type_id = CommonPacketItemId::read_options(reader, endian, ())?;
+        let packet_length = CipUint::read_options(reader, endian, ())?;
+
+        let mut data = vec![0; packet_length as usize];
+        reader.read_exact(&mut data)?;
+
+        Ok(Self::parse_data(type_id, &data, endian)
+            .unwrap_or(CommonPacketItem::Unknown { type_id, data }))
+    }
+}
+
+impl<M: CipMessage> BinWrite for CommonPacketItem<M> {
+    type Args<'a> = ();
+
+    fn write_options<W: Write + Seek>(
+        &self,
+        writer: &mut W,
+        endian: Endian,
+        _args: Self::Args<'_>,
+    ) -> BinResult<()> {
+        // Serialize the data first, its size is the Length of the item
+        let mut data = Vec::new();
+        let mut data_writer = Cursor::new(&mut data);
+
+        match self {
+            CommonPacketItem::NullAddress => {}
+            CommonPacketItem::UnconnectedData(message) => {
+                message.write_options(&mut data_writer, endian, ())?
+            }
+            CommonPacketItem::O2TSockAddrInfo(info) | CommonPacketItem::T2OSockAddrInfo(info) => {
+                info.write_options(&mut data_writer, endian, ())?
+            }
+            CommonPacketItem::Unknown { data: raw_data, .. } => data_writer.write_all(raw_data)?,
+        }
+
+        self.type_id().write_options(writer, endian, ())?;
+        (data.len() as CipUint).write_options(writer, endian, ())?;
+        writer.write_all(&data)?;
+
+        Ok(())
     }
 }
 

@@ -43,7 +43,7 @@ where
     let raw_assembly_response = read_object_assembly(stream).await?;
 
     // Make sure there is actually a response
-    if let Some(ref router_response) = raw_assembly_response.cip_message {
+    if let Some(router_response) = raw_assembly_response.cip_message() {
         // Confirm that the read data is a Raw type (Vec<u8>)
         if let CipDataOpt::Raw(ref raw_data) = router_response.response_data.data {
             // Deserialize the raw data into the expected type

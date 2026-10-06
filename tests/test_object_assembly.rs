@@ -6,7 +6,7 @@ use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::packet::EnIpPacketDescription;
+use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 #[test]
 fn test_write_output_assembly_object_request() {
@@ -77,11 +77,8 @@ fn test_write_output_assembly_object_request() {
         CipPath::new_full(0x4, 0x70, 0x3),
     );
 
-    let set_digital_output_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
-        packet_description: EnIpPacketDescription::new_cip_description(provided_session_handle, 0),
-        additional_items: vec![],
-        cip_message: Some(full_path_request),
-    };
+    let set_digital_output_object =
+        RequestObjectAssembly::new_send_rr_data(provided_session_handle, 0, full_path_request);
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();

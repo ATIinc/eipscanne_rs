@@ -39,10 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("{:?}\n", registration_response);
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
-    let provided_session_handle = registration_response
-        .packet_description
-        .header
-        .session_handle;
+    let provided_session_handle = registration_response.header.session_handle;
 
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");

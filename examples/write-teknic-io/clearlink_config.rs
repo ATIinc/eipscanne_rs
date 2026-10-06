@@ -263,8 +263,7 @@ mod tests {
     use eipscanne_rs::eip::command::{
         CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
     };
-    use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
-    use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+    use eipscanne_rs::eip::packet::EncapsulationHeader;
     use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
     use crate::clearlink_config::ConfigAssemblyObject;
@@ -353,14 +352,12 @@ mod tests {
             Some(Box::new(ConfigAssemblyObject::default())),
         );
 
-        let set_clearlink_config_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
-            packet_description: EnIpPacketDescription::new_cip_description(
+        let set_clearlink_config_object =
+            eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
                 provided_session_handle,
                 0,
-            ),
-            additional_items: vec![],
-            cip_message: Some(set_clearlink_config_message),
-        };
+                set_clearlink_config_message,
+            );
 
         // Write the object_assembly binary data to the buffer
         let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -421,39 +418,29 @@ mod tests {
         ];
 
         let expected_set_config_assembly_response = ResponseObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(20),
-                    session_handle: 0x3,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x0; 8],
-                    options: 0x0,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                    item_count: 2,
-                    interface_handle: 0x0,
-                    timeout: 0,
-                    empty_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::NullAddr,
-                        packet_length: Some(0),
-                    },
-                    unconnected_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::UnconnectedMessage,
-                        packet_length: Some(4),
-                    },
-                }),
+            header: EncapsulationHeader {
+                command: EnIpCommand::SendRrData,
+                length: Some(20),
+                session_handle: 0x3,
+                status_code: EncapsStatusCode::Success,
+                sender_context: [0x0; 8],
+                options: 0x0,
             },
-            additional_items: vec![],
-            cip_message: Some(MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::SetAttributeSingle),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::Success,
-                    additional_status_size: 0,
-                    additional_status: vec![],
-                    data: CipDataOpt::Raw(vec![]),
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+                0x0,
+                0,
+                MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(
+                        ServiceCode::SetAttributeSingle,
+                    ),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Raw(vec![]),
+                    },
                 },
-            }),
+            )),
         };
 
         let byte_cursor = std::io::Cursor::new(raw_bytes);

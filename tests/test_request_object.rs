@@ -9,7 +9,7 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
 };
-use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 #[test]
@@ -80,27 +80,24 @@ fn test_deserialize_cip_identity_request() {
 
     let cip_identity_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
-    let expected_identity_packet =
-        RequestObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(26),
-                    session_handle: 0x06,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x00; 8],
-                    options: 0x00,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(
-                    RRPacketData::test_with_size(0x0, 0x0, Some(10)),
-                ),
-            },
-            additional_items: vec![],
-            cip_message: Some(MessageRouterRequest {
+    let expected_identity_packet = RequestObjectAssembly {
+        header: EncapsulationHeader {
+            command: EnIpCommand::SendRrData,
+            length: Some(26),
+            session_handle: 0x06,
+            status_code: EncapsStatusCode::Success,
+            sender_context: [0x00; 8],
+            options: 0x00,
+        },
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+            0x0,
+            0x0,
+            MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
                 request_data: RequestData::new(Some(0x4), CipPath::new(0x1, 0x1), None),
-            }),
-        };
+            },
+        )),
+    };
 
     // Assert equality
     assert_eq!(expected_identity_packet, cip_identity_request);
@@ -139,22 +136,18 @@ fn test_deserialize_registration_request() {
     let registration_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
     let expected_identity_packet = RequestObjectAssembly {
-        packet_description: EnIpPacketDescription {
-            header: EncapsulationHeader {
-                command: EnIpCommand::RegisterSession,
-                length: Some(4),
-                session_handle: 0x00,
-                status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; 8],
-                options: 0x00,
-            },
-            command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0x00,
-            }),
+        header: EncapsulationHeader {
+            command: EnIpCommand::RegisterSession,
+            length: Some(4),
+            session_handle: 0x00,
+            status_code: EncapsStatusCode::Success,
+            sender_context: [0x00; 8],
+            options: 0x00,
         },
-        additional_items: vec![],
-        cip_message: None,
+        command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
+            protocol_version: 1,
+            option_flags: 0x00,
+        }),
     };
 
     assert_eq!(expected_identity_packet, registration_request);
