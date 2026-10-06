@@ -10,6 +10,7 @@
 
 use std::time::Instant;
 
+use anyhow::{Context, bail};
 use clap::Parser;
 
 use eipscanne_rs::cip::connection_manager::parameters::ConnectionTimeoutMultiplier;
@@ -29,7 +30,7 @@ mod assemblies {
     pub mod io_hub;
 }
 
-use assemblies::io_hub::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E, MotorInputData};
+use assemblies::io_hub::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E};
 use assemblies::io_hub::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyHub4E};
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
@@ -64,15 +65,16 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // ========= Read the EDS and derive the connection ============
-    let text = std::fs::read_to_string(&args.eds)?;
+    let text = std::fs::read_to_string(&args.eds)
+        .with_context(|| format!("reading {}", args.eds.display()))?;
     let eds = Eds::parse(&text)?;
     let connection = eds
         .first_exclusive_owner_connection()
-        .ok_or("the EDS offers no exclusive-owner connection")?;
+        .context("the EDS offers no exclusive-owner connection")?;
     let config = to_connection_config(
         connection,
         OriginatorSettings {
@@ -99,23 +101,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if config.t2o.connection_point != INPUT_ASSEMBLY_INSTANCE
         || config.o2t.connection_point != OUTPUT_ASSEMBLY_INSTANCE
     {
-        return Err(format!(
+        bail!(
             "the connection carries assemblies {} and {}, the structs are for {INPUT_ASSEMBLY_INSTANCE} and {OUTPUT_ASSEMBLY_INSTANCE}",
-            config.t2o.connection_point, config.o2t.connection_point
-        )
-        .into());
+            config.t2o.connection_point,
+            config.o2t.connection_point
+        );
     }
     let (Some(input_format), Some(output_format)) =
         (&connection.t2o.format, &connection.o2t.format)
     else {
-        return Err(format!("{} names no assembly for its data", connection.keyword).into());
+        bail!("{} names no assembly for its data", connection.keyword);
     };
     let input_layout = eds
         .assembly(input_format)
-        .ok_or_else(|| format!("the EDS has no {input_format}"))?;
+        .with_context(|| format!("the EDS has no {input_format}"))?;
     let output_layout = eds
         .assembly(output_format)
-        .ok_or_else(|| format!("the EDS has no {output_format}"))?;
+        .with_context(|| format!("the EDS has no {output_format}"))?;
     println!("CHECKING the structs against {input_format} and {output_format}");
     for finding in check_assembly::<InputAssemblyHub4E>(input_layout)? {
         println!("  {finding}");
@@ -147,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut send_timer = tokio::time::interval(producer.period());
     let outputs = OutputAssemblyHub4E::default();
-    let mut last_motor: Option<MotorInputData> = None;
+    let mut last_line: Option<String> = None;
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
     // Ctrl+C ends the exchange and the connection is still closed below
@@ -181,20 +183,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         continue;
                     }
                 };
+                // Printed when it changes: measured values such as torque move all the time
                 let motor = inputs.motor_input(args.motor);
-                if last_motor.as_ref() != Some(motor) {
-                    let status = motor.statusword;
-                    println!(
-                        "[{cycle:>4}] M{} connected={} enabled={} ready={} has_homed={} shutdown={} position={}",
-                        args.motor,
-                        u8::from(status.motor_connected()),
-                        u8::from(status.enabled()),
-                        u8::from(status.ready_for_command()),
-                        u8::from(status.has_homed()),
-                        u8::from(status.motor_shutdown_present()),
-                        motor.position_measured,
-                    );
-                    last_motor = Some(motor.clone());
+                let status = motor.statusword;
+                let line = format!(
+                    "M{} connected={} enabled={} ready={} has_homed={} shutdown={} position={}",
+                    args.motor,
+                    u8::from(status.motor_connected()),
+                    u8::from(status.enabled()),
+                    u8::from(status.ready_for_command()),
+                    u8::from(status.has_homed()),
+                    u8::from(status.motor_shutdown_present()),
+                    motor.position_measured,
+                );
+                if last_line.as_ref() != Some(&line) {
+                    println!("[{cycle:>4}] {line}");
+                    last_line = Some(line);
                 }
             }
 
