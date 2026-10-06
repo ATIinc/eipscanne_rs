@@ -319,16 +319,22 @@ pub(crate) fn resolve_path(text: &str, params: &[Param], entry: &str) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use crate::params::DataType;
+
     use super::*;
 
     fn param(keyword: &str, data_size: u8, default: i64) -> Param {
         Param {
             keyword: keyword.to_string(),
             name: String::new(),
+            data_type: DataType::Udint,
             data_size,
+            units: String::new(),
+            help: String::new(),
             min: None,
             max: None,
             default: Some(default),
+            enum_names: vec![],
         }
     }
 
@@ -336,7 +342,9 @@ mod tests {
         Assembly {
             keyword: keyword.to_string(),
             name: String::new(),
+            path: vec![],
             size,
+            members: vec![],
         }
     }
 

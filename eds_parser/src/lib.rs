@@ -13,19 +13,26 @@
 //!
 //! [`Eds::parse`] runs steps 1 to 3; [`to_connection_config`] is step 4. Nothing here touches
 //! the network: the `eds-implicit-io` example feeds the result to the scanner.
+//!
+//! An [`Assembly`] also carries its members, the layout its `Display` prints. A caller's
+//! assembly struct is written from that layout and checked against it with [`check_assembly`]
+//! (module `check`), so the same struct decodes explicit replies and implicit inputs (the
+//! `io-hub-implicit` example).
 
 pub mod assembly;
+pub mod check;
 pub mod connection;
 pub mod document;
 pub mod error;
 pub mod params;
 pub mod to_connection_config;
 
-pub use assembly::Assembly;
+pub use assembly::{Assembly, Member};
+pub use check::{AssemblyMismatch, Finding, check_assembly};
 pub use connection::{Connection, ConnectionParameters, DirectionSpec, TriggerAndTransport};
 pub use document::{Document, Entry, Field, Section};
 pub use error::{BridgeError, EdsError};
-pub use params::Param;
+pub use params::{DataType, Param};
 pub use to_connection_config::{OriginatorSettings, to_connection_config};
 
 /// An EDS file read into its document and typed sections
@@ -44,7 +51,7 @@ impl Eds {
     pub fn parse(text: &str) -> Result<Eds, EdsError> {
         let document = Document::parse(text)?;
         let params = Param::all(&document)?;
-        let assemblies = Assembly::all(&document)?;
+        let assemblies = Assembly::all(&document, &params)?;
         let connections = Connection::all(&document, &params, &assemblies)?;
         Ok(Eds {
             document,
@@ -61,6 +68,14 @@ impl Eds {
             connection.keyword.eq_ignore_ascii_case(keyword_or_name)
                 || connection.name.eq_ignore_ascii_case(keyword_or_name)
         })
+    }
+
+    /// The assembly with `keyword` (`Assem100`), case ignored: the layout of a connection
+    /// direction's `format`
+    pub fn assembly(&self, keyword: &str) -> Option<&Assembly> {
+        self.assemblies
+            .iter()
+            .find(|assembly| assembly.keyword.eq_ignore_ascii_case(keyword))
     }
 
     /// The first connection the device offers to an exclusive owner, which is what this scanner

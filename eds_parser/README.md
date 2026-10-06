@@ -11,7 +11,9 @@ happens:
 | 3 | `params`, `assembly`, `connection` | Typed views of `ParamN`, `AssemN` and `ConnectionN` entries with their references resolved: an RPI or size given as `ParamN` takes the param's default, an empty size takes the format's `AssemN` size, `[ParamN]` in a path becomes the default's little-endian bytes. The two mask words are `bilge` bitfields. |
 | 4 | `to_connection_config` | `to_connection_config(&Connection, OriginatorSettings)`: picks what this scanner asks for from what the device supports. |
 
-`Eds::parse(&str)` runs steps 1 to 3.
+`Eds::parse(&str)` runs steps 1 to 3. An `Assembly` also keeps its members (`size, ParamN`
+pairs, each param with its type, units, help and `EnumN` names), and `check` compares a caller's
+assembly struct with them.
 
 ## What the bridge accepts
 
@@ -52,6 +54,44 @@ idle unless `--run` is given, because an output assembly may drive real outputs;
 O->T direction idle cannot be signalled, so the example refuses to start without `--run`. Ctrl+C
 ends the exchange early; the connection is still closed and the session unregistered.
 
+## Writing a device's assemblies
+
+Assemblies are plain `binrw` structs written by hand in `scanner/assemblies/<device>/`, so they
+keep groups, named bits, enums and helpers. The same struct then decodes an explicit
+Get_Attribute_Single reply (`decode_reply`) and an implicit input packet (`Input::decode`), and
+is sent as implicit outputs with `Producer::next_packet_from`.
+
+1. Print the layout, one line per member with its byte offset, size, type, param, units, help
+   and bit names:
+   ```
+   cargo run --example eds-assemblies -- --eds docs/IO-HUB-4-E_EDS_File.eds --assembly Assem100
+   ```
+   Without `--assembly` it lists which assemblies each connection carries, then all of them.
+2. Write the structs from it, or hand the printout to Claude to write them. Give reserved bytes a
+   named `_reserved` field, so every byte of the layout shows up in the struct.
+3. Check them with `check_assembly::<T>(&assembly)`, in a test and before opening a connection:
+
+   | Step | What is done | What it catches |
+   |---|---|---|
+   | size | read `size` zero bytes, write them back | a missing, extra or wrong-width field |
+   | coverage | per member: only its bits set, read, write back, compare | padding over bytes the EDS calls data |
+   | values | per number member: a distinctive value, read, look for it in the struct's `Debug` output | a field of the wrong width or signedness, reordered fields |
+
+   Members named "Reserved…" may be padding. Bit strings (BYTE, WORD, DWORD, LWORD) only get the
+   coverage step, since they are usually bitfields. A member whose probe the struct refuses (an
+   enum without that value) is returned as not checked rather than failing. Two adjacent fields of
+   the same type that are swapped pass every step: a test against captured data catches that.
+4. Add a test against a capture of the real device.
+
+`io-hub-implicit` does all of this for the IO-HUB-4-E: it derives the connection from the hub's
+EDS, refuses to open it unless `InputAssemblyHub4E` and `OutputAssemblyHub4E` pass the check, then
+decodes every input packet as an `InputAssemblyHub4E` and prints one motor's status when it
+changes. Outputs are `OutputAssemblyHub4E::default()` (nothing enabled), sent idle unless `--run`:
+
+```
+cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host <ip> --motor 0
+```
+
 ## Tests
 
 * `tests/fixtures/sample_adapter.eds`: a file written for this crate (no third-party file)
@@ -60,4 +100,5 @@ ends the exchange early; the connection is still closed and the session unregist
   the path and configuration data to be ignored.
 * `tests/sample_adapter.rs`: the fixture end to end, down to the Forward_Open bytes of the
   library's captured request.
-* Against a device's own file: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -p eds_parser -- --ignored`.
+* Against a device's own file: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`,
+  which also checks the IO-HUB assemblies of `scanner/assemblies/` (`tests/io_hub_assemblies.rs`).

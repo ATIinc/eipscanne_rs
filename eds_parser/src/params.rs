@@ -11,16 +11,47 @@ pub struct Param {
     /// `ParamN`, as written in the file
     pub keyword: String,
     pub name: String,
+    pub data_type: DataType,
     /// Bytes the value occupies on the wire
     pub data_size: u8,
+    pub units: String,
+    pub help: String,
     pub min: Option<i64>,
     pub max: Option<i64>,
     pub default: Option<i64>,
+    /// The names of the `EnumN` entry with the param's number, as `(value, name)` pairs; the
+    /// value is a bit number when the param is a bit string (BYTE, WORD, DWORD, LWORD)
+    pub enum_names: Vec<(i64, String)>,
+}
+
+/// The CIP elementary data type of a param, from its data type code
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DataType {
+    Bool,
+    Sint,
+    Int,
+    Dint,
+    Lint,
+    Usint,
+    Uint,
+    Udint,
+    Ulint,
+    Real,
+    Lreal,
+    Byte,
+    Word,
+    Dword,
+    Lword,
+    /// Any other code (strings, dates, structures)
+    Other(u8),
 }
 
 /// Field positions of a `ParamN` entry
+const DATA_TYPE: usize = 4;
 const DATA_SIZE: usize = 5;
 const NAME: usize = 6;
+const UNITS: usize = 7;
+const HELP: usize = 8;
 const MIN: usize = 9;
 const MAX: usize = 10;
 const DEFAULT: usize = 11;
@@ -36,23 +67,115 @@ impl Param {
         };
         section
             .numbered_entries("Param")
-            .map(Param::from_entry)
+            .map(|entry| {
+                // `Param4` takes its names from `Enum4`
+                let number = &entry.keyword["Param".len()..];
+                let names = section
+                    .numbered_entries("Enum")
+                    .find(|names| names.keyword["Enum".len()..] == *number);
+                Param::from_entry(entry, names)
+            })
             .collect()
     }
 
-    fn from_entry(entry: &Entry) -> Result<Param, EdsError> {
+    fn from_entry(entry: &Entry, names: Option<&Entry>) -> Result<Param, EdsError> {
+        let data_type: u8 = integer_field(entry, DATA_TYPE, "the data type code")?;
         Ok(Param {
             keyword: entry.keyword.clone(),
             name: text_or_empty(entry, NAME),
+            data_type: DataType::from_code(data_type),
             data_size: integer_field(entry, DATA_SIZE, "the data size in bytes")?,
+            units: text_or_empty(entry, UNITS),
+            help: text_or_empty(entry, HELP),
             min: optional_integer(entry, MIN)?,
             max: optional_integer(entry, MAX)?,
             default: optional_integer(entry, DEFAULT)?,
+            enum_names: match names {
+                None => Vec::new(),
+                Some(names) => enum_names(names)?,
+            },
         })
     }
 }
 
 // ^^^^^^^^ End of Param impl ^^^^^^^^
+
+// ======= Start of DataType impl ========
+
+impl DataType {
+    pub fn from_code(code: u8) -> DataType {
+        match code {
+            0xC1 => DataType::Bool,
+            0xC2 => DataType::Sint,
+            0xC3 => DataType::Int,
+            0xC4 => DataType::Dint,
+            0xC5 => DataType::Lint,
+            0xC6 => DataType::Usint,
+            0xC7 => DataType::Uint,
+            0xC8 => DataType::Udint,
+            0xC9 => DataType::Ulint,
+            0xCA => DataType::Real,
+            0xCB => DataType::Lreal,
+            0xD1 => DataType::Byte,
+            0xD2 => DataType::Word,
+            0xD3 => DataType::Dword,
+            0xD4 => DataType::Lword,
+            other => DataType::Other(other),
+        }
+    }
+
+    /// The type's name as CIP writes it
+    pub fn name(&self) -> String {
+        match self {
+            DataType::Bool => "BOOL".to_string(),
+            DataType::Sint => "SINT".to_string(),
+            DataType::Int => "INT".to_string(),
+            DataType::Dint => "DINT".to_string(),
+            DataType::Lint => "LINT".to_string(),
+            DataType::Usint => "USINT".to_string(),
+            DataType::Uint => "UINT".to_string(),
+            DataType::Udint => "UDINT".to_string(),
+            DataType::Ulint => "ULINT".to_string(),
+            DataType::Real => "REAL".to_string(),
+            DataType::Lreal => "LREAL".to_string(),
+            DataType::Byte => "BYTE".to_string(),
+            DataType::Word => "WORD".to_string(),
+            DataType::Dword => "DWORD".to_string(),
+            DataType::Lword => "LWORD".to_string(),
+            DataType::Other(code) => format!("{code:#04X}"),
+        }
+    }
+
+    /// Whether the type is a bit string, whose enum names are bit numbers
+    pub fn is_bit_string(&self) -> bool {
+        matches!(
+            self,
+            DataType::Byte | DataType::Word | DataType::Dword | DataType::Lword
+        )
+    }
+}
+
+// ^^^^^^^^ End of DataType impl ^^^^^^^^
+
+/// The `(value, name)` pairs of an `EnumN` entry
+fn enum_names(entry: &Entry) -> Result<Vec<(i64, String)>, EdsError> {
+    entry
+        .fields
+        .chunks(2)
+        .enumerate()
+        .filter(|(_, pair)| !pair.iter().all(Field::is_empty))
+        .map(|(pair_index, pair)| {
+            let index = pair_index * 2;
+            let value = pair[0].as_integer().ok_or_else(|| EdsError::BadField {
+                entry: entry.keyword.clone(),
+                index,
+                expected: "an enum value",
+                found: pair[0].describe(),
+            })?;
+            Ok((value, text_or_empty(entry, index + 1)))
+        })
+        .collect()
+}
 
 /// The param with `keyword` (case ignored), or an `UnknownReference` naming `entry`
 pub(crate) fn lookup<'a>(
@@ -137,7 +260,7 @@ mod tests {
 "#;
 
     #[test]
-    fn params_are_read_with_their_defaults_and_scaling_ignored() {
+    fn params_are_read_with_their_types_defaults_and_enum_names_and_scaling_ignored() {
         let document = Document::parse(PARAMS).unwrap();
         let params = Param::all(&document).unwrap();
 
@@ -147,18 +270,26 @@ mod tests {
                 Param {
                     keyword: "Param1".to_string(),
                     name: "RPI Range".to_string(),
+                    data_type: DataType::Udint,
                     data_size: 4,
+                    units: "".to_string(),
+                    help: "limits the RPI".to_string(),
                     min: Some(1000),
                     max: Some(1_000_000),
                     default: Some(10_000),
+                    enum_names: vec![(0, "a".to_string())],
                 },
                 Param {
                     keyword: "Param3".to_string(),
                     name: "Config instance".to_string(),
+                    data_type: DataType::Usint,
                     data_size: 1,
+                    units: "".to_string(),
+                    help: "".to_string(),
                     min: None,
                     max: None,
                     default: Some(0x97),
+                    enum_names: vec![],
                 },
             ]
         );

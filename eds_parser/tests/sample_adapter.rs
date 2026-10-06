@@ -13,7 +13,9 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 use scanner::implicit::{ConnectionConfig, DirectionConfig};
 
-use eds_parser::{BridgeError, Eds, OriginatorSettings, to_connection_config};
+use eds_parser::{
+    BridgeError, Eds, Finding, OriginatorSettings, check_assembly, to_connection_config,
+};
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
 
@@ -152,6 +154,36 @@ fn the_input_only_connection_is_refused() {
         matches!(&error, BridgeError::Unsupported { connection, what }
             if connection == "Connection2" && what.contains("exclusive-owner")),
         "{error}"
+    );
+}
+
+#[test]
+fn the_fixtures_assemblies_check_against_byte_arrays_of_their_size() {
+    let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
+    let connection = eds.first_exclusive_owner_connection().unwrap();
+    let inputs = eds
+        .assembly(connection.t2o.format.as_deref().unwrap())
+        .unwrap();
+    let outputs = eds
+        .assembly(connection.o2t.format.as_deref().unwrap())
+        .unwrap();
+
+    // Both are one 256-bit member without a param: only the size and coverage steps apply
+    assert_eq!(
+        (inputs.instance(), outputs.instance()),
+        (Some(100), Some(150))
+    );
+    assert_eq!(check_assembly::<[u8; 32]>(inputs), Ok(vec![]));
+    assert_eq!(check_assembly::<[u8; 32]>(outputs), Ok(vec![]));
+    assert_eq!(
+        check_assembly::<[u8; 31]>(inputs).unwrap_err().findings,
+        vec![
+            Finding::ReadSize { read: 31, size: 32 },
+            Finding::WriteSize {
+                written: 31,
+                size: 32
+            }
+        ]
     );
 }
 
