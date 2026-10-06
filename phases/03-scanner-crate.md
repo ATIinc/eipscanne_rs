@@ -1,4 +1,4 @@
-# Phase 4 — `scanner` crate: open a connection and exchange I/O
+# Phase 3 — `scanner` crate: open a connection and exchange I/O
 
 ## Goal
 
@@ -95,7 +95,7 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
   `connection_size()`, the bitfield builders and `CipPath::new_assembly_connection`.
 * The real-time formats live here because the Forward_Open does not carry them, yet both
   directions need them to frame their data.
-* Phase 5 (EDS parser) produces a `ConnectionConfig`.
+* Phase 4 (EDS parser) produces a `ConnectionConfig`.
 
 ### Stage 2 — `src/implicit/open.rs`
 
