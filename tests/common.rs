@@ -1,5 +1,7 @@
 //! Values shared by the integration tests, taken from the captures the tests are built on.
 //! Each test binary compiles this module on its own and uses only some of it.
+// Cargo also compiles this file as an integration test target of its own, where nothing uses
+// these items.
 #![allow(dead_code)]
 
 use eipscanne_rs::cip::types::CipUdint;

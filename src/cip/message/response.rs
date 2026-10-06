@@ -128,16 +128,6 @@ pub struct ResponseData {
     pub data: CipDataOpt,
 }
 
-// ======= Start of ResponseData impl ========
-
-impl ResponseData {
-    fn is_success(&self) -> bool {
-        self.status == ResponseStatusCode::Success
-    }
-}
-
-// ^^^^^^^^ End of ResponseData impl ^^^^^^^^
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -154,7 +144,7 @@ pub struct MessageRouterResponse {
 
 impl MessageRouterResponse {
     pub fn is_success(&self) -> bool {
-        self.response_data.is_success()
+        self.response_data.status == ResponseStatusCode::Success
     }
 }
 

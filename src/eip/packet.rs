@@ -179,18 +179,12 @@ impl EnIpPacket {
         })
     }
 
-    /// Reads a packet sent by an adapter: a SendRRData packet must carry a Message Router response.
-    ///
-    /// Unlike `read`, which keeps an unexpected or unparsable message as an `Unknown` item, this
-    /// fails when the response is missing.
     pub fn read_response<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
         Self::read_expecting(reader, "a Message Router response", |packet| {
             packet.response().is_some()
         })
     }
 
-    /// Reads a packet and checks that a SendRRData packet carries the expected message. Packets of
-    /// other commands (Register Session, ...) carry no message and are accepted as they are.
     fn read_expecting<R: Read + Seek>(
         reader: &mut R,
         expected: &str,

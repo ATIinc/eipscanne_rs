@@ -83,16 +83,15 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   (`RRPacketData::new_unconnected`, `RequestObjectAssembly::new_send_rr_data`). Tests that
   serialized or read only the header and command specific data now include the Unconnected Data
   Item data from the same capture, since it is part of the packet.
-* `tests/test_common_packet.rs` — Sockaddr Info byte order, Sockaddr Info items, unknown items,
-  a reply with three items round-tripped byte-for-byte.
-* `tests/test_common_packet.rs` also checks that `read_response` rejects a request, that
-  `read_request` (`adapter` feature) accepts a request and rejects a response, and a
-  write-then-read round trip of a reply carrying a Sockaddr Info item.
+* `tests/test_common_packet.rs` — Sockaddr Info byte order, Sockaddr Info items, and
+  `read_response` rejecting a request. Replies carrying Sockaddr Info items are tested in phase 2
+  with real Forward_Open reply bodies.
 * `tests/test_cip_path.rs` — assembly connection path, rejection of unsupported segment types and
   of segments overrunning the declared length. `tests/test_path_segment.rs` covers 16-bit
   class/instance paths and the data segment; `src/cip/path.rs` unit-tests the sizes.
-* `tests/common/mod.rs` — session handles, instances and other values shared by the captures.
-* `tests/test_general_status.rs` — additional status words, unknown general status, service codes.
+* `tests/common.rs` — session handles, instances and other values shared by the captures.
+* `tests/test_general_status.rs` — additional status words with data, unknown general status, service
+  codes.
 
 ## Verification
 

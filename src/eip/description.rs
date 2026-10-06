@@ -14,10 +14,6 @@ use crate::cip::types::{CipUint, CipUsint};
 
 use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
 
-/// Type ID of a Common Packet Format item.
-///
-/// Unknown values are kept as-is so an unexpected item can be skipped using its length instead of
-/// failing the whole packet.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -41,11 +37,6 @@ pub enum CommonPacketItemId {
     Unknown(CipUint),
 }
 
-/// A Common Packet Format item: Type ID, Length and the data selected by the Type ID.
-///
-/// The Type ID and the Length are derived from the variant on write, so an item can never be built
-/// with a Type ID or Length that does not match its data. On read, an item whose data does not fit
-/// its variant (wrong length, unparsable message) is kept as `Unknown` with its raw data.
 #[derive(Debug, PartialEq)]
 pub enum CommonPacketItem {
     /// Null Address Item: no data, used for unconnected messages
@@ -78,7 +69,6 @@ impl CommonPacketItem {
         }
     }
 
-    /// Parses the data of an item into the variant selected by its Type ID
     fn parse_data(type_id: CommonPacketItemId, data: &[CipUsint], endian: Endian) -> Option<Self> {
         let packet_length = data.len() as CipUint;
         let mut data_reader = Cursor::new(data);

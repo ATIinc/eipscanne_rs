@@ -53,13 +53,6 @@ pub enum EncapsStatusCode {
 /// (an unconnected explicit message, e.g. Get Attribute Single or Forward_Open) and the reply is
 /// the matching Message Router response. Connected messages use Send Unit Data (0x0070) instead,
 /// which gets no reply.
-///
-/// * `interface_handle`: the communications interface the request is for; always 0 for CIP.
-/// * `timeout`: an encapsulation-level timeout in seconds, 0 meaning "rely on the encapsulated
-///   protocol's own timeout". It is always 0 for CIP and ignored by the target; the reply has the
-///   field too but does not use it.
-/// * `items`: the Common Packet Format items: the Null Address Item, the Unconnected Data Item
-///   holding the CIP message, then, for Forward_Open, optional Socket Address Info items.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
