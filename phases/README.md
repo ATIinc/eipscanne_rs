@@ -12,13 +12,17 @@ the only edit a later phase makes here is filling in its pull request number bel
 | 2 | [Connection Manager packets and class 1 I/O packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
 | 3 | [`scanner` crate: open a connection and exchange I/O](03-scanner-crate.md) | #5 (`feat/SW-4573-4-utils-crate`) |
 | 4 | [EDS parser crate and `eds-implicit-io` example](04-eds-parser.md) | #7 (`feat/SW-4573-eds-parser`) |
-| 5 | [Safety System validation](05-safety-system-validation.md) | not yet opened |
+| 5 | [Device assemblies checked against the EDS](05-eds-assemblies.md) | #8 (`feat/SW-4573-eds-assemblies`) |
 
 ## How the stack works
 
 * Integration branch: `feat/SW-4573-implicit-messaging`.
 * One branch per phase (`feat/SW-4573-<n>-<name>`), each based on the previous phase's branch, each
   opened as its own pull request so reviews stay small.
+* A change to a file goes into the phase that introduced the file and is merged up the stack, so
+  each pull request stays on its own component. The exception is a fix that only that later
+  phase's work could surface: the IO-HUB assembly types, found by checking them against the EDS,
+  are corrected in phase 5.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
   `cargo test --all --features adapter` and `cargo test --examples` green (from phase 3 on, the
   workspace equivalents listed in that phase).
