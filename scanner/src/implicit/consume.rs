@@ -249,6 +249,34 @@ impl Consumer {
 
 // ^^^^^^^^ End of Consumer impl ^^^^^^^^
 
+// ======= Start of Input impl ========
+
+impl Input {
+    /// The inputs decoded as a `T` declared by the caller (the input assembly), the implicit
+    /// counterpart of `explicit::decode_reply`. Every byte must belong to `T`: bytes left over
+    /// mean `T` does not describe this assembly.
+    pub fn decode<T>(&self) -> BinResult<T>
+    where
+        T: for<'a> BinRead<Args<'a> = ()>,
+    {
+        let mut cursor = Cursor::new(&self.data);
+        let value = T::read_le(&mut cursor)?;
+        let pos = cursor.position();
+        if pos != self.data.len() as u64 {
+            return Err(binrw::Error::AssertFail {
+                pos,
+                message: format!(
+                    "the inputs are {} bytes, the type read only {pos}",
+                    self.data.len()
+                ),
+            });
+        }
+        Ok(value)
+    }
+}
+
+// ^^^^^^^^ End of Input impl ^^^^^^^^
+
 // ======= Start of Discarded impl ========
 
 impl fmt::Display for Discarded {

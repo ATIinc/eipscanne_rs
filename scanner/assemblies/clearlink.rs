@@ -1,5 +1,5 @@
 //! The assemblies of a Teknic ClearLink controller, declared by the caller as plain `binrw`
-//! structs. Not part of the scanner library: the `write-teknic-io` and `clearlink-homing`
+//! structs. Not part of the scanner library: the `write-clearlink-io` and `clearlink-homing`
 //! examples include `scanner/assemblies/` as a module, and the library frames the assemblies
 //! without modelling their content.
 //!

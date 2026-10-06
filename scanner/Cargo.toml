@@ -21,7 +21,7 @@ pretty_assertions = "1.4.1"
 # Cargo finds every example on its own; these two are listed only to run the assembly tests they
 # carry with `cargo test`
 [[example]]
-name = "write-teknic-io"
+name = "write-clearlink-io"
 test = true
 
 [[example]]
