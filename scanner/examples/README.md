@@ -26,10 +26,13 @@ in `write-teknic-io` (they also run as part of `cargo test --workspace`).
 | `io-hub-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
 
-Device assemblies that more than one example may use live in shared modules included with
-`#[path]`: `clearlink_assemblies.rs` (config, input, output) and `io_hub_assemblies.rs` (input,
-output), each with a directory of the same name. The other examples keep their device types next
-to their `main.rs`. Application data is always declared by the example as plain `binrw` structs.
+Device assemblies that more than one example may use live outside the library in
+`scanner/assemblies/`: `clearlink.rs` (config, input, output) and `io_hub.rs` (input, output), each
+with a directory of the same name. An example that needs them declares
+`#[path = "../../assemblies"] mod assemblies { pub mod clearlink; }` and imports
+`assemblies::clearlink::...`. Other examples keep
+their device types next to their `main.rs`. Application data is always declared by the caller as
+plain `binrw` structs; the library never models it.
 
 ### read-identity
 
@@ -99,21 +102,21 @@ Homes one motor of a Teknic ClearLink over explicit messaging. This moves a real
 
 ### io-hub-homing
 
-Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging. Same safety rules as
-`clearlink-homing`. `--repeat N` sends N homing commands back to back, each before the previous
-one has finished, which reproduces a firmware bug (the move is cancelled, `has_homed` never
-asserts, or the motor faults, depending on the version); the status line printed while waiting
-shows the relevant bits and decodes a rejected command's AOI error code.
+Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging, top to bottom like
+the other explicit examples. This moves a real motor, so `--host` is required. `--repeat N` sends
+N homing commands back to back, each before the previous one has finished, which reproduces a
+firmware bug (the move is cancelled, `has_homed` never asserts, or the motor faults, depending on
+the version); the status line printed while waiting shows the relevant bits and decodes a
+rejected command's AOI error code.
 
 * `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0`
 * `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0 --repeat 4 --delay-ms 10`
 
 1. Registers a session
-1. Clears a shutdown if present (Shutdown Reset handshake: raise until acknowledged, lower until
-   the acknowledgement drops)
+1. Reads the inputs and, if a shutdown is present, raises Shutdown Reset briefly and lowers it again
 1. Enables the motor
 1. Sends the homing command(s), each with the next move number
-1. Polls the input assembly, printing the status, until `has_homed` or the timeout
+1. Reads the inputs every 500 ms, printing the status, until `has_homed` or `--timeout-s`
 1. Disables the motor and unregisters the session
 
 ### implicit-io
