@@ -23,7 +23,9 @@ pub enum EnIpCommand {
     ListInterfaces = 0x0064,
     RegisterSession = 0x0065,
     UnRegisterSession = 0x0066,
+    /// Send Request/Reply Data: an unconnected request, answered by a reply, see [`RRPacketData`]
     SendRrData = 0x006F,
+    /// Send Unit Data: a connected message, sent without a reply
     SendUnitData = 0x0070,
     IndicateStatus = 0x0072,
     Cancel = 0x0073,
