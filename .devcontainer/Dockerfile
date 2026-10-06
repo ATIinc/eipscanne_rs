@@ -1,8 +1,9 @@
 FROM mcr.microsoft.com/devcontainers/rust:2-trixie
 
-# ping for checking device reachability; gh for GitHub operations (and git auth, see devcontainer.json)
+# ping for checking device reachability; gh for GitHub operations (and git auth, see devcontainer.json);
+# poppler-utils for reading PDF references (scripts/pdf-to-text.sh, and PDF page rendering in Claude Code)
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends iputils-ping gh \
+	&& apt-get install -y --no-install-recommends iputils-ping gh poppler-utils \
 	&& rm -rf /var/lib/apt/lists/*
 
 # Keep Claude Code's config file inside the bind-mounted ~/.claude (as ~/.claude/.claude.json) instead of the
