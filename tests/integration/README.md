@@ -120,3 +120,10 @@ output packet.
 1. Expected traffic in Wireshark: a Forward Open request and reply on TCP 44818, Connected Data
    Items on UDP 2222 in both directions (Wireshark decodes the I/O data once it has seen the
    Forward Open), a Forward Close request and reply, then Unregister Session
+
+The same connection can be opened from an EDS file instead of flags. The `eds_parser` crate ships
+a fixture describing the OpENer connection:
+
+* `cargo run --example eds-implicit-io -- --eds eds_parser/tests/fixtures/sample_adapter.eds --host 172.28.0.10 --run`
+* Without `--run` the outputs are sent idle (run flag cleared); OpENer still echoes them. `--run`
+  matches what `implicit-io` always does

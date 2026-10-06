@@ -1,0 +1,26 @@
+[package]
+name = "eds_parser"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "Reads an EtherNet/IP device's EDS file and turns one of its connections into a scanner ConnectionConfig"
+
+[dependencies]
+eipscanne_rs = { path = ".." }
+scanner = { path = "../scanner" }
+bilge = "0.5.0"
+pest = "2"
+pest_derive = "2"
+
+[dev-dependencies]
+# Used by the example only
+clap = { version = "4.6.7", features = ["derive"] }
+rand = "0.9"
+tokio = { version = "1.53.2", features = ["net", "rt-multi-thread", "macros", "time"] }
+binrw = "0.15.2"
+hex-test-macros = { version = "0.1.0", path = "../hex_test_macros" }
+
+[[example]]
+name = "eds-implicit-io"
+path = "examples/eds-implicit-io/main.rs"
