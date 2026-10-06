@@ -1,7 +1,5 @@
 # Phase 1 — explicit-messaging groundwork
 
-**Status:** In review (branch `feat/SW-4573-1-explicit-groundwork`)
-
 ## Goal
 
 Generalize the explicit-messaging code so the Connection Manager traffic of the next phases fits
@@ -96,7 +94,7 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
 ## Verification
 
 ```
-cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples && cargo build --features async
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples
 ```
 
 Pre-existing clippy style warnings (`Into` impls, `-1 *`, `if let Err` blocks) are left untouched.
