@@ -164,7 +164,7 @@ fn test_serialize_forward_open_request() {
     EtherNet/IP (Industrial Protocol), Session: 0x00000003, Send RR Data
         Encapsulation Header
             Command: Send RR Data (0x006f)
-            Length: 70
+            Length: 66
             Session Handle: 0x00000003
             Status: Success (0x00000000)
             Sender Context: 0000000000000000
@@ -176,23 +176,23 @@ fn test_serialize_forward_open_request() {
                 Type ID: Null Address Item (0x0000)
                     Length: 0
                 Type ID: Unconnected Data Item (0x00b2)
-                    Length: 54
+                    Length: 50
     Common Industrial Protocol
         Service: Unknown Service (0x54) (Request)
             0... .... = Request/Response: Request (0x0)
             .101 0100 = Service: Unknown (0x54)
-        Request Path Size: 4 words
-        Request Path: Connection Manager, Instance: 0x0001
-            Path Segment: 0x21 (16-Bit Class Segment)
+        Request Path Size: 2 words
+        Request Path: Connection Manager, Instance: 0x01
+            Path Segment: 0x20 (8-Bit Class Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 00.. = Logical Segment Type: Class ID (0)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Class: Connection Manager (0x0006)
-            Path Segment: 0x25 (16-Bit Instance Segment)
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Class: Connection Manager (0x06)
+            Path Segment: 0x24 (8-Bit Instance Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 01.. = Logical Segment Type: Instance ID (1)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Instance: 0x0001
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Instance: 0x01
     CIP Connection Manager
         Service: Forward Open (Request)
             0... .... = Request/Response: Request (0x0)
@@ -251,21 +251,20 @@ fn test_serialize_forward_open_request() {
                     Connection Point: 0x64
 
     Hex Dump:
-    0000   6f 00 46 00 03 00 00 00 00 00 00 00 00 00 00 00
+    0000   6f 00 42 00 03 00 00 00 00 00 00 00 00 00 00 00
     0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-    0020   00 00 00 00 b2 00 36 00 54 04 21 00 06 00 25 00
-    0030   01 00 0a 05 00 00 00 00 78 56 34 12 01 00 56 01
-    0040   45 23 01 00 00 00 00 00 40 42 0f 00 26 48 40 42
-    0050   0f 00 22 48 01 04 20 04 24 97 2c 96 2c 64
+    0020   00 00 00 00 b2 00 32 00 54 02 20 06 24 01 0a 05
+    0030   00 00 00 00 78 56 34 12 01 00 56 01 45 23 01 00
+    0040   00 00 00 00 40 42 0f 00 26 48 40 42 0f 00 22 48
+    0050   01 04 20 04 24 97 2c 96 2c 64
     */
     let expected_byte_array: Vec<CipByte> = vec![
-        0x6f, 0x00, 0x46, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x6f, 0x00, 0x42, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x36, 0x00, 0x54, 0x04, 0x21, 0x00, 0x06,
-        0x00, 0x25, 0x00, 0x01, 0x00, 0x0a, 0x05, 0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
-        0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f,
-        0x00, 0x26, 0x48, 0x40, 0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97,
-        0x2c, 0x96, 0x2c, 0x64,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x32, 0x00, 0x54, 0x02, 0x20, 0x06, 0x24,
+        0x01, 0x0a, 0x05, 0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12, 0x01, 0x00, 0x56, 0x01,
+        0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f, 0x00, 0x26, 0x48, 0x40,
+        0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
     ];
 
     let request = sample_request(false);
@@ -284,7 +283,7 @@ fn test_serialize_forward_open_request() {
     let expected_request_object = RequestObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: Some(70),
+            length: Some(66),
             session_handle: CLEARLINK_IO_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
@@ -296,8 +295,8 @@ fn test_serialize_forward_open_request() {
             MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::ForwardOpen),
                 request_data: RequestData {
-                    total_word_size: 4,
-                    cip_path: CipPath::new(
+                    total_word_size: 2,
+                    cip_path: CipPath::new_u8(
                         CONNECTION_MANAGER_CLASS_ID,
                         CONNECTION_MANAGER_INSTANCE_ID,
                     ),
@@ -337,7 +336,7 @@ fn test_serialize_large_forward_open_request() {
     EtherNet/IP (Industrial Protocol), Session: 0x00000003, Send RR Data
         Encapsulation Header
             Command: Send RR Data (0x006f)
-            Length: 74
+            Length: 70
             Session Handle: 0x00000003
             Status: Success (0x00000000)
             Sender Context: 0000000000000000
@@ -349,23 +348,23 @@ fn test_serialize_large_forward_open_request() {
                 Type ID: Null Address Item (0x0000)
                     Length: 0
                 Type ID: Unconnected Data Item (0x00b2)
-                    Length: 58
+                    Length: 54
     Common Industrial Protocol
         Service: Unknown Service (0x5b) (Request)
             0... .... = Request/Response: Request (0x0)
             .101 1011 = Service: Unknown (0x5b)
-        Request Path Size: 4 words
-        Request Path: Connection Manager, Instance: 0x0001
-            Path Segment: 0x21 (16-Bit Class Segment)
+        Request Path Size: 2 words
+        Request Path: Connection Manager, Instance: 0x01
+            Path Segment: 0x20 (8-Bit Class Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 00.. = Logical Segment Type: Class ID (0)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Class: Connection Manager (0x0006)
-            Path Segment: 0x25 (16-Bit Instance Segment)
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Class: Connection Manager (0x06)
+            Path Segment: 0x24 (8-Bit Instance Segment)
                 001. .... = Path Segment Type: Logical Segment (1)
                 ...0 01.. = Logical Segment Type: Instance ID (1)
-                .... ..01 = Logical Segment Format: 16-bit Logical Segment (1)
-                Instance: 0x0001
+                .... ..00 = Logical Segment Format: 8-bit Logical Segment (0)
+                Instance: 0x01
     CIP Connection Manager
         Service: Large Forward Open (Request)
             0... .... = Request/Response: Request (0x0)
@@ -424,22 +423,21 @@ fn test_serialize_large_forward_open_request() {
                     Connection Point: 0x64
 
     Hex Dump:
-    0000   6f 00 4a 00 03 00 00 00 00 00 00 00 00 00 00 00
+    0000   6f 00 46 00 03 00 00 00 00 00 00 00 00 00 00 00
     0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-    0020   00 00 00 00 b2 00 3a 00 5b 04 21 00 06 00 25 00
-    0030   01 00 0a 05 00 00 00 00 78 56 34 12 01 00 56 01
-    0040   45 23 01 00 00 00 00 00 40 42 0f 00 26 00 00 48
-    0050   40 42 0f 00 22 00 00 48 01 04 20 04 24 97 2c 96
-    0060   2c 64
+    0020   00 00 00 00 b2 00 36 00 5b 02 20 06 24 01 0a 05
+    0030   00 00 00 00 78 56 34 12 01 00 56 01 45 23 01 00
+    0040   00 00 00 00 40 42 0f 00 26 00 00 48 40 42 0f 00
+    0050   22 00 00 48 01 04 20 04 24 97 2c 96 2c 64
     */
     let expected_byte_array: Vec<CipByte> = vec![
-        0x6f, 0x00, 0x4a, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x6f, 0x00, 0x46, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x3a, 0x00, 0x5b, 0x04, 0x21, 0x00, 0x06,
-        0x00, 0x25, 0x00, 0x01, 0x00, 0x0a, 0x05, 0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
-        0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f,
-        0x00, 0x26, 0x00, 0x00, 0x48, 0x40, 0x42, 0x0f, 0x00, 0x22, 0x00, 0x00, 0x48, 0x01, 0x04,
-        0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x36, 0x00, 0x5b, 0x02, 0x20, 0x06, 0x24,
+        0x01, 0x0a, 0x05, 0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12, 0x01, 0x00, 0x56, 0x01,
+        0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f, 0x00, 0x26, 0x00, 0x00,
+        0x48, 0x40, 0x42, 0x0f, 0x00, 0x22, 0x00, 0x00, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97,
+        0x2c, 0x96, 0x2c, 0x64,
     ];
 
     let request = sample_request(true);
@@ -457,7 +455,7 @@ fn test_serialize_large_forward_open_request() {
     let expected_request_object = RequestObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
-            length: Some(74),
+            length: Some(70),
             session_handle: CLEARLINK_IO_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
@@ -469,8 +467,8 @@ fn test_serialize_large_forward_open_request() {
             MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::LargeForwardOpen),
                 request_data: RequestData {
-                    total_word_size: 4,
-                    cip_path: CipPath::new(
+                    total_word_size: 2,
+                    cip_path: CipPath::new_u8(
                         CONNECTION_MANAGER_CLASS_ID,
                         CONNECTION_MANAGER_INSTANCE_ID,
                     ),
@@ -748,7 +746,7 @@ fn test_deserialize_forward_open_rejected_response() {
     ];
 
     let expected_response = UnsuccessfulResponse {
-        connection_triad: sample_connection_triad(),
+        connection_triad: Some(sample_connection_triad()),
         remaining_path_size: Some(0),
         reserved: Some(0),
     };
@@ -800,5 +798,110 @@ fn test_deserialize_forward_open_rejected_response() {
             &response.response_data.additional_status
         ),
         Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
+    );
+
+    // Both read as words with their codes in error messages
+    assert_eq!(
+        ResponseStatusCode::ConnectionFailure.to_string(),
+        "connection failure (0x01)"
+    );
+    assert_eq!(
+        ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen.to_string(),
+        "connection in use or duplicate forward open (0x0100)"
+    );
+    assert_eq!(
+        ConnectionManagerExtendedStatus::Unknown(0x0abc).to_string(),
+        "unknown extended status (0x0abc)"
+    );
+}
+
+#[test]
+fn test_deserialize_forward_open_path_segment_error_response() {
+    // Captured from a Teknic IO-HUB-4-E, which refuses the Forward_Open when the request path to
+    // the Connection Manager uses 16-bit segments (`21 00 06 00 25 00 01 00`). The Message Router
+    // answers before the Connection Manager sees the request, so the reply carries no data: no
+    // connection triad, no remaining path size.
+    /*
+    EtherNet/IP (Industrial Protocol), Session: 0x0000000B, Send RR Data
+        Encapsulation Header
+            Command: Send RR Data (0x006f)
+            Length: 20
+            Session Handle: 0x0000000b
+            Status: Success (0x00000000)
+            Sender Context: 0000000000000000
+            Options: 0x00000000
+        Command Specific Data
+            Interface Handle: CIP (0x00000000)
+            Timeout: 0
+            Item Count: 2
+                Type ID: Null Address Item (0x0000)
+                    Length: 0
+                Type ID: Unconnected Data Item (0x00b2)
+                    Length: 4
+            [Request In: 1]
+            [Time: 0.000001000 seconds]
+    Common Industrial Protocol
+        Service: Unknown Service (0x54) (Response)
+            1... .... = Request/Response: Response (0x1)
+            .101 0100 = Service: Unknown (0x54)
+        Status: Path segment error:
+            General Status: Path segment error (0x04)
+            Additional Status Size: 0 words
+        [Request Path Size: 4 words]
+        [Request Path: Connection Manager, Instance: 0x0001]
+            [Path Segment: 0x21 (16-Bit Class Segment)]
+                [001. .... = Path Segment Type: Logical Segment (1)]
+                [...0 00.. = Logical Segment Type: Class ID (0)]
+                [.... ..01 = Logical Segment Format: 16-bit Logical Segment (1)]
+                [Class: Connection Manager (0x0006)]
+            [Path Segment: 0x25 (16-Bit Instance Segment)]
+                [001. .... = Path Segment Type: Logical Segment (1)]
+                [...0 01.. = Logical Segment Type: Instance ID (1)]
+                [.... ..01 = Logical Segment Format: 16-bit Logical Segment (1)]
+                [Instance: 0x0001]
+    CIP Connection Manager
+        Service: Forward Open (Response)
+            1... .... = Request/Response: Response (0x1)
+            .101 0100 = Service: Forward Open (0x54)
+
+    Hex Dump:
+    0000   6f 00 14 00 0b 00 00 00 00 00 00 00 00 00 00 00
+    0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
+    0020   00 00 00 00 b2 00 04 00 d4 00 04 00
+    */
+    let raw_bytes: Vec<CipByte> = vec![
+        0x6f, 0x00, 0x14, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x04, 0x00, 0xd4, 0x00, 0x04, 0x00,
+    ];
+
+    let expected_response = UnsuccessfulResponse {
+        connection_triad: None,
+        remaining_path_size: None,
+        reserved: None,
+    };
+
+    let byte_cursor = std::io::Cursor::new(raw_bytes);
+    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response = response_object.response().unwrap();
+
+    assert_eq!(
+        response.response_data.status,
+        ResponseStatusCode::PathSegmentError
+    );
+    assert_eq!(
+        response.response_data.status.to_string(),
+        "path segment error (0x04)"
+    );
+    assert_eq!(
+        ConnectionManagerResponse::from_message_router_response(response).unwrap(),
+        ConnectionManagerResponse::Unsuccessful(expected_response)
+    );
+    assert_eq!(
+        ConnectionManagerExtendedStatus::from_additional_status(
+            &response.response_data.additional_status
+        ),
+        None
     );
 }

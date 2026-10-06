@@ -1,6 +1,7 @@
 //! Reply side of the Connection Manager services. Which reply data a Message Router response
 //! carries is decided by its service and general status.
 
+use std::fmt;
 use std::io::Cursor;
 
 use binrw::{BinRead, BinResult, BinWrite, binrw};
@@ -8,7 +9,7 @@ use binrw::{BinRead, BinResult, BinWrite, binrw};
 use crate::cip::connection_manager::forward_close::ForwardCloseResponse;
 use crate::cip::connection_manager::forward_open::ForwardOpenResponse;
 use crate::cip::connection_manager::shared::UnsuccessfulResponse;
-use crate::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
+use crate::cip::message::response::{MessageRouterResponse, ResponseStatusCode, variant_words};
 use crate::cip::message::shared::ServiceCode;
 use crate::cip::types::CipUint;
 
@@ -147,6 +148,23 @@ impl ConnectionManagerExtendedStatus {
         let word = additional_status.first()?;
         // Reading a 16-bit word cannot fail: every value without a variant of its own is `Unknown`
         ConnectionManagerExtendedStatus::read_le(&mut Cursor::new(word.to_le_bytes())).ok()
+    }
+}
+
+/// The extended status in words with its code: `connection in use or duplicate forward open
+/// (0x0100)`
+impl fmt::Display for ConnectionManagerExtendedStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut code = Cursor::new(Vec::new());
+        // Every variant, `Unknown` included, writes its 16-bit code
+        self.write_le(&mut code).map_err(|_| fmt::Error)?;
+        let code = u16::from_le_bytes([code.get_ref()[0], code.get_ref()[1]]);
+        match self {
+            ConnectionManagerExtendedStatus::Unknown(_) => {
+                write!(f, "unknown extended status ({code:#06x})")
+            }
+            _ => write!(f, "{} ({code:#06x})", variant_words(&format!("{self:?}"))),
+        }
     }
 }
 
