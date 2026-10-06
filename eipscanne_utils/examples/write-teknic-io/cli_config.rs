@@ -32,7 +32,7 @@ pub struct OutputValue {
     pwm_value: Option<u8>,
 }
 
-/// Simple program to greet a person
+/// Sets the value of a digital output on a Teknic ClearLink controller
 #[derive(Parser)]
 #[command(
     version,
@@ -40,7 +40,11 @@ pub struct OutputValue {
     long_about = "Used to set the value of a digital output on a Teknic ClearLink controller"
 )]
 pub struct CliArgs {
-    /// Name of the person to greet
+    /// IP address of the ClearLink
+    #[arg(long)]
+    pub host: Option<String>,
+
+    /// The digital output to set
     #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..5))]
     pub index: u8,
 

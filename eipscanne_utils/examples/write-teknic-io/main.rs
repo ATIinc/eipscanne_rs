@@ -1,51 +1,44 @@
 use clap::Parser;
-use tokio::net::TcpStream;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
+use eipscanne_utils::session::Session;
 
 // Assert dependency on the different modules in this directory
 mod clearlink_config;
 mod clearlink_output;
 mod cli_config;
-mod duplicated_stream_utils;
 
 // Make sure the code itself looks the same
 use clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
 use clearlink_output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 use cli_config::{CliArgs, set_io_data};
-use duplicated_stream_utils as stream_utils;
+
+/// The ClearLink to talk to unless one is given on the command line
+const DEFAULT_ADAPTER_IP: &str = "172.31.19.10";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
-
-    // Connect to the server at IP address and port
-    // let address = format!("172.28.0.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
-    let address = format!("172.31.19.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
-
-    let mut stream = TcpStream::connect(address).await?;
+    let adapter_ip = cli_args
+        .host
+        .clone()
+        .unwrap_or_else(|| DEFAULT_ADAPTER_IP.to_string());
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
-    stream_utils::write_object_assembly(&mut stream, RequestObjectAssembly::new_registration())
-        .await;
-    let registration_response = stream_utils::read_object_assembly(&mut stream).await?;
-
-    // println!("{:#?}\n", registration_response);     // NOTE: the :#? triggers a pretty-print
-    // println!("{:?}\n", registration_response);
+    let mut session = Session::register((adapter_ip.as_str(), ETHERNET_IP_TCP_PORT)).await?;
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
-    let provided_session_handle = registration_response.header.session_handle;
+    let provided_session_handle = session.session_handle();
 
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");
-    stream_utils::write_object_assembly(
-        &mut stream,
-        RequestObjectAssembly::new_service_request(
+    session
+        .send(&RequestObjectAssembly::new_service_request(
             provided_session_handle,
             CipPath::new_full(
                 ASSEMBLY_CLASS_ID,
@@ -54,11 +47,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
             ServiceCode::SetAttributeSingle,
             Some(Box::new(ConfigAssemblyObject::default())),
-        ),
-    )
-    .await;
+        ))
+        .await?;
 
-    let _config_success_response = stream_utils::read_object_assembly(&mut stream).await?;
+    let _config_success_response = session.read_reply().await?;
 
     // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _config_success_response);
@@ -67,9 +59,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= Request the digital output ============
     println!("REQUESTING - GET digital output");
 
-    stream_utils::write_object_assembly(
-        &mut stream,
-        RequestObjectAssembly::new_service_request(
+    session
+        .send(&RequestObjectAssembly::new_service_request(
             provided_session_handle,
             CipPath::new_full(
                 ASSEMBLY_CLASS_ID,
@@ -78,13 +69,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
             ServiceCode::GetAttributeSingle,
             None,
-        ),
-    )
-    .await;
+        ))
+        .await?;
 
     // TODO: Create the response for the SetDigitalIO message in the teknic_cip
     let (_set_digital_io_response_object, mut output_assembly_object) =
-        stream_utils::read_typed_object_assembly::<OutputAssemblyObject>(&mut stream).await?;
+        session.read_typed_reply::<OutputAssemblyObject>().await?;
 
     // println!("{:#?}\n", _set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
     // println!("{:?}\n", _set_digital_io_response_object);
@@ -105,9 +95,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("REQUESTING - SET digital output");
 
-    stream_utils::write_object_assembly(
-        &mut stream,
-        RequestObjectAssembly::new_service_request(
+    session
+        .send(&RequestObjectAssembly::new_service_request(
             provided_session_handle,
             CipPath::new_full(
                 ASSEMBLY_CLASS_ID,
@@ -116,21 +105,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             ),
             ServiceCode::SetAttributeSingle,
             Some(Box::new(output_assembly_object)),
-        ),
-    )
-    .await;
+        ))
+        .await?;
 
-    let _set_digital_io_success_response = stream_utils::read_object_assembly(&mut stream).await?;
+    let _set_digital_io_success_response = session.read_reply().await?;
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
-    // ========= UnRegister the sesion ============
+    // ========= UnRegister the session ============
     println!("REQUESTING - UN REGISTER session");
-    stream_utils::write_object_assembly(
-        &mut stream,
-        RequestObjectAssembly::new_unregistration(provided_session_handle),
-    )
-    .await;
+    session.unregister().await?;
 
     println!("UN Registered the CIP session");
     // ^^^^^^^^^ UnRegister the session ^^^^^^^^^^^^

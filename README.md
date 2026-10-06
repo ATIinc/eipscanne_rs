@@ -6,7 +6,7 @@ This was created by using the [EIPScanner](https://github.com/nimbuscontrols/EIP
 
 The struct definitions/names heavily correlate to their Wireshark counterparts. See the [captures](./captures/) directory for some examples of Ethernet/IP traffic. 
 
-See the [examples](./examples/) directory for ideas on how to implement an Ethernet/IP Explicit Messaging Scanner
+See the [examples](./eipscanne_utils/examples/) directory for ideas on how to implement an Ethernet/IP Explicit and Implicit Messaging Scanner; the [`eipscanne_utils`](./eipscanne_utils/) crate they live in holds the session, connection and I/O helpers they are built on
 
 ## Reading PDF references
 

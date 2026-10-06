@@ -1,10 +1,10 @@
-# Phase 6 — EDS parser crate
+# Phase 5 — EDS parser crate
 
 **Status:** Not started
 
 ## Goal
 
-Derive `Forward_Open` parameters from a device's EDS file instead of typing them by hand.
+Derive the `ConnectionConfig` of phase 4 from a device's EDS file instead of typing it by hand.
 
 ## Scope
 
@@ -22,17 +22,16 @@ New workspace crate `eds_parser/` (deps `pest`, `pest_derive`):
   `[Assembly]` (`AssemN`: name, path, size, descriptor), `[Connection Manager]` (`ConnectionN`:
   trigger/transport mask, connection parameter mask, O->T / T->O RPI, size and format, config
   entries, name, help, path). Empty sizes/RPIs resolve through the referenced `AssemN` / `ParamN`.
-* `bridge.rs` (depends on `eipscanne_rs`): `ConnectionN` → `ForwardOpenRequest`: class and
-  trigger into `TransportTypeTrigger`; per direction a `NetworkConnectionParameters` word
-  (connection type, priority, size type, and `connection_size()` of the data size and real-time
-  format); `o2t_requested_packet_interval` /
-  `t2o_requested_packet_interval`; `connection_path` as a `CipPath` from the path
-  string with `[ParamN]` substitution.
+* `bridge.rs` (depends on `eipscanne_utils`): `ConnectionN` → `ConnectionConfig`: transport
+  class and trigger; per direction the connection point, data size (EDS sizes exclude the sequence
+  count and real-time header), requested packet interval, real-time format, connection type,
+  priority and fixed/variable size; the configuration instance from the path string, with
+  `[ParamN]` substitution.
 
 ## Tests
 
 * Committed fixture: OpENer's BSD-licensed `opener_sample_app.eds` (`eds_parser/tests/fixtures/`).
-* Grammar edge cases as inline snippets; the bridge must produce the EIPScanner example parameters
-  for OpENer's `Connection1`.
+* Grammar edge cases as inline snippets; the bridge must produce the `implicit-io` defaults for
+  OpENer's `Connection1`.
 * An ignored test reads `EDS_FILE` so the Safety System's EDS (kept locally, not committed) can be
   exercised: `EDS_FILE=docs/<device>.eds cargo test -p eds-parser -- --ignored`.

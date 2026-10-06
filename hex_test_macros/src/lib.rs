@@ -1,6 +1,6 @@
 pub mod prelude {
     pub use crate::assert_eq_hex;
-    pub use pretty_hex::{config_hex, HexConfig};
+    pub use pretty_hex::{HexConfig, config_hex};
 }
 
 #[macro_export]

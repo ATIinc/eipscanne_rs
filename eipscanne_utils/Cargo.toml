@@ -1,0 +1,32 @@
+[package]
+name = "eipscanne-utils"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Reference scaffolding around eipscanne_rs: sessions, opening a class 1 connection, exchanging I/O, and the examples"
+
+[dependencies]
+eipscanne_rs = { path = ".." }
+bilge = "0.5.0"
+binrw = "0.15.2"
+tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time"] }
+
+[dev-dependencies]
+# Used by the examples only
+clap = { version = "4.6.7", features = ["derive"] }
+rand = "0.9"
+hex-test-macros = { version = "0.1.0", path = "../hex_test_macros" }
+pretty_assertions = "1.4.1"
+
+[[example]]
+name = "read-identity"
+
+[[example]]
+name = "write-teknic-io"
+path = "examples/write-teknic-io/main.rs"
+# Carries the byte-exact tests of the ClearLink assemblies, so they run with `cargo test`
+test = true
+
+[[example]]
+name = "implicit-io"
+path = "examples/implicit-io/main.rs"
