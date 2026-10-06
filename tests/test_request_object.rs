@@ -1,16 +1,26 @@
+mod common;
+
 use binrw::BinRead;
 
 use pretty_assertions::assert_eq;
 
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
 };
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
+    UNREGISTERED_SESSION_HANDLE,
+};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_deserialize_cip_identity_request() {
@@ -84,17 +94,21 @@ fn test_deserialize_cip_identity_request() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(26),
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0x0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
-                request_data: RequestData::new(Some(0x4), CipPath::new(0x1, 0x1), None),
+                request_data: RequestData::new(
+                    Some(0x4),
+                    CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+                    None,
+                ),
             },
         )),
     };
@@ -139,14 +153,14 @@ fn test_deserialize_registration_request() {
         header: EncapsulationHeader {
             command: EnIpCommand::RegisterSession,
             length: Some(4),
-            session_handle: 0x00,
+            session_handle: UNREGISTERED_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
-            protocol_version: 1,
-            option_flags: 0x00,
+            protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
+            option_flags: REGISTER_SESSION_OPTION_FLAGS,
         }),
     };
 

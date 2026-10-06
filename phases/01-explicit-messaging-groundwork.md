@@ -45,22 +45,27 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   item of one list:
   * `CommonPacketItemId` keeps unknown IDs (`Unknown(u16)`) so unexpected items are skipped by
     length instead of failing the packet;
-  * `CommonPacketItem<M>`: one enum for every item — Null Address, Unconnected Data (carrying the
-    CIP message `M`), O->T and T->O Sockaddr Info, and a raw `Unknown` fallback. The Type ID and
-    Length are derived from the variant on write; an item whose data does not fit its variant
-    (including an unparsable CIP message) is read as `Unknown` and re-serialized unchanged;
-  * `CipMessage`: the bound on `M` (read with the item length, written without arguments), met by
-    `MessageRouterRequest` and `MessageRouterResponse`;
+  * `CommonPacketItem`: one enum for every item — Null Address Item, Unconnected Data Item
+    (carrying a `CipMessage`), Socket Address Info O->T and T->O, and a raw `Unknown` fallback;
+    variant and Type ID names follow Wireshark. The Type ID and Length are derived from the variant
+    on write; an item whose data does not fit its variant (including an unparsable CIP message) is
+    read as `Unknown` and re-serialized unchanged;
+  * `CipMessage` (`src/cip/message.rs`): `Request(MessageRouterRequest)` or
+    `Response(MessageRouterResponse)`, chosen on read by the Request/Response bit of the service
+    code byte, so no type is generic over the message;
   * `src/eip/sockaddr.rs` (implicit-messaging only): `SockaddrInfo` (family, port, address in big
     endian; zero padding) with conversions from and to `SocketAddrV4`, and the Sockaddr Info item
     constructors;
-  * `RRPacketData<M>` holds the interface handle, the timeout and `items`; the item count is read
+  * `RRPacketData` holds the interface handle, the timeout and `items`; the item count is read
     from the wire and written from `items.len()`. `CommonPacketDescriptor`, `BASE_ITEM_COUNT` and
     the length write arguments are gone;
-  * `EnIpPacket<M>` (was `EnIpPacketDescription`) is the whole packet: header plus command specific
-    data; the header length is computed on write. `RequestObjectAssembly` / `ResponseObjectAssembly`
-    are aliases for `EnIpPacket<MessageRouterRequest>` / `EnIpPacket<MessageRouterResponse>`, with
-    `cip_message()`, `items()`, `sockaddr_info_items()` and `with_item()`.
+  * `EnIpPacket` (was `EnIpPacketDescription`) is the whole packet: header plus command specific
+    data; the header length is computed on write. `src/eip/packet.rs` starts with a map from the
+    Wireshark tree to the Rust fields. `read_request` / `read_response` fail when a SendRRData
+    packet does not carry the expected message, while plain `read` keeps it as an `Unknown` item.
+    `RequestObjectAssembly` / `ResponseObjectAssembly` are both aliases of `EnIpPacket` that only
+    document the direction, with `cip_message()`, `request()`, `response()`, `items()`,
+    `sockaddr_info_items()` and `with_item()`.
 * **README** — "Related projects" section.
 
 ## Tests

@@ -1,3 +1,5 @@
+mod common;
+
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::identity::{
@@ -12,8 +14,14 @@ use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    NO_ENCAPSULATION_TIMEOUT,
+};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_deserialize_device_type() {
@@ -94,7 +102,7 @@ fn test_serialize_new_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = RequestObjectAssembly::new_identity(0x6);
+    let identity_request_packet = RequestObjectAssembly::new_identity(IDENTITY_SESSION_HANDLE);
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
@@ -355,20 +363,20 @@ fn test_deserialize_full_identity_response() {
     let byte_cursor = std::io::Cursor::new(identity_response_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let identity_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let identity_response = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     let expected_identity_response = ResponseObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(44),
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0x0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             MessageRouterResponse {
                 service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll)
                     .into(),

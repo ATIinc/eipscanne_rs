@@ -1,9 +1,12 @@
+mod common;
+
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
 
+use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
@@ -13,16 +16,19 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    ETHERNET_IP_IO_UDP_PORT, NO_ENCAPSULATION_TIMEOUT,
+};
 use eipscanne_rs::eip::description::{CommonPacketItem, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
-/// Items of a response packet
-type ResponseItem = CommonPacketItem<MessageRouterResponse>;
+use common::CLEARLINK_IO_SESSION_HANDLE;
 
 fn sample_address() -> SocketAddrV4 {
-    SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 10), 0x08AE)
+    SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 10), ETHERNET_IP_IO_UDP_PORT)
 }
 
 #[test]
@@ -70,7 +76,7 @@ fn test_serialize_t2o_sockaddr_info_item() {
         0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let item = ResponseItem::new_t2o_sockaddr_info(sample_address());
+    let item = CommonPacketItem::new_t2o_sockaddr_info(sample_address());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
@@ -80,7 +86,7 @@ fn test_serialize_t2o_sockaddr_info_item() {
 
     let byte_cursor = std::io::Cursor::new(expected_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let deserialized = ResponseItem::read(&mut buf_reader).unwrap();
+    let deserialized = CommonPacketItem::read(&mut buf_reader).unwrap();
 
     assert_eq!(deserialized, item);
     assert_eq!(
@@ -97,11 +103,11 @@ fn test_unknown_item_is_kept_as_raw_bytes() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let item = ResponseItem::read(&mut buf_reader).unwrap();
+    let item = CommonPacketItem::read(&mut buf_reader).unwrap();
 
     assert_eq!(
         item,
-        ResponseItem::Unknown {
+        CommonPacketItem::Unknown {
             type_id: CommonPacketItemId::Unknown(0x1234),
             data: vec![0xaa, 0xbb, 0xcc],
         }
@@ -166,25 +172,27 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(40),
-            session_handle: 0x3,
+            session_handle: CLEARLINK_IO_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x0; 8],
-            options: 0x0,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(
-            0x0,
-            0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             vec![
-                CommonPacketItem::NullAddress,
-                CommonPacketItem::UnconnectedData(MessageRouterResponse {
-                    service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
-                    response_data: ResponseData {
-                        status: ResponseStatusCode::Success,
-                        additional_status_size: 0,
-                        additional_status: vec![],
-                        data: CipDataOpt::Raw(vec![]),
+                CommonPacketItem::NullAddressItem,
+                CommonPacketItem::UnconnectedDataItem(CipMessage::Response(
+                    MessageRouterResponse {
+                        service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
+                        response_data: ResponseData {
+                            status: ResponseStatusCode::Success,
+                            additional_status_size: 0,
+                            additional_status: vec![],
+                            data: CipDataOpt::Raw(vec![]),
+                        },
                     },
-                }),
+                )),
                 CommonPacketItem::new_o2t_sockaddr_info(sample_address()),
             ],
         )),
@@ -192,7 +200,7 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     assert_eq!(expected_response, response_object);
     assert_eq!(response_object.sockaddr_info_items().count(), 1);
@@ -203,4 +211,92 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
     response_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
+}
+
+#[test]
+fn test_read_response_rejects_a_request() {
+    // The identity request of a Get Attributes All exchange: a SendRRData packet carrying a request
+    let request_bytes: Vec<CipByte> = vec![
+        0x6f, 0x00, 0x1a, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0a, 0x00, 0x01, 0x04, 0x21, 0x00, 0x01,
+        0x00, 0x25, 0x00, 0x01, 0x00,
+    ];
+
+    let read_response =
+        ResponseObjectAssembly::read_response(&mut std::io::Cursor::new(&request_bytes));
+    assert!(read_response.is_err());
+
+    // The lenient read keeps the request
+    let packet = ResponseObjectAssembly::read(&mut std::io::Cursor::new(&request_bytes)).unwrap();
+    assert!(packet.request().is_some());
+    assert!(packet.response().is_none());
+}
+
+#[cfg(feature = "adapter")]
+#[test]
+fn test_read_request_accepts_a_request_and_rejects_a_response() {
+    use eipscanne_rs::object_assembly::RequestObjectAssembly;
+
+    let request_bytes = RequestObjectAssembly::new_identity(0x6);
+    let mut written_request: Vec<u8> = Vec::new();
+    request_bytes
+        .write(&mut std::io::Cursor::new(&mut written_request))
+        .unwrap();
+    assert!(
+        RequestObjectAssembly::read_request(&mut std::io::Cursor::new(&written_request)).is_ok()
+    );
+
+    let response = ResponseObjectAssembly::new_send_rr_data(
+        0x6,
+        0,
+        MessageRouterResponse {
+            service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
+            response_data: ResponseData {
+                status: ResponseStatusCode::Success,
+                additional_status_size: 0,
+                additional_status: vec![],
+                data: CipDataOpt::Raw(vec![]),
+            },
+        },
+    );
+    let mut written_response: Vec<u8> = Vec::new();
+    response
+        .write(&mut std::io::Cursor::new(&mut written_response))
+        .unwrap();
+    assert!(
+        RequestObjectAssembly::read_request(&mut std::io::Cursor::new(&written_response)).is_err()
+    );
+}
+
+#[test]
+fn test_write_then_read_response() {
+    // An adapter builds a Forward_Open reply with a Sockaddr Info item and writes it...
+    let forward_open_reply = MessageRouterResponse {
+        service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
+        response_data: ResponseData {
+            status: ResponseStatusCode::Success,
+            additional_status_size: 0,
+            additional_status: vec![],
+            data: CipDataOpt::Raw(vec![]),
+        },
+    };
+
+    let response =
+        ResponseObjectAssembly::new_send_rr_data(0x3, NO_ENCAPSULATION_TIMEOUT, forward_open_reply)
+            .with_item(CommonPacketItem::new_o2t_sockaddr_info(sample_address()));
+
+    let mut written_bytes: Vec<u8> = Vec::new();
+    response
+        .write(&mut std::io::Cursor::new(&mut written_bytes))
+        .unwrap();
+
+    // ...and the scanner reads it back as a response, with the lengths filled in
+    let read_back =
+        ResponseObjectAssembly::read_response(&mut std::io::Cursor::new(&written_bytes)).unwrap();
+
+    assert_eq!(read_back.header.length, Some(40));
+    assert_eq!(read_back.response(), response.response());
+    assert_eq!(read_back.items(), response.items());
+    assert_eq!(read_back.sockaddr_info_items().count(), 1);
 }

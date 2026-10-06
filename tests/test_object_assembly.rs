@@ -1,12 +1,18 @@
+mod common;
+
 use binrw::BinWrite;
 
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
+use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
+
+use common::{CLEARLINK_IO_SESSION_HANDLE, CLEARLINK_OUTPUT_ASSEMBLY_INSTANCE};
 
 #[test]
 fn test_write_output_assembly_object_request() {
@@ -70,15 +76,22 @@ fn test_write_output_assembly_object_request() {
         0x70, 0x30, 0x03,
     ];
 
-    let provided_session_handle = 0x3;
+    let provided_session_handle = CLEARLINK_IO_SESSION_HANDLE;
 
     let full_path_request = MessageRouterRequest::new(
         ServiceCode::GetAttributeSingle,
-        CipPath::new_full(0x4, 0x70, 0x3),
+        CipPath::new_full(
+            ASSEMBLY_CLASS_ID,
+            CLEARLINK_OUTPUT_ASSEMBLY_INSTANCE,
+            ASSEMBLY_DATA_ATTRIBUTE_ID,
+        ),
     );
 
-    let set_digital_output_object =
-        RequestObjectAssembly::new_send_rr_data(provided_session_handle, 0, full_path_request);
+    let set_digital_output_object = RequestObjectAssembly::new_send_rr_data(
+        provided_session_handle,
+        NO_ENCAPSULATION_TIMEOUT,
+        full_path_request,
+    );
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();

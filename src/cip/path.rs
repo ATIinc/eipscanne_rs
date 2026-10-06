@@ -11,6 +11,7 @@ use binrw::{
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3};
 
+use crate::cip::object_ids::ASSEMBLY_CLASS_ID;
 use crate::cip::types::CipUsint;
 
 pub const BYTES_PER_PATH_WORD: usize = 2;
@@ -195,8 +196,6 @@ pub struct CipPath {
 // ======= Start of CipPath impl ========
 
 impl CipPath {
-    pub const ASSEMBLY_CLASS_ID: u8 = 0x04;
-
     pub fn from_segments(segments: Vec<LogicalPathSegment>) -> Self {
         CipPath { segments }
     }
@@ -226,7 +225,7 @@ impl CipPath {
         t2o_connection_point: u8,
     ) -> Self {
         Self::from_segments(vec![
-            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, Self::ASSEMBLY_CLASS_ID),
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
             LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, configuration_instance),
             LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, o2t_connection_point),
             LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, t2o_connection_point),
@@ -285,6 +284,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cip::object_ids::{
+        ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
+    };
 
     #[test]
     fn test_path_data_into_u16_u8_variant() {
@@ -316,15 +318,18 @@ mod tests {
 
     #[test]
     fn test_cip_path_accessors_and_sizes() {
-        let full_path = CipPath::new_full(0x04, 0x96, 0x03);
-        assert_eq!(full_path.class_id(), Some(0x04));
+        let full_path = CipPath::new_full(ASSEMBLY_CLASS_ID, 0x96, ASSEMBLY_DATA_ATTRIBUTE_ID);
+        assert_eq!(full_path.class_id(), Some(ASSEMBLY_CLASS_ID.into()));
         assert_eq!(full_path.instance_id(), Some(0x96));
-        assert_eq!(full_path.attribute_id(), Some(0x03));
+        assert_eq!(
+            full_path.attribute_id(),
+            Some(ASSEMBLY_DATA_ATTRIBUTE_ID.into())
+        );
         assert_eq!(full_path.byte_len(), 6);
         assert_eq!(full_path.word_len(), 3);
 
-        let class_instance = CipPath::new(0x0001, 0x0001);
-        assert_eq!(class_instance.class_id(), Some(0x0001));
+        let class_instance = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
+        assert_eq!(class_instance.class_id(), Some(IDENTITY_CLASS_ID));
         assert_eq!(class_instance.attribute_id(), None);
         assert_eq!(class_instance.segments.len(), 2);
         assert_eq!(class_instance.word_len(), 4);
@@ -334,7 +339,7 @@ mod tests {
         assert_eq!(connection_path.word_len(), 4);
 
         let mixed_path = CipPath::from_segments(vec![
-            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, 0x04),
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
             LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, 0x0096),
         ]);
         assert_eq!(mixed_path.byte_len(), 6);

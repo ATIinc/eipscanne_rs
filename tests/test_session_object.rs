@@ -1,6 +1,8 @@
+mod common;
+
 use std::io::Cursor;
 
-use binrw::{BinRead, BinWrite};
+use binrw::BinWrite;
 
 use hex_test_macros::prelude::*;
 
@@ -8,8 +10,14 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData,
 };
+use eipscanne_rs::eip::constants::{
+    DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT, ENCAPSULATION_PROTOCOL_VERSION,
+    REGISTER_SESSION_OPTION_FLAGS,
+};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_serialize_register_session_request() {
@@ -97,23 +105,23 @@ fn test_deserialize_register_session_response_packet_description() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let session_response = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
         length: Some(0x04),
-        session_handle: 0x006,
+        session_handle: IDENTITY_SESSION_HANDLE,
         status_code: EncapsStatusCode::Success,
-        sender_context: [0x00; 8],
-        options: 0x00,
+        sender_context: EMPTY_SENDER_CONTEXT,
+        options: DEFAULT_ENCAPSULATION_OPTIONS,
     };
 
     // Assert equality
     assert_eq!(expected_session_header, session_response.header);
 
     let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
-        protocol_version: 0x1,
-        option_flags: 0x00,
+        protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
+        option_flags: REGISTER_SESSION_OPTION_FLAGS,
     });
 
     assert_eq!(
@@ -162,23 +170,23 @@ fn test_deserialize_register_session_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let session_response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
         length: Some(0x04),
-        session_handle: 0x006,
+        session_handle: IDENTITY_SESSION_HANDLE,
         status_code: EncapsStatusCode::Success,
-        sender_context: [0x00; 8],
-        options: 0x00,
+        sender_context: EMPTY_SENDER_CONTEXT,
+        options: DEFAULT_ENCAPSULATION_OPTIONS,
     };
 
     // Assert equality
     assert_eq!(expected_session_header, session_response_object.header);
 
     let expected_packet_description = CommandSpecificData::RegisterSession(RegisterData {
-        protocol_version: 0x1,
-        option_flags: 0x00,
+        protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
+        option_flags: REGISTER_SESSION_OPTION_FLAGS,
     });
 
     assert_eq!(
@@ -220,7 +228,7 @@ fn test_serialize_unregister_session_request() {
     ];
 
     // create an empty packet
-    let unregistration_packet = RequestObjectAssembly::new_unregistration(0x6);
+    let unregistration_packet = RequestObjectAssembly::new_unregistration(IDENTITY_SESSION_HANDLE);
 
     // Write into a byte array
     let mut unregistration_byte_array: Vec<u8> = Vec::new();

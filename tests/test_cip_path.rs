@@ -1,9 +1,16 @@
+mod common;
+
 use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
+
+use common::{
+    FORWARD_OPEN_CONFIG_INSTANCE, FORWARD_OPEN_O2T_CONNECTION_POINT,
+    FORWARD_OPEN_T2O_CONNECTION_POINT,
+};
 
 fn write_path(path: &CipPath) -> Vec<u8> {
     let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -36,7 +43,11 @@ fn test_assembly_connection_path() {
     */
     let expected_byte_array: Vec<CipByte> = vec![0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64];
 
-    let path = CipPath::new_assembly_connection(0x97, 0x96, 0x64);
+    let path = CipPath::new_assembly_connection(
+        FORWARD_OPEN_CONFIG_INSTANCE,
+        FORWARD_OPEN_O2T_CONNECTION_POINT,
+        FORWARD_OPEN_T2O_CONNECTION_POINT,
+    );
     assert_eq!(path.word_len(), 4);
 
     assert_eq_hex!(expected_byte_array, write_path(&path));

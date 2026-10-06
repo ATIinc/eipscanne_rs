@@ -2,7 +2,9 @@ use clap::Parser;
 use tokio::net::TcpStream;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 // Assert dependency on the different modules in this directory
@@ -12,20 +14,18 @@ mod cli_config;
 mod duplicated_stream_utils;
 
 // Make sure the code itself looks the same
-use clearlink_config::ConfigAssemblyObject;
-use clearlink_output::OutputAssemblyObject;
+use clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+use clearlink_output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 use cli_config::{CliArgs, set_io_data};
 use duplicated_stream_utils as stream_utils;
-
-const ETHERNET_IP_PORT: u16 = 0xAF12;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
 
     // Connect to the server at IP address and port
-    // let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
-    let address = format!("172.31.19.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
+    // let address = format!("172.28.0.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
+    let address = format!("172.31.19.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
 
     let mut stream = TcpStream::connect(address).await?;
 
@@ -47,7 +47,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut stream,
         RequestObjectAssembly::new_service_request(
             provided_session_handle,
-            CipPath::new_full(0x4, 0x96, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                CONFIG_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             ServiceCode::SetAttributeSingle,
             Some(Box::new(ConfigAssemblyObject::default())),
         ),
@@ -67,7 +71,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut stream,
         RequestObjectAssembly::new_service_request(
             provided_session_handle,
-            CipPath::new_full(0x4, 0x70, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                OUTPUT_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             ServiceCode::GetAttributeSingle,
             None,
         ),
@@ -101,7 +109,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut stream,
         RequestObjectAssembly::new_service_request(
             provided_session_handle,
-            CipPath::new_full(0x4, 0x70, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                OUTPUT_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             ServiceCode::SetAttributeSingle,
             Some(Box::new(output_assembly_object)),
         ),

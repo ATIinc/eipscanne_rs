@@ -1,17 +1,16 @@
 use tokio::net::TcpStream;
 
 use eipscanne_rs::cip::identity::IdentityResponse;
+use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 mod stream_utils;
 
-const ETHERNET_IP_PORT: u16 = 0xAF12;
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to the server at IP address and port
-    // let address = format!("172.28.0.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
-    let address = format!("172.31.19.10:{}", ETHERNET_IP_PORT); // Change this to the correct IP and port
+    // let address = format!("172.28.0.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
+    let address = format!("172.31.19.10:{}", ETHERNET_IP_TCP_PORT); // Change this to the correct IP and port
 
     let mut stream = TcpStream::connect(address).await?;
 

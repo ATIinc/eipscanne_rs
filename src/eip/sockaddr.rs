@@ -6,7 +6,7 @@ use binrw::binrw;
 
 use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
 
-use super::description::{CipMessage, CommonPacketItem};
+use super::description::CommonPacketItem;
 
 /// Length of the data carried by a Sockaddr Info item
 pub const SOCKADDR_INFO_LENGTH: u16 = 16;
@@ -62,7 +62,7 @@ impl From<SockaddrInfo> for SocketAddrV4 {
 
 // ======= Start of CommonPacketItem sockaddr impl ========
 
-impl<M: CipMessage> CommonPacketItem<M> {
+impl CommonPacketItem {
     /// Sockaddr Info describing where originator-to-target I/O data must be sent
     pub fn new_o2t_sockaddr_info(address: SocketAddrV4) -> Self {
         CommonPacketItem::O2TSockAddrInfo(SockaddrInfo::new(address))

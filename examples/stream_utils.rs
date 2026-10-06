@@ -8,6 +8,9 @@ use std::io::BufReader;
 
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
+/// Large enough for any response the examples read
+const RESPONSE_BUFFER_SIZE: usize = 500;
+
 pub async fn write_object_assembly(stream: &mut TcpStream, object_assembly: RequestObjectAssembly) {
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -22,7 +25,7 @@ pub async fn read_object_assembly(
     stream: &mut TcpStream,
 ) -> Result<ResponseObjectAssembly, binrw::Error> {
     // Write the object_assembly binary data to the buffer
-    let mut response_buffer = vec![0; 500];
+    let mut response_buffer = vec![0; RESPONSE_BUFFER_SIZE];
     let response_bytes_read = stream.read(&mut response_buffer).await?;
     response_buffer.truncate(response_bytes_read);
 
@@ -31,7 +34,7 @@ pub async fn read_object_assembly(
     let response_byte_cursor = std::io::Cursor::new(response_buffer);
     let mut response_reader = BufReader::new(response_byte_cursor);
 
-    ResponseObjectAssembly::read(&mut response_reader)
+    ResponseObjectAssembly::read_response(&mut response_reader)
 }
 
 pub async fn read_typed_object_assembly<T>(
@@ -43,7 +46,7 @@ where
     let raw_assembly_response = read_object_assembly(stream).await?;
 
     // Make sure there is actually a response
-    if let Some(router_response) = raw_assembly_response.cip_message() {
+    if let Some(router_response) = raw_assembly_response.response() {
         // Confirm that the read data is a Raw type (Vec<u8>)
         if let CipDataOpt::Raw(ref raw_data) = router_response.response_data.data {
             // Deserialize the raw data into the expected type

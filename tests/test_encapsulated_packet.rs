@@ -1,4 +1,6 @@
-use binrw::{BinRead, BinWrite};
+mod common;
+
+use binrw::BinWrite;
 
 use hex_test_macros::prelude::*;
 
@@ -8,13 +10,20 @@ use eipscanne_rs::cip::message::response::{
 };
 use eipscanne_rs::cip::message::shared::ServiceContainer;
 use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    NO_ENCAPSULATION_TIMEOUT,
+};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
+
+use common::IDENTITY_SESSION_HANDLE;
 
 /// The Get Attributes All response of the identity object (the data of the Unconnected Data Item)
 fn identity_response_message() -> MessageRouterResponse {
@@ -99,15 +108,18 @@ fn test_serialize_identity_ethernet_ip_component_request() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: None,
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0,
-            MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1)),
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
+            MessageRouterRequest::new(
+                ServiceCode::GetAttributeAll,
+                CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+            ),
         )),
     };
 
@@ -129,13 +141,16 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
         0x00, 0x25, 0x00, 0x01, 0x00,
     ];
 
-    let identity_cip_path = CipPath::new(0x1, 0x1);
+    let identity_cip_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
 
     let message_router_request =
         MessageRouterRequest::new(ServiceCode::GetAttributeAll, identity_cip_path);
 
-    let cip_request_packet =
-        RequestObjectAssembly::new_send_rr_data(0x06, 0, message_router_request);
+    let cip_request_packet = RequestObjectAssembly::new_send_rr_data(
+        IDENTITY_SESSION_HANDLE,
+        NO_ENCAPSULATION_TIMEOUT,
+        message_router_request,
+    );
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
@@ -189,20 +204,20 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let packet_description = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     let expected_packet_description = ResponseObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(44),
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             identity_response_message(),
         )),
     };
@@ -255,20 +270,20 @@ fn test_deserialize_identity_object_response() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+    let packet_description = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     let expected_packaet_description = ResponseObjectAssembly {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(44),
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             identity_response_message(),
         )),
     };

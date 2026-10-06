@@ -4,6 +4,9 @@ use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u10
 
 use eipscanne_rs::cip::types::{CipDint, CipDword, CipInt, CipUdint, CipUlint, CipUsint};
 
+/// Assembly instance holding the ClearLink outputs
+pub const OUTPUT_ASSEMBLY_INSTANCE: u8 = 0x70;
+
 // https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
 
 #[bitsize(16)]
@@ -184,9 +187,20 @@ mod tests {
     };
     use eipscanne_rs::eip::packet::EncapsulationHeader;
 
-    use crate::clearlink_output::{
-        DigitalOutputs, IOOutputData, MotorOutputData, OutputAssemblyObject, SerialAsciiOutputData,
+    use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
+    use eipscanne_rs::cip::types::CipUdint;
+    use eipscanne_rs::eip::constants::{
+        CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+        NO_ENCAPSULATION_TIMEOUT,
     };
+
+    use crate::clearlink_output::{
+        DigitalOutputs, IOOutputData, MotorOutputData, OUTPUT_ASSEMBLY_INSTANCE,
+        OutputAssemblyObject, SerialAsciiOutputData,
+    };
+
+    /// Session handle of the captures below
+    const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;
 
     #[test]
     fn test_write_output_assembly_cip() {
@@ -216,7 +230,11 @@ mod tests {
 
         let set_digital_output_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
-            CipPath::new_full(0x4, 0x70, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                OUTPUT_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             Some(Box::new(OutputAssemblyObject {
                 io_output_data: IOOutputData::new_digital_outputs(
                     DigitalOutputs::builder()
@@ -348,11 +366,15 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
 
-        let provided_session_handle = 0x3;
+        let provided_session_handle = CAPTURE_SESSION_HANDLE;
 
         let set_digital_output_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
-            CipPath::new_full(0x4, 0x70, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                OUTPUT_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             Some(Box::new(OutputAssemblyObject {
                 io_output_data: IOOutputData::new_digital_outputs(
                     DigitalOutputs::builder()
@@ -375,7 +397,7 @@ mod tests {
         let set_digital_output_object =
             eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
                 provided_session_handle,
-                0,
+                NO_ENCAPSULATION_TIMEOUT,
                 set_digital_output_message,
             );
 
@@ -491,14 +513,14 @@ mod tests {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
                 length: Some(300),
-                session_handle: 0x3,
+                session_handle: CAPTURE_SESSION_HANDLE,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x0; 8],
-                options: 0x0,
+                sender_context: EMPTY_SENDER_CONTEXT,
+                options: DEFAULT_ENCAPSULATION_OPTIONS,
             },
             command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-                0x0,
-                0,
+                CIP_INTERFACE_HANDLE,
+                NO_ENCAPSULATION_TIMEOUT,
                 MessageRouterResponse {
                     service_container: ServiceContainer::new_response(
                         ServiceCode::GetAttributeSingle,
@@ -525,7 +547,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
         assert_eq!(expected_output_assembly_response, response_object);
     }
@@ -572,21 +594,25 @@ mod tests {
                 // NOTE: For some reason the serialized length is 300... But the Wireshark data said 300
                 //  Could be an internal subtraction?
                 length: Some(304),
-                session_handle: 0x3,
+                session_handle: CAPTURE_SESSION_HANDLE,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x0; 8],
-                options: 0x0,
+                sender_context: EMPTY_SENDER_CONTEXT,
+                options: DEFAULT_ENCAPSULATION_OPTIONS,
             },
             command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-                0x0,
-                0,
+                CIP_INTERFACE_HANDLE,
+                NO_ENCAPSULATION_TIMEOUT,
                 MessageRouterRequest {
                     service_container: ServiceContainer::new_request(
                         ServiceCode::SetAttributeSingle,
                     ),
                     request_data: RequestData::new(
                         Some(0x3),
-                        CipPath::new_full(0x4, 0x70, 0x3),
+                        CipPath::new_full(
+                            ASSEMBLY_CLASS_ID,
+                            OUTPUT_ASSEMBLY_INSTANCE,
+                            ASSEMBLY_DATA_ATTRIBUTE_ID,
+                        ),
                         Some(Box::new(OutputAssemblyObject {
                             io_output_data: IOOutputData {
                                 aop_value: 0x00, // 0x02

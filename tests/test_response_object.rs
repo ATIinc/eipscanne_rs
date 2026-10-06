@@ -1,3 +1,5 @@
+mod common;
+
 use binrw::BinWrite;
 
 use hex_test_macros::prelude::*;
@@ -14,8 +16,14 @@ use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    NO_ENCAPSULATION_TIMEOUT,
+};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_serialize_rr_data() {
@@ -33,8 +41,11 @@ fn test_serialize_rr_data() {
         },
     };
 
-    let rr_data =
-        CommandSpecificData::SendRrData(RRPacketData::new_unconnected(0x0, 0x0, identity_message));
+    let rr_data = CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+        CIP_INTERFACE_HANDLE,
+        NO_ENCAPSULATION_TIMEOUT,
+        identity_message,
+    ));
 
     let mut rr_data_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut rr_data_byte_array);
@@ -139,14 +150,14 @@ fn test_serialize_generic_response() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(44),
-            session_handle: 0x06,
+            session_handle: IDENTITY_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
-            sender_context: [0x00; 8],
-            options: 0x00,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
         command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            0x0,
-            0x0,
+            CIP_INTERFACE_HANDLE,
+            NO_ENCAPSULATION_TIMEOUT,
             MessageRouterResponse {
                 service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll)
                     .into(),

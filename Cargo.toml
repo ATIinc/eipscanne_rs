@@ -18,3 +18,5 @@ pretty_assertions = "1.4.1"
 default = []            # Comment to enable async support
 # default = ["async"]   # UN-Comment to enable async support for testing
 async = []
+# Adapter-side helpers, e.g. reading the requests a scanner sends (`EnIpPacket::read_request`)
+adapter = []

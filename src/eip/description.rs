@@ -9,6 +9,7 @@ use binrw::{
     binrw, // #[binrw] attribute
 };
 
+use crate::cip::message::CipMessage;
 use crate::cip::types::{CipUint, CipUsint};
 
 use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
@@ -22,15 +23,15 @@ use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum CommonPacketItemId {
     #[brw(magic = 0x0000u16)]
-    NullAddr,
+    NullAddressItem,
     #[brw(magic = 0x000Cu16)]
-    ListIdentity,
+    ListIdentityResponse,
     #[brw(magic = 0x00A1u16)]
-    ConnectionAddressItem,
+    ConnectedAddressItem,
     #[brw(magic = 0x00B1u16)]
-    ConnectedTransportPacket,
+    ConnectedDataItem,
     #[brw(magic = 0x00B2u16)]
-    UnconnectedMessage,
+    UnconnectedDataItem,
     #[brw(magic = 0x8000u16)]
     O2TSockAddrInfo,
     #[brw(magic = 0x8001u16)]
@@ -40,31 +41,18 @@ pub enum CommonPacketItemId {
     Unknown(CipUint),
 }
 
-/// A message carried by an Unconnected Data Item, e.g. a Message Router request or response.
-///
-/// Reading it takes the length of the item, since the message does not encode its own length.
-pub trait CipMessage:
-    'static + for<'a> BinRead<Args<'a> = (u16,)> + for<'a> BinWrite<Args<'a> = ()>
-{
-}
-
-impl<T> CipMessage for T where
-    T: 'static + for<'a> BinRead<Args<'a> = (u16,)> + for<'a> BinWrite<Args<'a> = ()>
-{
-}
-
 /// A Common Packet Format item: Type ID, Length and the data selected by the Type ID.
 ///
 /// The Type ID and the Length are derived from the variant on write, so an item can never be built
 /// with a Type ID or Length that does not match its data. On read, an item whose data does not fit
 /// its variant (wrong length, unparsable message) is kept as `Unknown` with its raw data.
-#[derive(Debug, PartialEq, Clone)]
-pub enum CommonPacketItem<M: CipMessage> {
+#[derive(Debug, PartialEq)]
+pub enum CommonPacketItem {
     /// Null Address Item: no data, used for unconnected messages
-    NullAddress,
+    NullAddressItem,
 
     /// Unconnected Data Item: the CIP message of a SendRRData packet
-    UnconnectedData(M),
+    UnconnectedDataItem(CipMessage),
 
     O2TSockAddrInfo(SockaddrInfo),
 
@@ -79,11 +67,11 @@ pub enum CommonPacketItem<M: CipMessage> {
 
 // ======= Start of CommonPacketItem impl ========
 
-impl<M: CipMessage> CommonPacketItem<M> {
+impl CommonPacketItem {
     pub fn type_id(&self) -> CommonPacketItemId {
         match self {
-            CommonPacketItem::NullAddress => CommonPacketItemId::NullAddr,
-            CommonPacketItem::UnconnectedData(_) => CommonPacketItemId::UnconnectedMessage,
+            CommonPacketItem::NullAddressItem => CommonPacketItemId::NullAddressItem,
+            CommonPacketItem::UnconnectedDataItem(_) => CommonPacketItemId::UnconnectedDataItem,
             CommonPacketItem::O2TSockAddrInfo(_) => CommonPacketItemId::O2TSockAddrInfo,
             CommonPacketItem::T2OSockAddrInfo(_) => CommonPacketItemId::T2OSockAddrInfo,
             CommonPacketItem::Unknown { type_id, .. } => *type_id,
@@ -96,11 +84,13 @@ impl<M: CipMessage> CommonPacketItem<M> {
         let mut data_reader = Cursor::new(data);
 
         match type_id {
-            CommonPacketItemId::NullAddr if data.is_empty() => Some(CommonPacketItem::NullAddress),
-            CommonPacketItemId::UnconnectedMessage => {
-                M::read_options(&mut data_reader, endian, (packet_length,))
+            CommonPacketItemId::NullAddressItem if data.is_empty() => {
+                Some(CommonPacketItem::NullAddressItem)
+            }
+            CommonPacketItemId::UnconnectedDataItem => {
+                CipMessage::read_options(&mut data_reader, endian, (packet_length,))
                     .ok()
-                    .map(CommonPacketItem::UnconnectedData)
+                    .map(CommonPacketItem::UnconnectedDataItem)
             }
             CommonPacketItemId::O2TSockAddrInfo if packet_length == SOCKADDR_INFO_LENGTH => {
                 SockaddrInfo::read_options(&mut data_reader, endian, ())
@@ -117,15 +107,15 @@ impl<M: CipMessage> CommonPacketItem<M> {
     }
 }
 
-impl<M: CipMessage> ReadEndian for CommonPacketItem<M> {
+impl ReadEndian for CommonPacketItem {
     const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
 }
 
-impl<M: CipMessage> WriteEndian for CommonPacketItem<M> {
+impl WriteEndian for CommonPacketItem {
     const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
 }
 
-impl<M: CipMessage> BinRead for CommonPacketItem<M> {
+impl BinRead for CommonPacketItem {
     type Args<'a> = ();
 
     fn read_options<R: Read + Seek>(
@@ -144,7 +134,7 @@ impl<M: CipMessage> BinRead for CommonPacketItem<M> {
     }
 }
 
-impl<M: CipMessage> BinWrite for CommonPacketItem<M> {
+impl BinWrite for CommonPacketItem {
     type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
@@ -158,8 +148,8 @@ impl<M: CipMessage> BinWrite for CommonPacketItem<M> {
         let mut data_writer = Cursor::new(&mut data);
 
         match self {
-            CommonPacketItem::NullAddress => {}
-            CommonPacketItem::UnconnectedData(message) => {
+            CommonPacketItem::NullAddressItem => {}
+            CommonPacketItem::UnconnectedDataItem(message) => {
                 message.write_options(&mut data_writer, endian, ())?
             }
             CommonPacketItem::O2TSockAddrInfo(info) | CommonPacketItem::T2OSockAddrInfo(info) => {

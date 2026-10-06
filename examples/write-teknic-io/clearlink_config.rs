@@ -3,6 +3,9 @@ use binrw::{BinRead, BinWrite, binrw};
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u26};
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipDword, CipSint, CipUdint, CipUint, CipUsint};
 
+/// Assembly instance holding the ClearLink configuration
+pub const CONFIG_ASSEMBLY_INSTANCE: u8 = 0x96;
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -249,7 +252,7 @@ impl ConfigAssemblyObject {
 mod tests {
     use std::vec;
 
-    use binrw::{BinRead, BinWrite};
+    use binrw::BinWrite;
 
     use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
     use hex_test_macros::prelude::*;
@@ -266,7 +269,17 @@ mod tests {
     use eipscanne_rs::eip::packet::EncapsulationHeader;
     use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
-    use crate::clearlink_config::ConfigAssemblyObject;
+    use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
+    use eipscanne_rs::cip::types::CipUdint;
+    use eipscanne_rs::eip::constants::{
+        CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+        NO_ENCAPSULATION_TIMEOUT,
+    };
+
+    use crate::clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+
+    /// Session handle of the captures below
+    const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;
 
     #[test]
     fn test_write_clearlink_config_assembly_object() {
@@ -344,18 +357,22 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
         ];
 
-        let provided_session_handle = 0x3;
+        let provided_session_handle = CAPTURE_SESSION_HANDLE;
 
         let set_clearlink_config_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
-            CipPath::new_full(0x4, 0x96, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                CONFIG_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             Some(Box::new(ConfigAssemblyObject::default())),
         );
 
         let set_clearlink_config_object =
             eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
                 provided_session_handle,
-                0,
+                NO_ENCAPSULATION_TIMEOUT,
                 set_clearlink_config_message,
             );
 
@@ -421,14 +438,14 @@ mod tests {
             header: EncapsulationHeader {
                 command: EnIpCommand::SendRrData,
                 length: Some(20),
-                session_handle: 0x3,
+                session_handle: CAPTURE_SESSION_HANDLE,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x0; 8],
-                options: 0x0,
+                sender_context: EMPTY_SENDER_CONTEXT,
+                options: DEFAULT_ENCAPSULATION_OPTIONS,
             },
             command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-                0x0,
-                0,
+                CIP_INTERFACE_HANDLE,
+                NO_ENCAPSULATION_TIMEOUT,
                 MessageRouterResponse {
                     service_container: ServiceContainer::new_response(
                         ServiceCode::SetAttributeSingle,
@@ -446,7 +463,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
         assert_eq!(expected_set_config_assembly_response, response_object);
     }
