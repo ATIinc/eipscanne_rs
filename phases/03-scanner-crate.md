@@ -56,7 +56,7 @@ give packets and verdicts out.
   `examples/write-teknic-io/duplicated_stream_utils.rs` are deleted in favour of `session.rs`.
   The library then has no dependency on its utilities (no dev-dependency cycle), and `tokio` and
   `clap` leave its dev-dependencies. The example tests (`clearlink_config.rs`,
-  `clearlink_output.rs`) move unchanged and keep their bytes.
+  `clearlink_output.rs`) move unchanged to `scanner/tests/clearlink/` and keep their bytes.
 
 ### `src/lib.rs`
 

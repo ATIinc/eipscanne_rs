@@ -10,11 +10,6 @@ messaging (a class 1 I/O connection, one submodule per stage). `read-identity` a
 From the repository root: `cargo run --example <name> -- <arguments>` (the root `Cargo.toml`
 lists the scanner among the workspace's default members, so no `-p scanner` is needed).
 
-## Test Examples
-
-`cargo test --examples` runs the byte-exact tests of the ClearLink assemblies
-in `write-clearlink-io` (they also run as part of `cargo test --workspace`).
-
 ## Examples Explained
 
 | Example | Device | Messaging | Moves hardware |

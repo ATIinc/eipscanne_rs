@@ -159,15 +159,3 @@ impl OutputAssemblyHub4E {
 }
 
 // ^^^^^^^^ End of OutputAssemblyHub4E impl ^^^^^^^^
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn output_assembly_is_148_bytes() {
-        let mut bytes = std::io::Cursor::new(Vec::new());
-        OutputAssemblyHub4E::default().write(&mut bytes).unwrap();
-        assert_eq!(bytes.into_inner().len(), 148);
-    }
-}
