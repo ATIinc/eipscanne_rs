@@ -3,24 +3,19 @@
 The examples live in the `scanner` crate, which also holds what they are built on: the
 encapsulation `session` (shared), `explicit` messaging (one request, one reply) and `implicit`
 messaging (a class 1 I/O connection, one submodule per stage). `read-identity` and
-`write-teknic-io` use `session` and `explicit`; `implicit-io` uses `session` and `implicit`.
+`write-clearlink-io` use `session` and `explicit`; `implicit-io` uses `session` and `implicit`.
 
 ## Run Examples
 
 From the repository root: `cargo run --example <name> -- <arguments>` (the root `Cargo.toml`
 lists the scanner among the workspace's default members, so no `-p scanner` is needed).
 
-## Test Examples
-
-`cargo test --examples` runs the byte-exact tests of the ClearLink assemblies
-in `write-teknic-io` (they also run as part of `cargo test --workspace`).
-
 ## Examples Explained
 
 | Example | Device | Messaging | Moves hardware |
 |---|---|---|---|
 | `read-identity` | any adapter | explicit | no |
-| `write-teknic-io` | Teknic ClearLink | explicit | digital outputs |
+| `write-clearlink-io` | Teknic ClearLink | explicit | digital outputs |
 | `write-nitra-io` | Nitra pneumatic valve manifold | explicit | solenoid valves |
 | `clearlink-homing` | Teknic ClearLink | explicit (polling) | a motor |
 | `io-hub-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
@@ -45,16 +40,16 @@ i.e. `cargo run --example read-identity -- --host 172.28.0.10`
    `IdentityResponse`)
 1. Unregisters the session
 
-### write-teknic-io
+### write-clearlink-io
 
 Reads from and writes to a Teknic ClearLink motor controller board using the assembly objects
 defined in Teknic's EtherNet/IP Object Reference:
 https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=18
 
-i.e. `cargo run --example write-teknic-io -- --help`
-* `cargo run --example write-teknic-io -- --index 4 --on`
-* `cargo run --example write-teknic-io -- --index 4 --off`
-* `cargo run --example write-teknic-io -- --index 4 --pwm 100`
+i.e. `cargo run --example write-clearlink-io -- --help`
+* `cargo run --example write-clearlink-io -- --index 4 --on`
+* `cargo run --example write-clearlink-io -- --index 4 --off`
+* `cargo run --example write-clearlink-io -- --index 4 --pwm 100`
 * `--host <ip>` picks another ClearLink than the default one
 
 1. Parses the desired digital output to be modified from the command line
