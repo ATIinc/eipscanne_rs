@@ -20,7 +20,8 @@ point. Update the **Status** line of a phase when it changes.
 * One branch per phase (`feat/SW-4573-<n>-<name>`), each based on the previous phase's branch, each
   opened as its own pull request so reviews stay small.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
-  `cargo test --examples` and `cargo build --features async` green.
+  `cargo test --all --features adapter`, `cargo test --examples` and
+  `cargo build --features async` green.
 
 ## Ground rules
 
@@ -37,7 +38,9 @@ point. Update the **Status** line of a phase when it changes.
 * **Bitfields are built by name.** Every `bilge` bitfield derives `BuilderBits`
   (`Type::builder().field(value)....build()`, each field set exactly once, reserved bits zero) and,
   when every field has a zero default, `DefaultBits` (`Type::default()` plus `set_*` setters). The
-  positional `new(...)` constructor stays private.
+  positional `new(...)` constructor stays private, and with it the builder (bilge 0.5), so outside
+  the defining module bitfields are built with `Type::default()` and the setters, or through a
+  wrapper such as `ServiceContainer::new_request`.
 * **EIPScanner parity.** Behaviour mirrors the C++ [EIPScanner](https://github.com/nimbuscontrols/EIPScanner)
   `ConnectionManager` / `IOConnection` logic unless the specification says otherwise.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against
