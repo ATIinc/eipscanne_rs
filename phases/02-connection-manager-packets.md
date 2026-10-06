@@ -49,6 +49,9 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
   The `CipData` blanket impl no longer requires `BinRead` with empty arguments: `write_to` only
   writes, and `ForwardOpenRequest` reads with a `large` argument. Every type that satisfied the
   bound before still does.
+* The `async` feature is gone: `CipData` always requires `Send + Sync` (what `async` used to add), so
+  packets carrying typed data can be held across `.await` points without opting in. `adapter` is
+  the only feature left.
 
 ## Design notes
 
@@ -69,5 +72,5 @@ codes.
 ## Verification
 
 ```
-cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples && cargo build --features async
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples
 ```

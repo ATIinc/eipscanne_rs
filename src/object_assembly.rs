@@ -1,5 +1,8 @@
+use crate::cip::connection_manager::forward_close::ForwardCloseRequest;
+use crate::cip::connection_manager::forward_open::ForwardOpenRequest;
 use crate::cip::message::data::CipData;
 use crate::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
+use crate::cip::object_ids::{CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID};
 use crate::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
@@ -36,6 +39,27 @@ impl RequestObjectAssembly {
             session_handle,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest::new_data(service_code, request_path, data),
+        )
+    }
+
+    /// Forward_Open or Large_Forward_Open, decided by the width of the request's connection
+    /// parameters
+    pub fn new_forward_open(session_handle: CipUdint, request: ForwardOpenRequest) -> Self {
+        let service_code = request.service_code();
+        Self::new_service_request(
+            session_handle,
+            CipPath::new(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
+            service_code,
+            Some(Box::new(request)),
+        )
+    }
+
+    pub fn new_forward_close(session_handle: CipUdint, request: ForwardCloseRequest) -> Self {
+        Self::new_service_request(
+            session_handle,
+            CipPath::new(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
+            ServiceCode::ForwardClose,
+            Some(Box::new(request)),
         )
     }
 }

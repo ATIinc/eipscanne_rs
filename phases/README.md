@@ -7,7 +7,7 @@ point. Update the **Status** line of a phase when it changes.
 | Phase | Document | Status |
 |---|---|---|
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | In review |
-| 2 | [Connection Manager packets](02-connection-manager-packets.md) | Not started |
+| 2 | [Connection Manager packets](02-connection-manager-packets.md) | Implemented, awaiting review |
 | 3 | [Class 1 I/O packets](03-class1-io-packets.md) | Not started |
 | 4 | [I/O connection state](04-io-connection-state.md) | Not started |
 | 5 | [Socket utilities and implicit-io example](05-socket-utilities-and-example.md) | Not started |
@@ -40,7 +40,7 @@ point. Update the **Status** line of a phase when it changes.
   when every field has a zero default, `DefaultBits` (`Type::default()` plus `set_*` setters). The
   positional `new(...)` constructor stays private, and with it the builder (bilge 0.5), so outside
   the defining module bitfields are built with `Type::default()` and the setters, or through a
-  wrapper such as `ServiceContainer::new_request`.
+  wrapper such as `ServiceContainer::new_request` or `NetworkConnectionParameters::new`.
 * **EIPScanner parity.** Behaviour mirrors the C++ [EIPScanner](https://github.com/nimbuscontrols/EIPScanner)
   `ConnectionManager` / `IOConnection` logic unless the specification says otherwise.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against
