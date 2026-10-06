@@ -16,6 +16,10 @@
 //! receiving direction of stage 3 share no state, so they are two types, [`Producer`] and
 //! [`Consumer`]; neither touches the network. Only `open`, `close`, `udp` and the caller's loop
 //! do (see the `implicit-io` example).
+//!
+//! The data of both directions is the caller's assembly, as bytes or as the same `binrw` struct
+//! the explicit side uses: [`Producer::next_packet_from`] encodes one, [`Input::decode`] decodes
+//! one.
 
 pub mod close;
 pub mod config;
@@ -28,5 +32,5 @@ pub use close::{CloseError, forward_close};
 pub use config::{ConfigError, ConnectionConfig, DirectionConfig};
 pub use consume::{Consumer, Discarded, Input};
 pub use open::{OpenConnection, OpenError, forward_open};
-pub use produce::{Producer, SizeError};
+pub use produce::{OutputsError, Producer, SizeError};
 pub use udp::{bind_io_socket, recv_io_packet, send_io_packet};

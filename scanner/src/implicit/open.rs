@@ -125,15 +125,12 @@ impl fmt::Display for OpenError {
                 extended_status: Some(extended_status),
             } => write!(
                 f,
-                "the adapter rejected the Forward_Open: {general_status:?}, {extended_status:?}"
+                "the adapter rejected the Forward_Open: {general_status}, {extended_status}"
             ),
             OpenError::Rejected {
                 general_status,
                 extended_status: None,
-            } => write!(
-                f,
-                "the adapter rejected the Forward_Open: {general_status:?}"
-            ),
+            } => write!(f, "the adapter rejected the Forward_Open: {general_status}"),
             OpenError::UnexpectedReply(what) => {
                 write!(f, "unexpected reply to the Forward_Open: {what}")
             }

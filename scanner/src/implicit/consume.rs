@@ -9,7 +9,7 @@ use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::{Duration, Instant};
 
-use binrw::{BinRead, BinWrite};
+use binrw::{BinRead, BinResult, BinWrite};
 
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, RealTimeFormat, TransportClass, connection_size,
@@ -248,6 +248,34 @@ impl Consumer {
 }
 
 // ^^^^^^^^ End of Consumer impl ^^^^^^^^
+
+// ======= Start of Input impl ========
+
+impl Input {
+    /// The inputs decoded as a `T` declared by the caller (the input assembly), the implicit
+    /// counterpart of `explicit::decode_reply`. Every byte must belong to `T`: bytes left over
+    /// mean `T` does not describe this assembly.
+    pub fn decode<T>(&self) -> BinResult<T>
+    where
+        T: for<'a> BinRead<Args<'a> = ()>,
+    {
+        let mut cursor = Cursor::new(&self.data);
+        let value = T::read_le(&mut cursor)?;
+        let pos = cursor.position();
+        if pos != self.data.len() as u64 {
+            return Err(binrw::Error::AssertFail {
+                pos,
+                message: format!(
+                    "the inputs are {} bytes, the type read only {pos}",
+                    self.data.len()
+                ),
+            });
+        }
+        Ok(value)
+    }
+}
+
+// ^^^^^^^^ End of Input impl ^^^^^^^^
 
 // ======= Start of Discarded impl ========
 
@@ -549,6 +577,47 @@ mod tests {
                 .accept(&input_packet(1, 1, &[0; 32]), from_adapter(), now)
                 .is_ok()
         );
+    }
+
+    /// A caller's input assembly for the sample connection's 32 bytes
+    #[binrw::binrw]
+    #[brw(little)]
+    #[derive(Debug, PartialEq)]
+    struct SampleInputs {
+        status: CipUdint,
+        values: [CipUint; 14],
+    }
+
+    #[test]
+    fn inputs_decode_as_the_callers_assembly() {
+        let (mut consumer, now) = consumer();
+        let mut inputs = vec![0x01, 0x02, 0x03, 0x04];
+        inputs.extend((0..14u16).flat_map(|value| value.to_le_bytes()));
+
+        let input = consumer
+            .accept(&input_packet(1, 1, &inputs), from_adapter(), now)
+            .unwrap();
+
+        assert_eq!(
+            input.decode::<SampleInputs>().unwrap(),
+            SampleInputs {
+                status: 0x0403_0201,
+                values: core::array::from_fn(|index| index as CipUint),
+            }
+        );
+    }
+
+    #[test]
+    fn inputs_with_bytes_left_over_do_not_decode() {
+        let input = Input {
+            data: vec![0; 32],
+            run_idle: None,
+            new_data: true,
+        };
+
+        assert!(input.decode::<[u8; 31]>().is_err());
+        assert!(input.decode::<[u8; 33]>().is_err());
+        assert!(input.decode::<[u8; 32]>().is_ok());
     }
 
     #[test]

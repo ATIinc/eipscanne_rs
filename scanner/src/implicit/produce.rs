@@ -4,7 +4,10 @@
 //! sends them every `period()`.
 
 use std::fmt;
+use std::io::Cursor;
 use std::time::Duration;
+
+use binrw::BinWrite;
 
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, RealTimeFormat, TransportClass,
@@ -40,6 +43,15 @@ pub struct SizeError {
     pub connection_size_type: ConnectionSizeType,
     pub data_size: u16,
     pub actual: usize,
+}
+
+/// Typed outputs that cannot be sent
+#[derive(Debug)]
+pub enum OutputsError {
+    /// The outputs did not encode
+    Encode(binrw::Error),
+    /// The encoded outputs do not fit the connection
+    Size(SizeError),
 }
 
 // ======= Start of Producer impl ========
@@ -119,6 +131,17 @@ impl Producer {
         Ok(packet)
     }
 
+    /// The next packet to send, carrying `outputs` (the caller's output assembly) encoded the
+    /// way `explicit::send_request` encodes request data, with the run flag set to `run`
+    pub fn next_packet_from<T>(&mut self, outputs: &T, run: bool) -> Result<IoPacket, OutputsError>
+    where
+        T: for<'a> BinWrite<Args<'a> = ()>,
+    {
+        let mut bytes = Cursor::new(Vec::new());
+        outputs.write_le(&mut bytes)?;
+        Ok(self.next_packet(&bytes.into_inner(), run)?)
+    }
+
     fn check_size(&self, actual: usize) -> Result<(), SizeError> {
         let fits = match self.connection_size_type {
             ConnectionSizeType::Fixed => actual == usize::from(self.data_size),
@@ -157,6 +180,33 @@ impl fmt::Display for SizeError {
 impl std::error::Error for SizeError {}
 
 // ^^^^^^^^ End of SizeError impl ^^^^^^^^
+
+// ======= Start of OutputsError impl ========
+
+impl fmt::Display for OutputsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OutputsError::Encode(error) => write!(f, "the outputs did not encode: {error}"),
+            OutputsError::Size(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for OutputsError {}
+
+impl From<binrw::Error> for OutputsError {
+    fn from(error: binrw::Error) -> Self {
+        OutputsError::Encode(error)
+    }
+}
+
+impl From<SizeError> for OutputsError {
+    fn from(error: SizeError) -> Self {
+        OutputsError::Size(error)
+    }
+}
+
+// ^^^^^^^^ End of OutputsError impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
@@ -293,6 +343,45 @@ mod tests {
         );
         assert!(producer.next_packet(&[0u8; 33], true).is_err());
         assert!(producer.next_packet(&[0u8; 32], true).is_ok());
+    }
+
+    /// A caller's output assembly for the sample connection's 32 bytes
+    #[binrw::binwrite]
+    #[bw(little)]
+    struct SampleOutputs {
+        command: CipUdint,
+        values: [CipUint; 14],
+    }
+
+    #[test]
+    fn typed_outputs_send_the_same_packet_as_their_bytes() {
+        let connection = sample_connection();
+        let outputs = SampleOutputs {
+            command: 0x0403_0201,
+            values: core::array::from_fn(|index| index as CipUint),
+        };
+        let mut bytes = vec![0x01, 0x02, 0x03, 0x04];
+        bytes.extend((0..14u16).flat_map(|value| value.to_le_bytes()));
+
+        let typed = Producer::new(&connection, 1)
+            .next_packet_from(&outputs, true)
+            .unwrap();
+        let raw = Producer::new(&connection, 1)
+            .next_packet(&bytes, true)
+            .unwrap();
+
+        assert_eq_hex!(bytes_of(&raw), bytes_of(&typed));
+    }
+
+    #[test]
+    fn typed_outputs_must_fit_the_connection() {
+        let connection = sample_connection();
+        let mut producer = Producer::new(&connection, 1);
+
+        assert!(matches!(
+            producer.next_packet_from(&[0u8; 31], true),
+            Err(OutputsError::Size(SizeError { actual: 31, .. }))
+        ));
     }
 
     #[test]
