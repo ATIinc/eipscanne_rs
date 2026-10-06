@@ -4,17 +4,18 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use scanner::explicit::{send_request, typed_data};
+use scanner::explicit::{decode_reply, send_request};
 use scanner::session::Session;
 
-// Assert dependency on the different modules in this directory
-mod clearlink_config;
-mod clearlink_output;
+// The ClearLink assemblies, shared with the clearlink-homing example; each example uses a
+// different part of them
+#[allow(dead_code)]
+#[path = "../clearlink_assemblies.rs"]
+mod clearlink_assemblies;
 mod cli_config;
 
-// Make sure the code itself looks the same
-use clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
-use clearlink_output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
+use clearlink_assemblies::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+use clearlink_assemblies::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 use cli_config::{CliArgs, set_io_data};
 
 /// The ClearLink to talk to unless one is given on the command line
@@ -66,16 +67,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    // TODO: Create the response for the SetDigitalIO message in the teknic_cip
-    let mut output_assembly_object: OutputAssemblyObject = typed_data(&output_assembly_reply)?;
-
-    // println!("{:#?}\n", _set_digital_io_response_object);      // NOTE: the :#? triggers a pretty-print
-    // println!("{:?}\n", _set_digital_io_response_object);
+    let mut output_assembly_object: OutputAssemblyObject = decode_reply(&output_assembly_reply)?;
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
     // ========= Write the Digital Output ============
-
-    // let mut output_assembly_data = OutputAssemblyObject::test_default();
 
     // |||||||||||||||||||||||||||||||||
     // |||| Actually set the output ||||

@@ -3,13 +3,16 @@ name = "scanner"
 version = "0.1.0"
 edition = "2024"
 publish = false
+# Every example is listed below; `examples/clearlink_assemblies.rs` and `examples/io_hub_assemblies.rs`
+# are shared modules, not examples
+autoexamples = false
 description = "The scanner side built on eipscanne_rs: sessions, explicit requests, class 1 I/O connections, and the examples"
 
 [dependencies]
 eipscanne_rs = { path = ".." }
 bilge = "0.5.0"
 binrw = "0.15.2"
-tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time"] }
+tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time", "signal"] }
 
 [dev-dependencies]
 # Used by the examples only
@@ -30,3 +33,17 @@ test = true
 [[example]]
 name = "implicit-io"
 path = "examples/implicit-io/main.rs"
+
+[[example]]
+name = "write-nitra-io"
+path = "examples/write-nitra-io/main.rs"
+
+[[example]]
+name = "clearlink-homing"
+path = "examples/clearlink-homing/main.rs"
+
+[[example]]
+name = "io-hub-homing"
+path = "examples/io-hub-homing/main.rs"
+# Carries the layout tests of the IO-HUB assemblies, so they run with `cargo test`
+test = true

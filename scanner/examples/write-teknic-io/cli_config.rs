@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use crate::clearlink_output::IOOutputData;
+use crate::clearlink_assemblies::output::IOOutputData;
 
 #[derive(Parser)]
 pub struct OutputValue {

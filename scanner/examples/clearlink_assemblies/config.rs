@@ -1,3 +1,6 @@
+//! The ClearLink configuration assembly (instance 0x96):
+//! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=32
+
 use binrw::{BinRead, BinWrite, binrw};
 
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u26};
@@ -8,7 +11,7 @@ pub const CONFIG_ASSEMBLY_INSTANCE: u8 = 0x96;
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)] // CipUsint
 pub enum AnalogInputRange {
     #[brw(magic = 2u8)]
@@ -20,7 +23,7 @@ pub enum AnalogInputRange {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)] // CipUsint
 pub enum AnalogOutputRange {
     #[brw(magic = 0u8)]
@@ -35,7 +38,7 @@ pub enum AnalogOutputRange {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 #[repr(u8)] // CipBool
 pub enum PWMFrequency {
     #[brw(magic = 0u8)]
@@ -47,7 +50,7 @@ pub enum PWMFrequency {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IOModeConfigData {
     ai0_range: AnalogInputRange,
     ai1_range: AnalogInputRange,
@@ -79,7 +82,7 @@ impl IOModeConfigData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IOFiltersConfigData {
     aip_filters: [CipUsint; 4],
     dip_filters: [CipUint; 26],
@@ -102,7 +105,7 @@ impl IOFiltersConfigData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct EncoderConfigData {
     encoder_velocity_resolution: CipUdint,
     #[brw(pad_after = 3)]
@@ -127,27 +130,32 @@ impl EncoderConfigData {
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct ConfigRegisterData {
-    homing_enable: bool,                 // = bit 0
-    home_sensor_active_level: bool,      // bit = 1,
-    enable_inversion: bool,              // bit = 2,
-    hlfb_inversion: bool,                // bit = 3, // NOTE: The default if HIGH
-    position_capture_active_level: bool, // bit = 4,
-    software_limit_enable: bool,         // bit = 5,
-    reserved: u26,                       // bits 6-31
+    /// Must be set for sensor-based homing
+    pub homing_enable: bool, // bit 0
+    pub home_sensor_active_level: bool,      // bit 1
+    pub enable_inversion: bool,              // bit 2
+    pub hlfb_inversion: bool,                // bit 3, the device default is HIGH
+    pub position_capture_active_level: bool, // bit 4
+    pub software_limit_enable: bool,         // bit 5
+    reserved: u26,                           // bits 6-31
 }
+
+/// Based on the ClearLink Ethernet/IP Object Reference:
+/// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=49
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MotorConfigData {
-    config_register: ConfigRegisterData,
+    pub config_register: ConfigRegisterData,
     follow_divisor: CipDint,
     follow_multiplier: CipDint,
-    max_deceleration: CipDint,
+    pub max_deceleration: CipDint,
     soft_limit_position1: CipDint,
     soft_limit_position2: CipDint,
-    positive_limit_connector: CipSint,
-    negative_limit_connector: CipSint,
-    home_sensor_connector: CipSint,
+    pub positive_limit_connector: CipSint,
+    pub negative_limit_connector: CipSint,
+    /// The I/O connector (0-12) of the home sensor, or -1 for hard-stop homing
+    pub home_sensor_connector: CipSint,
     brake_output_connector: CipSint,
     stop_sensor_connector: CipSint,
     trigger_position_capture_connector: CipSint,
@@ -188,7 +196,7 @@ impl MotorConfigData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SerialAsciiConfigData {
     serial_baud_rate: CipUdint,
     input_start_delimiter: CipDword,
@@ -217,7 +225,7 @@ impl SerialAsciiConfigData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ConfigAssemblyObject {
     io_mode_config_data: IOModeConfigData,
     io_filters_config_data: IOFiltersConfigData,
@@ -242,6 +250,17 @@ impl ConfigAssemblyObject {
             motor2_config_data: MotorConfigData::default(),
             motor3_config_data: MotorConfigData::default(),
             serial_ascii_config_data: SerialAsciiConfigData::default(),
+        }
+    }
+
+    /// The configuration of motor connector `index` (0 = M0 ... 3 = M3)
+    pub fn motor_config_mut(&mut self, index: u8) -> &mut MotorConfigData {
+        match index {
+            0 => &mut self.motor0_config_data,
+            1 => &mut self.motor1_config_data,
+            2 => &mut self.motor2_config_data,
+            3 => &mut self.motor3_config_data,
+            _ => panic!("motor index must be 0-3, got {index}"),
         }
     }
 }
@@ -276,7 +295,7 @@ mod tests {
         NO_ENCAPSULATION_TIMEOUT,
     };
 
-    use crate::clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+    use super::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
 
     /// Session handle of the captures below
     const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;

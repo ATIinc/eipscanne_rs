@@ -17,6 +17,20 @@ in `write-teknic-io` (they also run as part of `cargo test --workspace`).
 
 ## Examples Explained
 
+| Example | Device | Messaging | Moves hardware |
+|---|---|---|---|
+| `read-identity` | any adapter | explicit | no |
+| `write-teknic-io` | Teknic ClearLink | explicit | digital outputs |
+| `write-nitra-io` | Nitra pneumatic valve manifold | explicit | solenoid valves |
+| `clearlink-homing` | Teknic ClearLink | explicit (polling) | a motor |
+| `io-hub-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
+| `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
+
+Device assemblies that more than one example may use live in shared modules included with
+`#[path]`: `clearlink_assemblies.rs` (config, input, output) and `io_hub_assemblies.rs` (input,
+output), each with a directory of the same name. The other examples keep their device types next
+to their `main.rs`. Application data is always declared by the example as plain `binrw` structs.
+
 ### read-identity
 
 Requests the Identity object from the connected device.
@@ -44,10 +58,63 @@ i.e. `cargo run --example write-teknic-io -- --help`
 1. Registers a session
 1. Writes the ConfigAssembly object (`explicit::send_request`, Set_Attribute_Single; a reply with
    a general status other than success is an error)
-1. Requests the OutputAssembly object and decodes its data (`explicit::typed_data`)
+1. Requests the OutputAssembly object and decodes its data (`explicit::decode_reply`)
 1. Modifies the value of the appropriate digital output (from the command line)
 1. Writes the modified OutputAssembly object
 1. Unregisters the session
+
+### write-nitra-io
+
+Energizes or releases solenoid valves on a Nitra EtherNet/IP pneumatic valve manifold
+(https://cdn.automationdirect.com/static/manuals/nitrainserts/nitra_ump_ethernetip.pdf#page=6).
+`--host` is required.
+
+* `cargo run --example write-nitra-io -- --host 172.31.19.60 --valves 0 2 --on`
+* `cargo run --example write-nitra-io -- --host 172.31.19.60 --valves 0 2 --off`
+* `cargo run --example write-nitra-io -- --host 172.31.19.60 --valves 7 --pulse 800`
+
+1. Registers a session
+1. Reads the status byte (assembly 101)
+1. Writes the 16 valve bits (assembly 100); `--pulse <ms>` writes them on, waits, and writes
+   them all off again
+1. Unregisters the session
+
+### clearlink-homing
+
+Homes one motor of a Teknic ClearLink over explicit messaging. This moves a real motor, so
+`--host` is required and the motor is disabled again however the run ends (error or Ctrl+C).
+
+* `cargo run --example clearlink-homing -- --host 172.31.19.14 --motor 1 --home-sensor 6`
+* `--home-sensor -1` (the default) homes against a hard stop; `--velocity` and `--acceleration`
+  set the move, `--poll-ms` and `--timeout-s` the polling
+
+1. Registers a session and reads the output assembly, so writes change only the motor being homed
+1. Clears shutdowns and a motor fault if the input assembly reports any (edge-triggered
+   handshakes, each acknowledged through the input assembly)
+1. Writes the configuration assembly with homing enabled and the home sensor connector
+1. Enables the motor and waits for `enabled`, then `ready_to_home`
+1. Starts the homing move (homing + load velocity move flags, jog velocity, limits), waits for
+   the acknowledgement, clears the flags, waits for `has_homed`
+1. Disables the motor and unregisters the session
+
+### io-hub-homing
+
+Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging. Same safety rules as
+`clearlink-homing`. `--repeat N` sends N homing commands back to back, each before the previous
+one has finished, which reproduces a firmware bug (the move is cancelled, `has_homed` never
+asserts, or the motor faults, depending on the version); the status line printed while waiting
+shows the relevant bits and decodes a rejected command's AOI error code.
+
+* `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0`
+* `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0 --repeat 4 --delay-ms 10`
+
+1. Registers a session
+1. Clears a shutdown if present (Shutdown Reset handshake: raise until acknowledged, lower until
+   the acknowledgement drops)
+1. Enables the motor
+1. Sends the homing command(s), each with the next move number
+1. Polls the input assembly, printing the status, until `has_homed` or the timeout
+1. Disables the motor and unregisters the session
 
 ### implicit-io
 

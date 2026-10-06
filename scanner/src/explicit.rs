@@ -67,8 +67,8 @@ pub async fn send_request(
     Ok(reply)
 }
 
-/// The data of a reply's Message Router response decoded as a `T`
-pub fn typed_data<T>(reply: &EnIpPacket) -> Result<T, ExplicitError>
+/// The data of a reply's Message Router response, decoded as a `T` declared by the caller
+pub fn decode_reply<T>(reply: &EnIpPacket) -> Result<T, ExplicitError>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
@@ -91,7 +91,7 @@ pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse, Ex
         None,
     )
     .await?;
-    typed_data(&reply)
+    decode_reply(&reply)
 }
 
 // ======= Start of ExplicitError impl ========

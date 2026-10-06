@@ -1,13 +1,14 @@
+//! The ClearLink output assembly (instance 0x70):
+//! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
+
 use binrw::{BinRead, BinWrite, binrw};
 
-use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u10};
+use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u10, u24};
 
 use eipscanne_rs::cip::types::{CipDint, CipDword, CipInt, CipUdint, CipUlint, CipUsint};
 
 /// Assembly instance holding the ClearLink outputs
 pub const OUTPUT_ASSEMBLY_INSTANCE: u8 = 0x70;
-
-// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
 
 #[bitsize(16)]
 #[derive(
@@ -45,7 +46,7 @@ impl DigitalOutputs {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IOOutputData {
     aop_value: CipInt,
     pub dop_value: DigitalOutputs,
@@ -92,17 +93,38 @@ impl IOOutputData {
 
 // ^^^^^^^^ End of private IOOutputData impl ^^^^^^^^
 
+/// The command bits of one motor connector
+#[bitsize(32)]
+#[derive(
+    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
+)]
+#[br(map = u32::into)]
+#[bw(map = |&x| u32::from(x))]
+pub struct OutputRegister {
+    pub enable: bool,
+    pub absolute_move: bool,
+    pub homing_move: bool,
+    pub load_position_move: bool,
+    pub load_velocity_move: bool,
+    pub software_e_stop: bool,
+    pub clear_alerts: bool,
+    pub clear_motor_fault: bool,
+    reserved: u24, // bits 8-31
+}
+
+/// Based on the ClearLink Ethernet/IP Object Reference:
+/// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=58
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MotorOutputData {
     move_distance: CipDint,
     velocity_limit: CipUdint,
-    acceleration_limit: CipUdint,
-    deceleration_limit: CipUdint,
-    jog_velocity: CipDint,
+    pub acceleration_limit: CipUdint,
+    pub deceleration_limit: CipUdint,
+    pub jog_velocity: CipDint,
     add_to_position: CipDint,
-    output_register: CipDword,
+    pub output_register: OutputRegister,
 }
 
 // ======= Start of private MotorOutputData impl ========
@@ -117,7 +139,7 @@ impl MotorOutputData {
             deceleration_limit: 0x0,
             jog_velocity: 0x0,
             add_to_position: 0x0,
-            output_register: 0x0,
+            output_register: OutputRegister::default(),
         }
     }
 }
@@ -126,7 +148,7 @@ impl MotorOutputData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SerialAsciiOutputData {
     serial_config: CipDword,
     input_sequence_ack: CipUdint,
@@ -154,7 +176,7 @@ impl SerialAsciiOutputData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct OutputAssemblyObject {
     pub io_output_data: IOOutputData,
     motor0_output_data: MotorOutputData,
@@ -163,6 +185,23 @@ pub struct OutputAssemblyObject {
     motor3_output_data: MotorOutputData,
     serial_ascii_output_data: SerialAsciiOutputData,
 }
+
+// ======= Start of OutputAssemblyObject impl ========
+
+impl OutputAssemblyObject {
+    /// The outputs of motor connector `index` (0 = M0 ... 3 = M3)
+    pub fn motor_output_mut(&mut self, index: u8) -> &mut MotorOutputData {
+        match index {
+            0 => &mut self.motor0_output_data,
+            1 => &mut self.motor1_output_data,
+            2 => &mut self.motor2_output_data,
+            3 => &mut self.motor3_output_data,
+            _ => panic!("motor index must be 0-3, got {index}"),
+        }
+    }
+}
+
+// ^^^^^^^^ End of OutputAssemblyObject impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
@@ -194,7 +233,7 @@ mod tests {
         NO_ENCAPSULATION_TIMEOUT,
     };
 
-    use crate::clearlink_output::{
+    use super::{
         DigitalOutputs, IOOutputData, MotorOutputData, OUTPUT_ASSEMBLY_INSTANCE,
         OutputAssemblyObject, SerialAsciiOutputData,
     };
