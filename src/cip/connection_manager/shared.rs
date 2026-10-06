@@ -20,7 +20,11 @@ pub struct ConnectionTriad {
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
 pub struct UnsuccessfulResponse {
-    pub connection_triad: ConnectionTriad,
+    /// The triad of the refused request when the Connection Manager itself refused it. A request
+    /// the Message Router refuses before it reaches the Connection Manager (a path segment error,
+    /// for one) comes back with no reply data at all.
+    #[br(try)]
+    pub connection_triad: Option<ConnectionTriad>,
 
     /// Remaining Path Size in 16-bit words and its reserved byte: how much of the connection path
     /// was left when a router rejected the request. Only present for routing errors, so both are

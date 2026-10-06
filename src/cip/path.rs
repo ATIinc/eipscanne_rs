@@ -208,6 +208,16 @@ impl CipPath {
         ])
     }
 
+    /// `[class, instance]` using 8-bit logical segments. Both widths are valid for a value that
+    /// fits, but 8-bit is what adapters expect: the Teknic IO-HUB refuses a Forward_Open whose
+    /// request path uses 16-bit segments with a path segment error.
+    pub fn new_u8(class_id: u8, instance_id: u8) -> Self {
+        Self::from_segments(vec![
+            LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, class_id),
+            LogicalPathSegment::new_u8(LogicalSegmentType::InstanceId, instance_id),
+        ])
+    }
+
     /// `[class, instance, attribute]` using 8-bit logical segments
     pub fn new_full(class_id: u8, instance_id: u8, attribute_id: u8) -> Self {
         Self::from_segments(vec![

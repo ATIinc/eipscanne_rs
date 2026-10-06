@@ -81,14 +81,14 @@ impl fmt::Display for CloseError {
                 extended_status: Some(extended_status),
             } => write!(
                 f,
-                "the adapter rejected the Forward_Close: {general_status:?}, {extended_status:?}"
+                "the adapter rejected the Forward_Close: {general_status}, {extended_status}"
             ),
             CloseError::Rejected {
                 general_status,
                 extended_status: None,
             } => write!(
                 f,
-                "the adapter rejected the Forward_Close: {general_status:?}"
+                "the adapter rejected the Forward_Close: {general_status}"
             ),
             CloseError::UnexpectedReply(what) => {
                 write!(f, "unexpected reply to the Forward_Close: {what}")
