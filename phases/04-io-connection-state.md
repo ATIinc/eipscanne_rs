@@ -11,7 +11,7 @@ about one open connection, mirroring EIPScanner's `IOConnection` and the receive
 ## Scope
 
 * Built from the `ForwardOpenRequest`, the `ForwardOpenResponse` (from
-  `ForwardOpenResponse::from_message_router_response`) and any Sockaddr Info items of the reply
+  `ConnectionManagerResponse::from_message_router_response`) and any Sockaddr Info items of the reply
   (`EnIpPacket::sockaddr_info_items()`); resolves the target UDP endpoint (the O->T
   `SockaddrInfo::socket_address()` if present, `0.0.0.0` meaning "the session's IP", else the
   session IP on `ETHERNET_IP_IO_UDP_PORT`).

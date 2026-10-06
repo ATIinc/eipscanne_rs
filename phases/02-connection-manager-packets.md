@@ -30,19 +30,26 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
     `Unknown` for reserved values, `multiplier()`);
   * `RealTimeFormat` (modeless, zero length, heartbeat, 32-bit header) with `header_len()`. The
     run/idle header itself belongs to the I/O packets of phase 3.
+* `shared.rs` — the blocks every service carries in the same layout: `ConnectionTriad`
+  (connection serial number, originator vendor ID, originator serial number; in every request and
+  reply, and what a Forward_Close is matched against), `ApplicationReply` (size in words, reserved
+  byte, data; the tail of every successful reply) and `UnsuccessfulResponse` (the triad plus an
+  optional `RemainingPath`, read with `try`; the reply data of any rejected request).
 * `forward_open.rs` — `ForwardOpenRequest` (one struct for 0x54 and 0x5B; `service_code()` picks
   the service from the parameter width; the Connection Path Size byte is derived from the path on
   write), `ConnectionParameters` (plain input struct mirroring EIPScanner's, turned into a request by
-  `ForwardOpenRequest::new`), `ForwardOpenResponse`, `ForwardOpenUnsuccessfulResponse` (the trailing
-  Remaining Path Size / reserved pair is optional), `ConnectionManagerExtendedStatus` (every
-  Connection Manager extended status code + `Unknown`, plain `From<u16>` / `code()` matches),
-  `ForwardOpenFailure` / `ForwardOpenError` and `ForwardOpenResponse::from_message_router_response`.
-  For point-to-point the originator chooses the T->O connection ID; the O->T ID comes back in the
-  reply.
-* `forward_close.rs` — `ForwardCloseRequest` (size byte, then a reserved byte, then the path),
-  `ForwardCloseResponse`, `ForwardCloseUnsuccessfulResponse`, `ForwardCloseFailure` /
-  `ForwardCloseError` and `ForwardCloseResponse::from_message_router_response`, mirroring
-  Forward_Open without a shared generic.
+  `ForwardOpenRequest::new`) and `ForwardOpenResponse` (connection IDs, triad, actual packet
+  intervals, application reply). For point-to-point the originator chooses the T->O connection ID;
+  the O->T ID comes back in the reply.
+* `forward_close.rs` — `ForwardCloseRequest` (size byte, then a reserved byte, then the path) and
+  `ForwardCloseResponse` (triad, application reply).
+* `response.rs` — the reply side: `ConnectionManagerResponse`, a `binrw` enum read with the service
+  and general status of the enclosing Message Router response (`ForwardOpen` / `ForwardClose` on
+  success, `Unsuccessful` otherwise), the way `CommandSpecificData` branches on the header command;
+  `ConnectionManagerExtendedStatus` (a `binrw` magic enum of every Connection Manager extended
+  status code + `Unknown`, like `ResponseStatusCode`); `ConnectionManagerFailure` /
+  `ConnectionManagerError` and `ConnectionManagerResponse::from_message_router_response`, which
+  reads the extended status from the first Additional Status word through `binrw`.
 * `src/object_assembly.rs` — `RequestObjectAssembly::new_forward_open` (sends Forward_Open or Large_Forward_Open depending on
   the request) and `new_forward_close`.
 * `CipDataOpt::to_bytes` (`src/cip/message/data.rs`) returns the reply data whether raw or typed.
@@ -62,12 +69,16 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
 
 ## Tests
 
-`tests/test_forward_open.rs`, `tests/test_forward_close.rs`: byte-exact vectors using the EIPScanner
-example parameters (path `20 04 24 97 2C 96 2C 64`, 32-byte assemblies, 1 s RPI, class 1,
-point-to-point, scheduled priority), both parameter widths, full encapsulated requests, success and
-rejected replies (with and without the remaining path size), a reply to another service, an
-oversized standard connection, bitfield layouts, the timeout multiplier and the extended status
-codes.
+`tests/test_forward_open.rs`, `tests/test_forward_close.rs`: one test per packet, each a full
+encapsulated packet using the EIPScanner example parameters (path `20 04 24 97 2C 96 2C 64`, 32-byte
+assemblies, 1 s RPI, class 1, point-to-point, scheduled priority): the Forward_Open,
+Large_Forward_Open and Forward_Close requests (written and read back), the success replies (plain and
+with a trailing Sockaddr Info item) and the rejected replies (with and without the remaining path
+size), each read and parsed into the typed reply. The dissection comment of every packet is generated
+with `scripts/dissect.sh` (tshark), a reply behind its request (`--request`) because Wireshark only
+names the service of a reply once it has seen the request. Smaller tests cover a reply to another
+service (`Malformed`), an oversized standard connection, bitfield layouts, the timeout multiplier and
+the extended status codes read and written through `binrw`.
 
 ## Verification
 

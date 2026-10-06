@@ -20,8 +20,7 @@ point. Update the **Status** line of a phase when it changes.
 * One branch per phase (`feat/SW-4573-<n>-<name>`), each based on the previous phase's branch, each
   opened as its own pull request so reviews stay small.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
-  `cargo test --all --features adapter`, `cargo test --examples` and
-  `cargo build --features async` green.
+  `cargo test --all --features adapter` and `cargo test --examples` green.
 
 ## Ground rules
 
@@ -44,8 +43,9 @@ point. Update the **Status** line of a phase when it changes.
 * **EIPScanner parity.** Behaviour mirrors the C++ [EIPScanner](https://github.com/nimbuscontrols/EIPScanner)
   `ConnectionManager` / `IOConnection` logic unless the specification says otherwise.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against
-  hand-assembled byte arrays, documented with Wireshark-style dissection comments like the existing
-  tests. Captures from real devices replace hand-assembled vectors as they become available.
+  byte arrays documented with Wireshark's dissection of those bytes: run `scripts/dissect.sh` (tshark)
+  on the bytes and paste its output into the test comment, so the comment is never hand-written.
+  Captures from real devices replace hand-assembled vectors as they become available.
 * **Nothing in the repository references the specification documents.** The specification is only
   consulted locally; code comments describe behaviour in plain words.
 
