@@ -15,9 +15,14 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
 use scanner::session::Session;
 
-mod nitra;
+// The Nitra assemblies live outside the library, in scanner/assemblies/
+#[allow(dead_code)]
+#[path = "../assemblies"]
+mod assemblies {
+    pub mod nitra;
+}
 
-use nitra::{
+use assemblies::nitra::{
     STATUS_ASSEMBLY_INSTANCE, SolenoidValves, StatusByte, VALVE_COUNT, VALVES_ASSEMBLY_INSTANCE,
 };
 
@@ -53,6 +58,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("one of --on, --off or --pulse <MS> is required".into());
     }
 
+    // The two assemblies this example talks to
+    let status_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        STATUS_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+    let valves_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        VALVES_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
     let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
@@ -61,11 +78,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING - GET status");
     let status_reply = send_request(
         &mut session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            STATUS_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
+        status_assembly,
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -78,36 +91,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for &index in &args.valves {
         valves.set_valve(usize::from(index), args.on || args.pulse.is_some());
     }
-    write_valves(&mut session, valves).await?;
+    println!("REQUESTING - SET valves {valves:?}");
+    send_request(
+        &mut session,
+        valves_assembly.clone(),
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(valves)),
+    )
+    .await?;
 
     if let Some(ms) = args.pulse {
-        tokio::time::sleep(Duration::from_millis(ms)).await;
-        write_valves(&mut session, SolenoidValves::default()).await?;
+        // Ctrl+C cuts the pulse short; the valves are released either way
+        tokio::select! {
+            _ = tokio::time::sleep(Duration::from_millis(ms)) => {}
+            _ = tokio::signal::ctrl_c() => println!("Ctrl+C: releasing the valves early"),
+        }
+        println!("REQUESTING - SET valves released");
+        send_request(
+            &mut session,
+            valves_assembly,
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(SolenoidValves::default())),
+        )
+        .await?;
     }
 
     // ========= UnRegister the session ============
     println!("REQUESTING - UN REGISTER session");
     session.unregister().await?;
 
-    Ok(())
-}
-
-/// Set_Attribute_Single on the valve assembly: every valve takes the state given here
-async fn write_valves(
-    session: &mut Session,
-    valves: SolenoidValves,
-) -> Result<(), Box<dyn std::error::Error>> {
-    println!("REQUESTING - SET valves {valves:?}");
-    send_request(
-        session,
-        CipPath::new_full(
-            ASSEMBLY_CLASS_ID,
-            VALVES_ASSEMBLY_INSTANCE,
-            ASSEMBLY_DATA_ATTRIBUTE_ID,
-        ),
-        ServiceCode::SetAttributeSingle,
-        Some(Box::new(valves)),
-    )
-    .await?;
     Ok(())
 }
