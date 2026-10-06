@@ -28,8 +28,10 @@ pub enum CommonPacketItemId {
     ConnectedDataItem,
     #[brw(magic = 0x00B2u16)]
     UnconnectedDataItem,
+    /// Socket Address Info O->T (originator to target: where the scanner sends I/O data)
     #[brw(magic = 0x8000u16)]
     O2TSockAddrInfo,
+    /// Socket Address Info T->O (target to originator: where the adapter sends I/O data)
     #[brw(magic = 0x8001u16)]
     T2OSockAddrInfo,
     #[brw(magic = 0x8002u16)]
@@ -45,8 +47,12 @@ pub enum CommonPacketItem {
     /// Unconnected Data Item: the CIP message of a SendRRData packet
     UnconnectedDataItem(CipMessage),
 
+    /// Socket Address Info O->T (originator to target): the address the scanner must send its
+    /// I/O data to
     O2TSockAddrInfo(SockaddrInfo),
 
+    /// Socket Address Info T->O (target to originator): the address the adapter must send its
+    /// I/O data to
     T2OSockAddrInfo(SockaddrInfo),
 
     /// Any other item: the raw data is kept so the packet can be re-serialized unchanged

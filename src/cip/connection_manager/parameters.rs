@@ -1,8 +1,6 @@
 //! Parameters shared by the services that open a connection.
 
-use bilge::prelude::{
-    BuilderBits, DebugBits, DefaultBits, FromBits, Integer, bitsize, u1, u2, u3, u4, u9,
-};
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, u9};
 use binrw::{BinRead, BinWrite, binrw};
 
 use crate::cip::types::CipUsint;
@@ -51,11 +49,9 @@ pub enum RedundantOwner {
     Redundant = 1,
 }
 
-/// Network Connection Parameters of a Forward_Open (16 bits)
-#[bitsize(16)]
-#[derive(
-    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
-)]
+/// Network Connection Parameters of a Forward_Open (16 bits).
+#[bitsize(16, new = pub)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct StandardNetworkConnectionParameters {
@@ -68,11 +64,12 @@ pub struct StandardNetworkConnectionParameters {
     pub redundant_owner: RedundantOwner,
 }
 
-/// Network Connection Parameters of a Large_Forward_Open (32 bits)
-#[bitsize(32)]
-#[derive(
-    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
-)]
+/// Network Connection Parameters of a Large_Forward_Open (32 bits).
+///
+/// Built by name: `LargeNetworkConnectionParameters::builder()`, every field set once, with the
+/// size from [`connection_size`].
+#[bitsize(32, new = pub)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct LargeNetworkConnectionParameters {
@@ -139,10 +136,8 @@ pub enum Direction {
 }
 
 /// Transport Type/Trigger byte of a Forward_Open
-#[bitsize(8)]
-#[derive(
-    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
-)]
+#[bitsize(8, new = pub)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct TransportTypeTrigger {
@@ -153,10 +148,8 @@ pub struct TransportTypeTrigger {
 
 /// Priority/Time_tick byte: the length of one tick of the request timeout
 /// (1 ms shifted left by `tick_time`) and the priority of the unconnected request
-#[bitsize(8)]
-#[derive(
-    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
-)]
+#[bitsize(8, new = pub)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct PriorityTimeTick {
@@ -245,87 +238,15 @@ impl RealTimeFormat {
 // ^^^^^^^^ End of RealTimeFormat impl ^^^^^^^^
 
 /// Connection size as sent on the wire: the application data, the 16-bit sequence count that
-/// transport classes 1, 2 and 3 prepend to every packet, and the real-time header, if any
+/// transport classes 1, 2 and 3 prepend to every packet, and the real-time header, if any.
 pub fn connection_size(
     data_size: u16,
     transport_class: TransportClass,
     real_time_format: RealTimeFormat,
-) -> u32 {
-    let sequence_count_len: u32 = match transport_class {
+) -> u16 {
+    let sequence_count_len: u16 = match transport_class {
         TransportClass::Class1 | TransportClass::Class2 | TransportClass::Class3 => 2,
         TransportClass::Class0 | TransportClass::Unknown(_) => 0,
     };
-    u32::from(data_size) + sequence_count_len + u32::from(real_time_format.header_len())
+    data_size + sequence_count_len + real_time_format.header_len()
 }
-
-/// What the caller asks for in one direction of the connection
-#[derive(Debug, PartialEq, Clone, Copy, Default)]
-pub struct ConnectionDirection {
-    pub connection_type: ConnectionType,
-    pub priority: ConnectionPriority,
-    pub connection_size_type: ConnectionSizeType,
-    pub redundant_owner: RedundantOwner,
-    /// Application data bytes per packet, without the sequence count and the real-time header
-    pub data_size: u16,
-    pub real_time_format: RealTimeFormat,
-}
-
-/// A connection size that does not fit the parameter width of the chosen service
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct ConnectionSizeError {
-    pub connection_size: u32,
-    pub maximum: u32,
-}
-
-// ======= Start of NetworkConnectionParameters impl ========
-
-impl NetworkConnectionParameters {
-    /// The parameters of one direction in the width of the chosen service: the flags as
-    /// requested and the connection size computed from the application data size
-    pub fn new(
-        direction: &ConnectionDirection,
-        transport_class: TransportClass,
-        large: bool,
-    ) -> Result<Self, ConnectionSizeError> {
-        let size = connection_size(
-            direction.data_size,
-            transport_class,
-            direction.real_time_format,
-        );
-
-        if large {
-            let connection_size = u16::try_from(size).map_err(|_| ConnectionSizeError {
-                connection_size: size,
-                maximum: u32::from(u16::MAX),
-            })?;
-            return Ok(NetworkConnectionParameters::Large(
-                LargeNetworkConnectionParameters::builder()
-                    .connection_size(connection_size)
-                    .connection_size_type(direction.connection_size_type)
-                    .priority(direction.priority)
-                    .connection_type(direction.connection_type)
-                    .redundant_owner(direction.redundant_owner)
-                    .build(),
-            ));
-        }
-
-        let maximum = u32::from(u9::MAX.value());
-        if size > maximum {
-            return Err(ConnectionSizeError {
-                connection_size: size,
-                maximum,
-            });
-        }
-        Ok(NetworkConnectionParameters::Standard(
-            StandardNetworkConnectionParameters::builder()
-                .connection_size(u9::new(size as u16))
-                .connection_size_type(direction.connection_size_type)
-                .priority(direction.priority)
-                .connection_type(direction.connection_type)
-                .redundant_owner(direction.redundant_owner)
-                .build(),
-        ))
-    }
-}
-
-// ^^^^^^^^ End of NetworkConnectionParameters impl ^^^^^^^^

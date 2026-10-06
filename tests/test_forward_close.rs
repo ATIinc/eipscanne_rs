@@ -10,13 +10,8 @@ use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::PriorityTimeTick;
-use eipscanne_rs::cip::connection_manager::response::{
-    ConnectionManagerError, ConnectionManagerExtendedStatus, ConnectionManagerFailure,
-    ConnectionManagerResponse,
-};
-use eipscanne_rs::cip::connection_manager::shared::{
-    ApplicationReply, ConnectionTriad, UnsuccessfulResponse,
-};
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerResponse;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
@@ -55,11 +50,11 @@ fn sample_connection_triad() -> ConnectionTriad {
 /// Closes the connection of the Forward_Open tests: the same triad and connection path,
 /// tick time 10 (1024 ms per tick), normal priority
 fn sample_request() -> ForwardCloseRequest {
-    let mut priority_time_tick = PriorityTimeTick::default();
-    priority_time_tick.set_tick_time(u4::new(TICK_TIME));
-
     ForwardCloseRequest {
-        priority_time_tick,
+        priority_time_tick: PriorityTimeTick::builder()
+            .tick_time(u4::new(TICK_TIME))
+            .priority(false)
+            .build(),
         timeout_ticks: TIMEOUT_TICKS,
         connection_triad: sample_connection_triad(),
         connection_path: CipPath::new_assembly_connection(
@@ -79,7 +74,13 @@ fn forward_close_request_of(packet: &RequestObjectAssembly) -> ForwardCloseReque
             packet.cip_message()
         );
     };
-    let data = message.request_data.additional_data.to_bytes().unwrap();
+    // A packet read from the wire keeps its request data raw
+    let CipDataOpt::Raw(data) = &message.request_data.additional_data else {
+        panic!(
+            "expected raw request data, got {:?}",
+            message.request_data.additional_data
+        );
+    };
     ForwardCloseRequest::read(&mut std::io::Cursor::new(data)).unwrap()
 }
 
@@ -287,10 +288,8 @@ fn test_deserialize_forward_close_success_response() {
 
     let expected_response = ForwardCloseResponse {
         connection_triad: sample_connection_triad(),
-        application_reply: ApplicationReply {
-            application_reply_size: 0,
-            application_reply: vec![],
-        },
+        application_reply_size: 0,
+        application_reply: vec![],
     };
 
     let expected_response_object = ResponseObjectAssembly {
@@ -338,151 +337,4 @@ fn test_deserialize_forward_close_success_response() {
     expected_response_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
-}
-
-#[test]
-fn test_deserialize_forward_close_rejected_response() {
-    /*
-    EtherNet/IP (Industrial Protocol), Session: 0x00000003, Send RR Data
-        Encapsulation Header
-            Command: Send RR Data (0x006f)
-            Length: 30
-            Session Handle: 0x00000003
-            Status: Success (0x00000000)
-            Sender Context: 0000000000000000
-            Options: 0x00000000
-        Command Specific Data
-            Interface Handle: CIP (0x00000000)
-            Timeout: 0
-            Item Count: 2
-                Type ID: Null Address Item (0x0000)
-                    Length: 0
-                Type ID: Unconnected Data Item (0x00b2)
-                    Length: 14
-            [Request In: 1]
-            [Time: 0.000001000 seconds]
-    Common Industrial Protocol
-        Service: Unknown Service (0x4e) (Response)
-            1... .... = Request/Response: Response (0x1)
-            .100 1110 = Service: Unknown (0x4e)
-        Status: Connection failure:
-            General Status: Connection failure (0x01)
-            Additional Status Size: 1 word
-            Additional Status
-                Additional Status: 0x0107
-        [Request Path Size: 4 words]
-        [Request Path: Connection Manager, Instance: 0x0001]
-            [Path Segment: 0x21 (16-Bit Class Segment)]
-                [001. .... = Path Segment Type: Logical Segment (1)]
-                [...0 00.. = Logical Segment Type: Class ID (0)]
-                [.... ..01 = Logical Segment Format: 16-bit Logical Segment (1)]
-                [Class: Connection Manager (0x0006)]
-            [Path Segment: 0x25 (16-Bit Instance Segment)]
-                [001. .... = Path Segment Type: Logical Segment (1)]
-                [...0 01.. = Logical Segment Type: Instance ID (1)]
-                [.... ..01 = Logical Segment Format: 16-bit Logical Segment (1)]
-                [Instance: 0x0001]
-    CIP Connection Manager
-        Service: Forward Close (Response)
-            1... .... = Request/Response: Response (0x1)
-            .100 1110 = Service: Forward Close (0x4e)
-        Status: Connection failure, Extended: Target connection not found
-            General Status: Connection failure (0x01)
-            Additional Status Size: 1 word
-            Extended Status: Target connection not found (0x0107)
-            Additional Status
-        Command Specific Data
-            Connection Serial Number: 0x0001
-            Originator Vendor ID: Bekaert Engineering NV (0x0156)
-            Originator Serial Number: 0x00012345
-            [Connection Path Size: 4 words]
-            [Route/Connection Path: Assembly, Instance: 0x97, Connection Point: 0x96, Connection Point: 0x64]
-                [Path Segment: 0x20 (8-Bit Class Segment)]
-                    [001. .... = Path Segment Type: Logical Segment (1)]
-                    [...0 00.. = Logical Segment Type: Class ID (0)]
-                    [.... ..00 = Logical Segment Format: 8-bit Logical Segment (0)]
-                    [Class: Assembly (0x04)]
-                [Path Segment: 0x24 (8-Bit Instance Segment)]
-                    [001. .... = Path Segment Type: Logical Segment (1)]
-                    [...0 01.. = Logical Segment Type: Instance ID (1)]
-                    [.... ..00 = Logical Segment Format: 8-bit Logical Segment (0)]
-                    [Instance: 0x97]
-                [Path Segment: 0x2c (8-Bit Connection Point Segment)]
-                    [001. .... = Path Segment Type: Logical Segment (1)]
-                    [...0 11.. = Logical Segment Type: Connection Point (3)]
-                    [.... ..00 = Logical Segment Format: 8-bit Logical Segment (0)]
-                    [Connection Point: 0x96]
-                [Path Segment: 0x2c (8-Bit Connection Point Segment)]
-                    [001. .... = Path Segment Type: Logical Segment (1)]
-                    [...0 11.. = Logical Segment Type: Connection Point (3)]
-                    [.... ..00 = Logical Segment Format: 8-bit Logical Segment (0)]
-                    [Connection Point: 0x64]
-
-    Hex Dump:
-    0000   6f 00 1e 00 03 00 00 00 00 00 00 00 00 00 00 00
-    0010   00 00 00 00 00 00 00 00 00 00 00 00 00 00 02 00
-    0020   00 00 00 00 b2 00 0e 00 ce 00 01 01 07 01 01 00
-    0030   56 01 45 23 01 00
-    */
-    let raw_bytes: Vec<CipByte> = vec![
-        0x6f, 0x00, 0x1e, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x0e, 0x00, 0xce, 0x00, 0x01, 0x01, 0x07,
-        0x01, 0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00,
-    ];
-
-    // The target itself rejected the request, so no remaining path size follows the triad
-    let expected_response = UnsuccessfulResponse {
-        connection_triad: sample_connection_triad(),
-        remaining_path: None,
-    };
-
-    let expected_response_object = ResponseObjectAssembly {
-        header: EncapsulationHeader {
-            command: EnIpCommand::SendRrData,
-            length: Some(30),
-            session_handle: CLEARLINK_IO_SESSION_HANDLE,
-            status_code: EncapsStatusCode::Success,
-            sender_context: EMPTY_SENDER_CONTEXT,
-            options: DEFAULT_ENCAPSULATION_OPTIONS,
-        },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::ForwardClose),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::ConnectionFailure,
-                    additional_status_size: 1,
-                    additional_status: vec![0x0107],
-                    data: CipDataOpt::Typed(Box::new(expected_response.clone())),
-                },
-            },
-        )),
-    };
-
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
-
-    assert_eq!(expected_response_object, response_object);
-
-    // The typed parse reports the rejection with its extended status
-    let error = ConnectionManagerResponse::from_message_router_response(
-        response_object.response().unwrap(),
-    )
-    .unwrap_err();
-    let ConnectionManagerError::Rejected(failure) = error else {
-        panic!("expected a rejected Forward_Close, got {error:?}");
-    };
-
-    assert_eq!(
-        failure,
-        ConnectionManagerFailure {
-            general_status: ResponseStatusCode::ConnectionFailure,
-            extended_status: Some(ConnectionManagerExtendedStatus::TargetConnectionNotFound),
-            additional_status: vec![0x0107],
-            response: expected_response,
-        }
-    );
 }

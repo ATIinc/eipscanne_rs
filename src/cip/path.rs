@@ -217,8 +217,8 @@ impl CipPath {
         ])
     }
 
-    /// The usual I/O connection path to the Assembly object:
-    /// configuration instance, then the O->T and T->O connection points, all as 8-bit segments
+    /// The usual I/O connection path to the Assembly object: configuration instance, then the
+    /// originator to target and target to originator connection points, all as 8-bit segments
     pub fn new_assembly_connection(
         configuration_instance: u8,
         o2t_connection_point: u8,

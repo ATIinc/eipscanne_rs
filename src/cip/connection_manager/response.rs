@@ -3,7 +3,7 @@
 
 use std::io::Cursor;
 
-use binrw::{BinRead, binrw};
+use binrw::{BinRead, BinResult, BinWrite, binrw};
 
 use crate::cip::connection_manager::forward_close::ForwardCloseResponse;
 use crate::cip::connection_manager::forward_open::ForwardOpenResponse;
@@ -34,7 +34,7 @@ pub enum ConnectionManagerExtendedStatus {
     #[brw(magic = 0x0110u16)]
     TargetForConnectionNotConfigured,
     #[brw(magic = 0x0111u16)]
-    RpiNotSupported,
+    RequestedPacketIntervalNotSupported,
     #[brw(magic = 0x0113u16)]
     OutOfConnections,
     #[brw(magic = 0x0114u16)]
@@ -52,7 +52,7 @@ pub enum ConnectionManagerExtendedStatus {
     #[brw(magic = 0x011Au16)]
     TargetObjectOutOfConnections,
     #[brw(magic = 0x011Bu16)]
-    RpiSmallerThanProductionInhibitTime,
+    RequestedPacketIntervalSmallerThanProductionInhibitTime,
     #[brw(magic = 0x0203u16)]
     ConnectionTimedOut,
     #[brw(magic = 0x0204u16)]
@@ -136,72 +136,54 @@ pub enum ConnectionManagerResponse {
     Unsuccessful(UnsuccessfulResponse),
 }
 
-/// Why the target rejected a Connection Manager request
-#[derive(Debug, PartialEq, Clone)]
-pub struct ConnectionManagerFailure {
-    pub general_status: ResponseStatusCode,
-    /// The first Additional Status word, if the reply carried one
-    pub extended_status: Option<ConnectionManagerExtendedStatus>,
-    pub additional_status: Vec<CipUint>,
-    pub response: UnsuccessfulResponse,
-}
+// ======= Start of ConnectionManagerExtendedStatus impl ========
 
-#[derive(Debug)]
-pub enum ConnectionManagerError {
-    /// The target answered with a general status other than success
-    Rejected(ConnectionManagerFailure),
-    /// The reply is not a Connection Manager reply, or its data could not be parsed
-    Malformed(binrw::Error),
-}
-
-impl From<binrw::Error> for ConnectionManagerError {
-    fn from(error: binrw::Error) -> Self {
-        ConnectionManagerError::Malformed(error)
+impl ConnectionManagerExtendedStatus {
+    /// The extended status carried by the Additional Status words of a Message Router response:
+    /// the first word, read through `binrw`; `None` when the reply carried no Additional Status
+    pub fn from_additional_status(
+        additional_status: &[CipUint],
+    ) -> Option<ConnectionManagerExtendedStatus> {
+        let word = additional_status.first()?;
+        // Reading a 16-bit word cannot fail: every value without a variant of its own is `Unknown`
+        ConnectionManagerExtendedStatus::read_le(&mut Cursor::new(word.to_le_bytes())).ok()
     }
 }
+
+// ^^^^^^^^ End of ConnectionManagerExtendedStatus impl ^^^^^^^^
 
 // ======= Start of ConnectionManagerResponse impl ========
 
 impl ConnectionManagerResponse {
-    /// Interprets the reply to a Forward_Open, Large_Forward_Open or Forward_Close
+    /// Interprets the reply to a Forward_Open, Large_Forward_Open or Forward_Close.
+    ///
+    /// A rejected request parses as `Unsuccessful`; its general status and Additional Status words
+    /// stay on the Message Router response (see
+    /// `ConnectionManagerExtendedStatus::from_additional_status`). The reply to any other service
+    /// is an error.
     pub fn from_message_router_response(
         response: &MessageRouterResponse,
-    ) -> Result<ConnectionManagerResponse, ConnectionManagerError> {
+    ) -> BinResult<ConnectionManagerResponse> {
         let service = response.service_container.service();
         if !matches!(
             service,
             ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen | ServiceCode::ForwardClose
         ) {
-            return Err(ConnectionManagerError::Malformed(
-                binrw::Error::AssertFail {
-                    pos: 0,
-                    message: format!("expected a Connection Manager reply, got {service:?}"),
-                },
-            ));
+            return Err(binrw::Error::AssertFail {
+                pos: 0,
+                message: format!(
+                    "not a Forward_Open, Large_Forward_Open or Forward_Close reply: {service:?}"
+                ),
+            });
         }
 
-        let status = response.response_data.status;
-        let data = response.response_data.data.to_bytes()?;
-        let mut reader = Cursor::new(&data);
+        // The reply data as bytes, whether the response holds them raw or typed; the write side
+        // of `CipDataOpt` ignores its length argument
+        let mut data = Cursor::new(Vec::new());
+        response.response_data.data.write_le_args(&mut data, (0,))?;
+        data.set_position(0);
 
-        match ConnectionManagerResponse::read_le_args(&mut reader, (service, status))? {
-            ConnectionManagerResponse::Unsuccessful(unsuccessful_response) => {
-                let extended_status = match response.response_data.additional_status.first() {
-                    Some(word) => Some(ConnectionManagerExtendedStatus::read_le(
-                        &mut Cursor::new(word.to_le_bytes()),
-                    )?),
-                    None => None,
-                };
-
-                Err(ConnectionManagerError::Rejected(ConnectionManagerFailure {
-                    general_status: status,
-                    extended_status,
-                    additional_status: response.response_data.additional_status.clone(),
-                    response: unsuccessful_response,
-                }))
-            }
-            successful_response => Ok(successful_response),
-        }
+        ConnectionManagerResponse::read_le_args(&mut data, (service, response.response_data.status))
     }
 }
 

@@ -3,10 +3,10 @@
 use binrw::binrw;
 
 use crate::cip::connection_manager::parameters::{
-    ConnectionDirection, ConnectionSizeError, ConnectionTimeoutMultiplier,
-    NetworkConnectionParameters, PriorityTimeTick, TransportTypeTrigger,
+    ConnectionTimeoutMultiplier, NetworkConnectionParameters, PriorityTimeTick,
+    TransportTypeTrigger,
 };
-use crate::cip::connection_manager::shared::{ApplicationReply, ConnectionTriad};
+use crate::cip::connection_manager::shared::ConnectionTriad;
 use crate::cip::message::shared::ServiceCode;
 use crate::cip::path::CipPath;
 use crate::cip::types::{CipUdint, CipUsint};
@@ -14,7 +14,8 @@ use crate::cip::types::{CipUdint, CipUsint};
 /// Forward_Open / Large_Forward_Open request data (everything after the request path).
 ///
 /// The width of the Network Connection Parameters decides the service: 16 bits for
-/// Forward_Open, 32 bits for Large_Forward_Open. Reading needs to be told which one to expect.
+/// Forward_Open, 32 bits for Large_Forward_Open, so both directions use the same case of
+/// [`NetworkConnectionParameters`]. Reading needs to be told which one to expect.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
@@ -22,7 +23,10 @@ use crate::cip::types::{CipUdint, CipUsint};
 pub struct ForwardOpenRequest {
     pub priority_time_tick: PriorityTimeTick,
     pub timeout_ticks: CipUsint,
+    /// O->T (originator to target) Network Connection ID.
+    /// 0 for a point-to-point connection: the target chooses it and returns it in the reply
     pub o2t_network_connection_id: CipUdint,
+    /// T->O (target to originator) Network Connection ID, chosen by the originator
     pub t2o_network_connection_id: CipUdint,
     pub connection_triad: ConnectionTriad,
 
@@ -30,13 +34,15 @@ pub struct ForwardOpenRequest {
     #[brw(pad_after = 3)]
     pub connection_timeout_multiplier: ConnectionTimeoutMultiplier,
 
-    /// Requested packet interval, originator to target, in microseconds
-    pub o2t_rpi: CipUdint,
+    /// O->T RPI (originator to target requested packet interval), in microseconds
+    pub o2t_requested_packet_interval: CipUdint,
+    /// O->T (originator to target) Network Connection Parameters
     #[br(args(large))]
     pub o2t_network_connection_parameters: NetworkConnectionParameters,
 
-    /// Requested packet interval, target to originator, in microseconds
-    pub t2o_rpi: CipUdint,
+    /// T->O RPI (target to originator requested packet interval), in microseconds
+    pub t2o_requested_packet_interval: CipUdint,
+    /// T->O (target to originator) Network Connection Parameters
     #[br(args(large))]
     pub t2o_network_connection_parameters: NetworkConnectionParameters,
 
@@ -51,63 +57,12 @@ pub struct ForwardOpenRequest {
     pub connection_path: CipPath,
 }
 
-/// Everything needed to build a Forward_Open request
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct ConnectionParameters {
-    pub priority_time_tick: PriorityTimeTick,
-    pub timeout_ticks: CipUsint,
-    /// Left at 0 for a point-to-point connection: the target chooses it and returns it in the reply
-    pub o2t_network_connection_id: CipUdint,
-    /// Chosen by the originator
-    pub t2o_network_connection_id: CipUdint,
-    pub connection_triad: ConnectionTriad,
-    pub connection_timeout_multiplier: ConnectionTimeoutMultiplier,
-    /// Requested packet interval, originator to target, in microseconds
-    pub o2t_rpi: CipUdint,
-    /// Requested packet interval, target to originator, in microseconds
-    pub t2o_rpi: CipUdint,
-    pub o2t: ConnectionDirection,
-    pub t2o: ConnectionDirection,
-    pub transport_type_trigger: TransportTypeTrigger,
-    pub connection_path: CipPath,
-    /// Send a Large_Forward_Open (32-bit connection parameters) instead of a Forward_Open
-    pub large: bool,
-}
-
 // ======= Start of ForwardOpenRequest impl ========
 
 impl ForwardOpenRequest {
-    /// Builds the request data, computing the connection size of each direction
-    pub fn new(
-        parameters: &ConnectionParameters,
-    ) -> Result<ForwardOpenRequest, ConnectionSizeError> {
-        let transport_class = parameters.transport_type_trigger.transport_class();
-
-        Ok(ForwardOpenRequest {
-            priority_time_tick: parameters.priority_time_tick,
-            timeout_ticks: parameters.timeout_ticks,
-            o2t_network_connection_id: parameters.o2t_network_connection_id,
-            t2o_network_connection_id: parameters.t2o_network_connection_id,
-            connection_triad: parameters.connection_triad,
-            connection_timeout_multiplier: parameters.connection_timeout_multiplier,
-            o2t_rpi: parameters.o2t_rpi,
-            o2t_network_connection_parameters: NetworkConnectionParameters::new(
-                &parameters.o2t,
-                transport_class,
-                parameters.large,
-            )?,
-            t2o_rpi: parameters.t2o_rpi,
-            t2o_network_connection_parameters: NetworkConnectionParameters::new(
-                &parameters.t2o,
-                transport_class,
-                parameters.large,
-            )?,
-            transport_type_trigger: parameters.transport_type_trigger,
-            connection_path: parameters.connection_path.clone(),
-        })
-    }
-
-    /// The service this request is sent with, decided by the width of its connection parameters
+    /// The service this request is sent with, decided by the width of its connection parameters.
+    /// The originator to target word is looked at; the target to originator word must have the
+    /// same width.
     pub fn service_code(&self) -> ServiceCode {
         match self.o2t_network_connection_parameters {
             NetworkConnectionParameters::Standard(_) => ServiceCode::ForwardOpen,
@@ -123,12 +78,21 @@ impl ForwardOpenRequest {
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
 pub struct ForwardOpenResponse {
+    /// O->T (originator to target) Network Connection ID, chosen by the target
     pub o2t_network_connection_id: CipUdint,
+    /// T->O (target to originator) Network Connection ID, echoed from the request
     pub t2o_network_connection_id: CipUdint,
     pub connection_triad: ConnectionTriad,
-    /// Actual packet interval, originator to target, in microseconds
-    pub o2t_api: CipUdint,
-    /// Actual packet interval, target to originator, in microseconds
-    pub t2o_api: CipUdint,
-    pub application_reply: ApplicationReply,
+    /// O->T API (originator to target actual packet interval), in microseconds
+    pub o2t_actual_packet_interval: CipUdint,
+    /// T->O API (target to originator actual packet interval), in microseconds
+    pub t2o_actual_packet_interval: CipUdint,
+
+    /// Application Reply Size in 16-bit words, followed by a reserved byte
+    #[brw(pad_after = 1)]
+    pub application_reply_size: CipUsint,
+
+    /// Data the target application adds to the reply
+    #[br(count = usize::from(application_reply_size) * 2)]
+    pub application_reply: Vec<CipUsint>,
 }

@@ -17,7 +17,7 @@ Run a real connection against an adapter without putting sockets in the library.
   I/O printing the input data → `Forward_Close` (`RequestObjectAssembly::new_forward_close`) →
   unregister. Defaults match the OpENer sample application
   (config 151, output 150, input 100, 32 bytes each); flags for host, instances, sizes, RPI and
-  `Large_Forward_Open` (`ConnectionParameters::large`).
+  `Large_Forward_Open` (the `Large` case of `NetworkConnectionParameters`).
 * Root `Cargo.toml` becomes a workspace (`hex_test_macros`, `eip_stream_utils`); the existing examples
   switch to the shared crate. The dev-dependency cycle is allowed by Cargo but means the library is
   compiled twice; never use the utilities from unit tests inside `src/`.

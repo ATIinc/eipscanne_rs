@@ -31,17 +31,18 @@ pub const CONNECTION_SERIAL_NUMBER: CipUint = 0x0001;
 pub const TICK_TIME: u8 = 10;
 pub const TIMEOUT_TICKS: CipUsint = 5;
 
-/// O->T network connection ID of the Forward_Open request: 0, the target picks it
+/// Originator to target network connection ID of the Forward_Open request: 0, the target picks it
 pub const REQUESTED_O2T_NETWORK_CONNECTION_ID: CipUdint = 0;
-/// O->T network connection ID the target picked in the Forward_Open reply
+/// Originator to target network connection ID the target picked in the Forward_Open reply
 pub const O2T_NETWORK_CONNECTION_ID: CipUdint = 0xa1b2_c3d4;
 pub const T2O_NETWORK_CONNECTION_ID: CipUdint = 0x1234_5678;
 
 /// Requested (and granted) packet interval of both directions, in microseconds
-pub const RPI_MICROSECONDS: CipUdint = 1_000_000;
+pub const REQUESTED_PACKET_INTERVAL_MICROSECONDS: CipUdint = 1_000_000;
 
-/// I/O data bytes of each direction, and the resulting connection sizes: O->T adds the 2-byte
-/// sequence count and the 4-byte 32-bit header, T->O only the sequence count
+/// I/O data bytes of each direction, and the resulting connection sizes: originator to target adds
+/// the 2-byte sequence count and the 4-byte 32-bit header, target to originator only the sequence
+/// count
 pub const IO_DATA_SIZE: u16 = 32;
 pub const O2T_CONNECTION_SIZE: u16 = 38;
 pub const T2O_CONNECTION_SIZE: u16 = 34;

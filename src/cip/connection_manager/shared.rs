@@ -15,29 +15,6 @@ pub struct ConnectionTriad {
     pub originator_serial_number: CipUdint,
 }
 
-/// Tail of every successful reply: data the target application adds to the reply
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
-pub struct ApplicationReply {
-    /// Application Reply Size in 16-bit words, followed by a reserved byte
-    #[brw(pad_after = 1)]
-    pub application_reply_size: CipUsint,
-
-    #[br(count = usize::from(application_reply_size) * 2)]
-    pub application_reply: Vec<CipUsint>,
-}
-
-/// Remaining Path Size in 16-bit words and its reserved byte: how much of the connection path
-/// was left when a routing node rejected the request
-#[binrw]
-#[brw(little)]
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub struct RemainingPath {
-    pub remaining_path_size: CipUsint,
-    pub reserved: CipUsint,
-}
-
 /// Reply data of any Connection Manager service when the general status is not success
 #[binrw]
 #[brw(little)]
@@ -45,7 +22,11 @@ pub struct RemainingPath {
 pub struct UnsuccessfulResponse {
     pub connection_triad: ConnectionTriad,
 
-    /// Only present when a routing node rejected the request
+    /// Remaining Path Size in 16-bit words and its reserved byte: how much of the connection path
+    /// was left when a router rejected the request. Only present for routing errors, so both are
+    /// read when the bytes are there and left out otherwise.
     #[br(try)]
-    pub remaining_path: Option<RemainingPath>,
+    pub remaining_path_size: Option<CipUsint>,
+    #[br(try)]
+    pub reserved: Option<CipUsint>,
 }

@@ -22,10 +22,12 @@ New workspace crate `eds_parser/` (deps `pest`, `pest_derive`):
   `[Assembly]` (`AssemN`: name, path, size, descriptor), `[Connection Manager]` (`ConnectionN`:
   trigger/transport mask, connection parameter mask, O->T / T->O RPI, size and format, config
   entries, name, help, path). Empty sizes/RPIs resolve through the referenced `AssemN` / `ParamN`.
-* `bridge.rs` (depends on `eipscanne_rs`): `ConnectionN` → `ConnectionParameters`: class and
-  trigger into `TransportTypeTrigger`; per direction a `ConnectionDirection` (`connection_type`,
-  `priority`, `connection_size_type`, `real_time_format`, `data_size`); `o2t_rpi` / `t2o_rpi`;
-  `connection_path` as a `CipPath` from the path string with `[ParamN]` substitution.
+* `bridge.rs` (depends on `eipscanne_rs`): `ConnectionN` → `ForwardOpenRequest`: class and
+  trigger into `TransportTypeTrigger`; per direction a `NetworkConnectionParameters` word
+  (connection type, priority, size type, and `connection_size()` of the data size and real-time
+  format); `o2t_requested_packet_interval` /
+  `t2o_requested_packet_interval`; `connection_path` as a `CipPath` from the path
+  string with `[ParamN]` substitution.
 
 ## Tests
 

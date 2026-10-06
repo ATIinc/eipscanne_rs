@@ -34,12 +34,13 @@ point. Update the **Status** line of a phase when it changes.
   (`enip.*` and `cip.cm.*` fields), in `snake_case`.
 * **Path-based module layout.** Modules are declared in `src/<name>.rs` with their submodules in
   `src/<name>/`; no `mod.rs` files.
-* **Bitfields are built by name.** Every `bilge` bitfield derives `BuilderBits`
-  (`Type::builder().field(value)....build()`, each field set exactly once, reserved bits zero) and,
-  when every field has a zero default, `DefaultBits` (`Type::default()` plus `set_*` setters). The
-  positional `new(...)` constructor stays private, and with it the builder (bilge 0.5), so outside
-  the defining module bitfields are built with `Type::default()` and the setters, or through a
-  wrapper such as `ServiceContainer::new_request` or `NetworkConnectionParameters::new`.
+* **Bitfields are built with their builders.** Every `bilge` bitfield derives `BuilderBits` and is
+  assembled with `Type::builder().field(value)....build()`, each field set exactly once, reserved
+  bits zero, in the library and in the tests alike; a bitfield is never assembled with
+  `Type::default()` and the `set_*` setters, and the positional `new(...)` constructor is never
+  called. bilge 0.5 gives the builder the visibility of that `new`, so a bitfield built outside its
+  module carries `new = pub` for the sole purpose of exposing its builder. A bitfield only built
+  inside its module, through a wrapper such as `ServiceContainer::new_request`, keeps `new` private.
 * **EIPScanner parity.** Behaviour mirrors the C++ [EIPScanner](https://github.com/nimbuscontrols/EIPScanner)
   `ConnectionManager` / `IOConnection` logic unless the specification says otherwise.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against

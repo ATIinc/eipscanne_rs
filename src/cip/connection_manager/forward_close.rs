@@ -3,7 +3,7 @@
 use binrw::binrw;
 
 use crate::cip::connection_manager::parameters::PriorityTimeTick;
-use crate::cip::connection_manager::shared::{ApplicationReply, ConnectionTriad};
+use crate::cip::connection_manager::shared::ConnectionTriad;
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUsint;
 
@@ -33,5 +33,12 @@ pub struct ForwardCloseRequest {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ForwardCloseResponse {
     pub connection_triad: ConnectionTriad,
-    pub application_reply: ApplicationReply,
+
+    /// Application Reply Size in 16-bit words, followed by a reserved byte
+    #[brw(pad_after = 1)]
+    pub application_reply_size: CipUsint,
+
+    /// Data the target application adds to the reply
+    #[br(count = usize::from(application_reply_size) * 2)]
+    pub application_reply: Vec<CipUsint>,
 }

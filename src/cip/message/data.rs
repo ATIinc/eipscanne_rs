@@ -1,5 +1,5 @@
 use binrw::{BinRead, BinResult, BinWrite, Endian};
-use std::io::{Cursor, Read, Seek, Write};
+use std::io::{Read, Seek, Write};
 
 pub trait WriteSeekTrait: Write + Seek {}
 impl<T: Write + Seek> WriteSeekTrait for T {}
@@ -26,24 +26,6 @@ pub enum CipDataOpt {
     Raw(Vec<u8>),
     Typed(Box<dyn CipData>),
 }
-
-// ======= Start of CipDataOpt impl ========
-
-impl CipDataOpt {
-    /// The data bytes, whether they are held raw or as a typed value
-    pub fn to_bytes(&self) -> BinResult<Vec<u8>> {
-        match self {
-            CipDataOpt::Raw(data) => Ok(data.clone()),
-            CipDataOpt::Typed(parsed) => {
-                let mut buffer = Vec::new();
-                parsed.write_to(&mut Cursor::new(&mut buffer), Endian::Little)?;
-                Ok(buffer)
-            }
-        }
-    }
-}
-
-// ^^^^^^^^ End of CipDataOpt impl ^^^^^^^^
 
 impl BinWrite for CipDataOpt {
     type Args<'a> = (u16,);
