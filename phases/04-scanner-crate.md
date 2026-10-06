@@ -12,7 +12,7 @@ stays packet (de)serialization only.
 
 ```text
 scanner/src/session.rs     the encapsulation session over TCP 44818, shared by both kinds of messaging
-scanner/src/explicit.rs    explicit (unconnected) messaging: send_request, typed_data, read_identity
+scanner/src/explicit.rs    explicit (unconnected) messaging: send_request, decode_reply, read_identity
 scanner/src/implicit.rs    implicit messaging: the stages below as submodules, re-exported flat
 scanner/src/implicit/{config,open,produce,consume,close,udp}.rs
 ```
@@ -80,7 +80,7 @@ which. `implicit.rs` lists the stages above with the submodule that implements e
 * `send_request(&mut Session, path, service, data) -> EnIpPacket`: build the Message Router
   request, send it, read the reply, fail with `ExplicitError::Status { general_status,
   additional_status }` unless the general status is success.
-* `typed_data::<T>(&EnIpPacket) -> T`: the reply's data decoded as a caller-declared `binrw` type
+* `decode_reply::<T>(&EnIpPacket) -> T`: the reply's data decoded as a caller-declared `binrw` type
   (what `read_typed_object_assembly` did in the old stream utils).
 * `read_identity(&mut Session) -> IdentityResponse`: Get_Attributes_All on the Identity object.
 
