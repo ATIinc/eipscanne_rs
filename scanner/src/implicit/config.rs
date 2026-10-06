@@ -40,7 +40,7 @@ pub struct DirectionConfig {
     pub connection_size_type: ConnectionSizeType,
 }
 
-/// Everything the caller decides before opening a connection. Phase 5 derives it from an EDS file;
+/// Everything the caller decides before opening a connection. Phase 4 derives it from an EDS file;
 /// until then it is typed by hand (see the `implicit-io` example).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ConnectionConfig {

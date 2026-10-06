@@ -9,11 +9,10 @@ the only edit a later phase makes here is filling in its pull request number bel
 | Phase | Document | Pull request |
 |---|---|---|
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | #3 (`feat/SW-4573-1-explicit-groundwork`) |
-| 2 | [Connection Manager packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
-| 3 | [Class 1 I/O packets](03-class1-io-packets.md) | #4, delivered with phase 2 |
-| 4 | [`scanner` crate: open a connection and exchange I/O](04-scanner-crate.md) | #5 (`feat/SW-4573-4-utils-crate`) |
-| 5 | [EDS parser crate](05-eds-parser.md) | not yet opened |
-| 6 | [Safety System validation](06-safety-system-validation.md) | not yet opened |
+| 2 | [Connection Manager packets and class 1 I/O packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
+| 3 | [`scanner` crate: open a connection and exchange I/O](03-scanner-crate.md) | #5 (`feat/SW-4573-3-scanner`) |
+| 4 | [EDS parser crate and `eds-implicit-io` example](04-eds-parser.md) | not yet opened |
+| 5 | [Safety System validation](05-safety-system-validation.md) | not yet opened |
 
 ## How the stack works
 
@@ -21,14 +20,14 @@ the only edit a later phase makes here is filling in its pull request number bel
 * One branch per phase (`feat/SW-4573-<n>-<name>`), each based on the previous phase's branch, each
   opened as its own pull request so reviews stay small.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
-  `cargo test --all --features adapter` and `cargo test --examples` green (from phase 4 on, the
+  `cargo test --all --features adapter` and `cargo test --examples` green (from phase 3 on, the
   workspace equivalents listed in that phase).
 
 ## Ground rules
 
 * **Packets only in the library.** `eipscanne_rs` stays a packet (de)serialization library built
   on `binrw` + `bilge`. Sessions, sockets, timers, connection state and the examples live in the
-  `scanner` workspace crate (phase 4): the shared `session`, then `explicit` and `implicit`
+  `scanner` workspace crate (phase 3): the shared `session`, then `explicit` and `implicit`
   messaging kept apart, the latter organized by protocol stage, so it reads as a reference for
   production code.
 * **Application data is declared by the caller.** Assemblies, configuration data and other
@@ -46,8 +45,8 @@ the only edit a later phase makes here is filling in its pull request number bel
   called. bilge 0.5 gives the builder the visibility of that `new`, so a bitfield built outside its
   module carries `new = pub` for the sole purpose of exposing its builder. A bitfield only built
   inside its module, through a wrapper such as `ServiceContainer::new_request`, keeps `new` private.
-* **EIPScanner is a loose reference only.** Behaviour follows the specification; code is
-  structured for a human reader, not after EIPScanner's classes.
+* **Written for a human reader.** Behaviour follows the specification; the code is structured so
+  it reads top to bottom, not after any other implementation.
 * **Tests are byte-exact.** Every packet type gets serialization and deserialization tests against
   byte arrays documented with Wireshark's dissection of those bytes: run `scripts/dissect.sh` (tshark)
   on the bytes and paste its output into the test comment, so the comment is never hand-written.
