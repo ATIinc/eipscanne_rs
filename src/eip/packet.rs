@@ -46,7 +46,6 @@ use binrw::{
 use std::io::{Read, Seek};
 
 use crate::cip::message::CipMessage;
-use crate::cip::message::request::MessageRouterRequest;
 use crate::cip::message::response::MessageRouterResponse;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
@@ -99,7 +98,7 @@ pub struct EnIpPacket {
 // ======= Start of EnIpPacket impl ========
 
 impl EnIpPacket {
-    pub fn new(
+    fn new(
         command: EnIpCommand,
         session_handle: CipUdint,
         command_specific_data: CommandSpecificData,
@@ -148,7 +147,7 @@ impl EnIpPacket {
     }
 
     /// The Common Packet Format items (empty for commands without them)
-    pub fn items(&self) -> &[CommonPacketItem] {
+    fn items(&self) -> &[CommonPacketItem] {
         self.command_specific_data.items()
     }
 
@@ -160,14 +159,12 @@ impl EnIpPacket {
         }
     }
 
-    /// The Message Router request carried by the packet, if it carries one
-    pub fn request(&self) -> Option<&MessageRouterRequest> {
-        self.cip_message().and_then(CipMessage::request)
-    }
-
     /// The Message Router response carried by the packet, if it carries one
     pub fn response(&self) -> Option<&MessageRouterResponse> {
-        self.cip_message().and_then(CipMessage::response)
+        match self.cip_message() {
+            Some(CipMessage::Response(response)) => Some(response),
+            _ => None,
+        }
     }
 
     /// Reads a packet sent by a scanner: a SendRRData packet must carry a Message Router request.
@@ -178,7 +175,7 @@ impl EnIpPacket {
     #[cfg(feature = "adapter")]
     pub fn read_request<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
         Self::read_expecting(reader, "a Message Router request", |packet| {
-            packet.request().is_some()
+            matches!(packet.cip_message(), Some(CipMessage::Request(_)))
         })
     }
 
@@ -221,15 +218,6 @@ impl EnIpPacket {
         self.items()
             .iter()
             .filter(|item| item.sockaddr_info().is_some())
-    }
-
-    /// Appends a Common Packet Format item (e.g. a Sockaddr Info item) to a SendRRData packet.
-    /// Packets of other commands carry no items and are returned unchanged.
-    pub fn with_item(mut self, item: CommonPacketItem) -> Self {
-        if let CommandSpecificData::SendRrData(ref mut rr_data) = self.command_specific_data {
-            rr_data.items.push(item);
-        }
-        self
     }
 }
 

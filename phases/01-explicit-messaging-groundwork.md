@@ -40,8 +40,8 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   * `CipPath` is now a list of logical segments (`segments`, any length) instead of a fixed
     class/instance/attribute shape: it reads with the path size in words, keeps the
     `new` / `new_full` constructors, adds `from_segments`, `new_assembly_connection` (the usual
-    `config instance / O->T connection point / T->O connection point` path),
-    `byte_len()` / `word_len()` and `class_id()` / `instance_id()` / `attribute_id()` accessors. Only logical segments are
+    `config instance / O->T connection point / T->O connection point` path) and `word_len()`.
+    Only logical segments are
     modelled; application-defined content (such as configuration data) is not part of the path
     type, following the same rule as assemblies: the caller declares it and passes it in;
   * `write_path_with_word_size`, a reusable `write_with` function that prefixes a path with its
@@ -63,8 +63,8 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
     `Response(MessageRouterResponse)`, chosen on read by the Request/Response bit of the service
     code byte, so no type is generic over the message;
   * `src/eip/sockaddr.rs` (implicit-messaging only): `SockaddrInfo` (family, port, address in big
-    endian; zero padding) with conversions from and to `SocketAddrV4`, and the Sockaddr Info item
-    constructors;
+    endian; zero padding) with conversions from and to `SocketAddrV4`, and
+    `CommonPacketItem::sockaddr_info()`;
   * `RRPacketData` holds the interface handle, the timeout and `items`; the item count is read
     from the wire and written from `items.len()`. `CommonPacketDescriptor`, `BASE_ITEM_COUNT` and
     the length write arguments are gone;
@@ -74,8 +74,7 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
     packet does not carry the expected message, while plain `read` keeps it as an `Unknown` item.
     `read_request` is only compiled with the new `adapter` feature (adapter-side helpers).
     `RequestObjectAssembly` / `ResponseObjectAssembly` are both aliases of `EnIpPacket` that only
-    document the direction, with `cip_message()`, `request()`, `response()`, `items()`,
-    `sockaddr_info_items()` and `with_item()`.
+    document the direction, with `cip_message()`, `response()` and `sockaddr_info_items()`.
 * **README** — "Related projects" section.
 
 ## Tests
@@ -91,7 +90,7 @@ without rewrites, while keeping every existing byte-exact test green. No new pro
   write-then-read round trip of a reply carrying a Sockaddr Info item.
 * `tests/test_cip_path.rs` — assembly connection path, rejection of unsupported segment types and
   of segments overrunning the declared length. `tests/test_path_segment.rs` covers 16-bit
-  class/instance paths and the data segment; `src/cip/path.rs` unit-tests the accessors and sizes.
+  class/instance paths and the data segment; `src/cip/path.rs` unit-tests the sizes.
 * `tests/common/mod.rs` — session handles, instances and other values shared by the captures.
 * `tests/test_general_status.rs` — additional status words, unknown general status, service codes.
 

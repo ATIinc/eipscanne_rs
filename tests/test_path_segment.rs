@@ -169,9 +169,6 @@ fn test_deserialize_cip_path() {
     let cip_path = CipPath::read_args(&mut buf_reader, (4,)).unwrap();
 
     // Assert equality
-    assert_eq!(cip_path.class_id(), Some(IDENTITY_CLASS_ID));
-    assert_eq!(cip_path.instance_id(), Some(IDENTITY_INSTANCE_ID));
-    assert_eq!(cip_path.attribute_id(), None);
     assert_eq!(cip_path.segments.len(), 2);
 
     let class_segment = &cip_path.segments[0];

@@ -79,7 +79,7 @@ pub struct RRPacketData {
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    pub fn new(interface_handle: CipUdint, timeout: CipUint, items: Vec<CommonPacketItem>) -> Self {
+    fn new(interface_handle: CipUdint, timeout: CipUint, items: Vec<CommonPacketItem>) -> Self {
         RRPacketData {
             interface_handle,
             timeout,
@@ -104,7 +104,7 @@ impl RRPacketData {
     }
 
     /// The CIP message carried by the Unconnected Data Item, if any
-    pub fn cip_message(&self) -> Option<&CipMessage> {
+    pub(crate) fn cip_message(&self) -> Option<&CipMessage> {
         self.items.iter().find_map(|item| match item {
             CommonPacketItem::UnconnectedDataItem(message) => Some(message),
             _ => None,
@@ -142,14 +142,14 @@ pub enum CommandSpecificData {
 // ======= Start of CommandSpecificData impl ========
 
 impl CommandSpecificData {
-    pub fn new_registration() -> Self {
+    pub(crate) fn new_registration() -> Self {
         Self::RegisterSession(RegisterData {
             protocol_version: eip_constants::ENCAPSULATION_PROTOCOL_VERSION,
             option_flags: eip_constants::REGISTER_SESSION_OPTION_FLAGS,
         })
     }
 
-    pub fn new_request(
+    pub(crate) fn new_request(
         interface_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
@@ -162,7 +162,7 @@ impl CommandSpecificData {
     }
 
     /// The Common Packet Format items (empty for commands without them)
-    pub fn items(&self) -> &[CommonPacketItem] {
+    pub(crate) fn items(&self) -> &[CommonPacketItem] {
         match self {
             CommandSpecificData::SendRrData(rr_data) => &rr_data.items,
             _ => &[],

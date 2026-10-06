@@ -23,22 +23,6 @@ pub enum CipMessage {
 
 // ======= Start of CipMessage impl ========
 
-impl CipMessage {
-    pub fn request(&self) -> Option<&MessageRouterRequest> {
-        match self {
-            CipMessage::Request(request) => Some(request),
-            CipMessage::Response(_) => None,
-        }
-    }
-
-    pub fn response(&self) -> Option<&MessageRouterResponse> {
-        match self {
-            CipMessage::Request(_) => None,
-            CipMessage::Response(response) => Some(response),
-        }
-    }
-}
-
 impl From<MessageRouterRequest> for CipMessage {
     fn from(request: MessageRouterRequest) -> Self {
         CipMessage::Request(request)

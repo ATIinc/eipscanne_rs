@@ -68,7 +68,7 @@ pub enum CommonPacketItem {
 // ======= Start of CommonPacketItem impl ========
 
 impl CommonPacketItem {
-    pub fn type_id(&self) -> CommonPacketItemId {
+    fn type_id(&self) -> CommonPacketItemId {
         match self {
             CommonPacketItem::NullAddressItem => CommonPacketItemId::NullAddressItem,
             CommonPacketItem::UnconnectedDataItem(_) => CommonPacketItemId::UnconnectedDataItem,

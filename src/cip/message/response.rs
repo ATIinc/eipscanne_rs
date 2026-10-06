@@ -131,7 +131,7 @@ pub struct ResponseData {
 // ======= Start of ResponseData impl ========
 
 impl ResponseData {
-    pub fn is_success(&self) -> bool {
+    fn is_success(&self) -> bool {
         self.status == ResponseStatusCode::Success
     }
 }

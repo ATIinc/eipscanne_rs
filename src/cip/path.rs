@@ -14,7 +14,7 @@ use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3};
 use crate::cip::object_ids::ASSEMBLY_CLASS_ID;
 use crate::cip::types::CipUsint;
 
-pub const BYTES_PER_PATH_WORD: usize = 2;
+const BYTES_PER_PATH_WORD: usize = 2;
 
 #[bitsize(3)]
 #[derive(Debug, Clone, Copy, FromBits, PartialEq)]
@@ -145,7 +145,7 @@ impl LogicalPathSegment {
     }
 
     /// Number of bytes this segment occupies on the wire
-    pub fn byte_len(&self) -> usize {
+    fn byte_len(&self) -> usize {
         match self.data {
             PathData::FormatAsU8(_) => 2,
             PathData::FormatAsU16(_) => 4,
@@ -233,33 +233,13 @@ impl CipPath {
     }
 
     /// Number of bytes the path occupies on the wire
-    pub fn byte_len(&self) -> usize {
+    fn byte_len(&self) -> usize {
         self.segments.iter().map(LogicalPathSegment::byte_len).sum()
     }
 
     /// Number of 16-bit words the path occupies on the wire (Request Path Size / Connection Path Size)
     pub fn word_len(&self) -> usize {
         self.byte_len().div_ceil(BYTES_PER_PATH_WORD)
-    }
-
-    /// Value of the first logical segment of the given type, regardless of its 8/16-bit format
-    fn logical_value(&self, logical_segment_type: LogicalSegmentType) -> Option<u16> {
-        self.segments
-            .iter()
-            .find(|segment| segment.path_definition.logical_segment_type() == logical_segment_type)
-            .map(|segment| (&segment.data).into())
-    }
-
-    pub fn class_id(&self) -> Option<u16> {
-        self.logical_value(LogicalSegmentType::ClassId)
-    }
-
-    pub fn instance_id(&self) -> Option<u16> {
-        self.logical_value(LogicalSegmentType::InstanceId)
-    }
-
-    pub fn attribute_id(&self) -> Option<u16> {
-        self.logical_value(LogicalSegmentType::AttributeId)
     }
 }
 
@@ -268,7 +248,7 @@ impl CipPath {
 /// Writes a path preceded by its size in 16-bit words (Request Path Size / Connection Path Size).
 ///
 /// Usable as a `write_with` function for a `CipPath` field.
-pub fn write_path_with_word_size<W>(
+pub(crate) fn write_path_with_word_size<W>(
     path: &CipPath,
     writer: &mut W,
     endian: Endian,
@@ -319,19 +299,43 @@ mod tests {
     #[test]
     fn test_cip_path_accessors_and_sizes() {
         let full_path = CipPath::new_full(ASSEMBLY_CLASS_ID, 0x96, ASSEMBLY_DATA_ATTRIBUTE_ID);
-        assert_eq!(full_path.class_id(), Some(ASSEMBLY_CLASS_ID.into()));
-        assert_eq!(full_path.instance_id(), Some(0x96));
+        let [class, instance, attribute] = full_path.segments.as_slice() else {
+            panic!("expected class, instance and attribute segments");
+        };
         assert_eq!(
-            full_path.attribute_id(),
-            Some(ASSEMBLY_DATA_ATTRIBUTE_ID.into())
+            class.path_definition.logical_segment_type(),
+            LogicalSegmentType::ClassId
+        );
+        assert_eq!(class.data, PathData::FormatAsU8(ASSEMBLY_CLASS_ID));
+        assert_eq!(
+            instance.path_definition.logical_segment_type(),
+            LogicalSegmentType::InstanceId
+        );
+        assert_eq!(instance.data, PathData::FormatAsU8(0x96));
+        assert_eq!(
+            attribute.path_definition.logical_segment_type(),
+            LogicalSegmentType::AttributeId
+        );
+        assert_eq!(
+            attribute.data,
+            PathData::FormatAsU8(ASSEMBLY_DATA_ATTRIBUTE_ID)
         );
         assert_eq!(full_path.byte_len(), 6);
         assert_eq!(full_path.word_len(), 3);
 
         let class_instance = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
-        assert_eq!(class_instance.class_id(), Some(IDENTITY_CLASS_ID));
-        assert_eq!(class_instance.attribute_id(), None);
-        assert_eq!(class_instance.segments.len(), 2);
+        let [class, instance] = class_instance.segments.as_slice() else {
+            panic!("expected class and instance segments");
+        };
+        assert_eq!(
+            class.path_definition.logical_segment_type(),
+            LogicalSegmentType::ClassId
+        );
+        assert_eq!(class.data, PathData::FormatAsU16(IDENTITY_CLASS_ID));
+        assert_eq!(
+            instance.path_definition.logical_segment_type(),
+            LogicalSegmentType::InstanceId
+        );
         assert_eq!(class_instance.word_len(), 4);
 
         let connection_path = CipPath::new_assembly_connection(0x97, 0x96, 0x64);

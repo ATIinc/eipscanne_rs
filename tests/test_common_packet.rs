@@ -48,7 +48,7 @@ fn test_serialize_sockaddr_info_big_endian_fields() {
         0x00,
     ];
 
-    let sockaddr_info = SockaddrInfo::new(sample_address());
+    let sockaddr_info = SockaddrInfo::from(sample_address());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
@@ -76,7 +76,7 @@ fn test_serialize_t2o_sockaddr_info_item() {
         0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let item = CommonPacketItem::new_t2o_sockaddr_info(sample_address());
+    let item = CommonPacketItem::T2OSockAddrInfo(sample_address().into());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
@@ -177,25 +177,25 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            vec![
-                CommonPacketItem::NullAddressItem,
-                CommonPacketItem::UnconnectedDataItem(CipMessage::Response(
-                    MessageRouterResponse {
-                        service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
-                        response_data: ResponseData {
-                            status: ResponseStatusCode::Success,
-                            additional_status_size: 0,
-                            additional_status: vec![],
-                            data: CipDataOpt::Raw(vec![]),
-                        },
+        command_specific_data: CommandSpecificData::SendRrData({
+            let mut rr_data = RRPacketData::new_unconnected(
+                CIP_INTERFACE_HANDLE,
+                NO_ENCAPSULATION_TIMEOUT,
+                MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Raw(vec![]),
                     },
-                )),
-                CommonPacketItem::new_o2t_sockaddr_info(sample_address()),
-            ],
-        )),
+                },
+            );
+            rr_data
+                .items
+                .push(CommonPacketItem::O2TSockAddrInfo(sample_address().into()));
+            rr_data
+        }),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
@@ -229,7 +229,7 @@ fn test_read_response_rejects_a_request() {
 
     // The lenient read keeps the request
     let packet = ResponseObjectAssembly::read(&mut std::io::Cursor::new(&request_bytes)).unwrap();
-    assert!(packet.request().is_some());
+    assert!(matches!(packet.cip_message(), Some(CipMessage::Request(_))));
     assert!(packet.response().is_none());
 }
 
@@ -282,9 +282,13 @@ fn test_write_then_read_response() {
         },
     };
 
-    let response =
-        ResponseObjectAssembly::new_send_rr_data(0x3, NO_ENCAPSULATION_TIMEOUT, forward_open_reply)
-            .with_item(CommonPacketItem::new_o2t_sockaddr_info(sample_address()));
+    let mut response =
+        ResponseObjectAssembly::new_send_rr_data(0x3, NO_ENCAPSULATION_TIMEOUT, forward_open_reply);
+    if let CommandSpecificData::SendRrData(rr_data) = &mut response.command_specific_data {
+        rr_data
+            .items
+            .push(CommonPacketItem::O2TSockAddrInfo(sample_address().into()));
+    }
 
     let mut written_bytes: Vec<u8> = Vec::new();
     response
@@ -297,6 +301,9 @@ fn test_write_then_read_response() {
 
     assert_eq!(read_back.header.length, Some(40));
     assert_eq!(read_back.response(), response.response());
-    assert_eq!(read_back.items(), response.items());
+    assert_eq!(
+        read_back.command_specific_data,
+        response.command_specific_data
+    );
     assert_eq!(read_back.sockaddr_info_items().count(), 1);
 }
