@@ -28,8 +28,6 @@ pub struct RunIdleHeader {
 /// connection, so reading takes the length of the item, the transport class and the real-time
 /// format of the direction, which the receiver looks up by the connection ID of the Sequenced
 /// Address Item. On the wire the sequence count comes first, then the header, then the data.
-/// (EIPScanner reads the header before the sequence count; that order is wrong and is not
-/// mirrored.)
 ///
 /// Writing takes no arguments (the optional fields are written when set, the data as it is), so
 /// an `IoData` is a `CipData` and can be the typed data of a `ConnectedDataItem`.
