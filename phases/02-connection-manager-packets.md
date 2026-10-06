@@ -31,8 +31,9 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
     run/idle header itself belongs to the I/O packets of phase 3.
 * `shared.rs` — the blocks every service carries in the same layout: `ConnectionTriad`
   (connection serial number, originator vendor ID, originator serial number; in every request and
-  reply, and what a Forward_Close is matched against) and `UnsuccessfulResponse` (the triad plus the optional remaining path size and reserved
-  byte a router appends to routing errors: the reply data of any rejected request).
+  reply, and what a Forward_Close is matched against) and `UnsuccessfulResponse`, the reply data
+  of any rejected request: the triad plus the remaining path size and reserved byte that only a
+  routing error carries (optional fields, read when the bytes are there).
 * `forward_open.rs` — `ForwardOpenRequest` (one struct for 0x54 and 0x5B, built field by field
   like every other packet; `service_code()` picks the service from the width of the O->T
   parameters, so both directions use the same case; the Connection Path Size byte is derived from
@@ -53,14 +54,16 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
   `CipDataOpt`, then reads the typed reply from those bytes; the reply to any other service is a
   `binrw` assertion error. A rejected request is not an error: it parses as `Ok(Unsuccessful(..))`,
   and its general status and Additional Status words stay on the Message Router response.
-* `src/object_assembly.rs` — `RequestObjectAssembly::new_forward_open` (sends Forward_Open or Large_Forward_Open depending on
-  the request) and `new_forward_close`.
+* `src/object_assembly.rs` — `RequestObjectAssembly::new_forward_open` (sends Forward_Open or
+  Large_Forward_Open depending on the request) and `new_forward_close`, both addressed to the
+  Connection Manager through the `CONNECTION_MANAGER_CLASS_ID` / `CONNECTION_MANAGER_INSTANCE_ID`
+  constants of `src/cip/object_ids.rs`.
 * The `CipData` blanket impl (`src/cip/message/data.rs`) no longer requires `BinRead` with empty
   arguments: `write_to` only writes, and `ForwardOpenRequest` reads with a `large` argument. Every
   type that satisfied the bound before still does.
-* The `async` feature is gone: `CipData` always requires `Send + Sync` (what `async` used to add), so
-  packets carrying typed data can be held across `.await` points without opting in. `adapter` is
-  the only feature left.
+* The `async` feature is gone: `CipData` always requires `Send + Sync` (what `async` used to
+  add), so packets carrying typed data can be held across `.await` points without opting in.
+  `adapter` is the only feature left.
 
 ## Design notes
 
@@ -71,10 +74,12 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
   `builder()`, its setters and `build()` the visibility of the generated `new`, so all four carry
   `new = pub` for no other reason than to expose the builder; the positional `new` that comes with
   it is never called.
-* Field names spell the directions and the intervals out
-  (`o2t_network_connection_id`, `t2o_requested_packet_interval`,
-  `o2t_actual_packet_interval`, `CommonPacketItem::O2TSockAddrInfo`)
-  where Wireshark abbreviates them (O->T, T->O, RPI, API).
+* Field names keep Wireshark's `O->T` / `T->O` abbreviations as the `o2t_` / `t2o_` prefixes and
+  spell the intervals out (`o2t_requested_packet_interval` for "O->T RPI",
+  `t2o_actual_packet_interval` for "T->O API"). Every such field's docstring gives the full name,
+  and the module docs of `src/cip/connection_manager.rs` map the terminology to the devices:
+  originator = the scanner (this library), target = the adapter, O->T = the outputs we send,
+  T->O = the inputs we receive.
 
 ## Tests
 
