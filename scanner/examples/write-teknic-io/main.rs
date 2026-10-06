@@ -7,15 +7,16 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
 use scanner::session::Session;
 
-// The ClearLink assemblies, shared with the clearlink-homing example; each example uses a
-// different part of them
+// The ClearLink assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
-#[path = "../clearlink_assemblies.rs"]
-mod clearlink_assemblies;
+#[path = "../../assemblies"]
+mod assemblies {
+    pub mod clearlink;
+}
 mod cli_config;
 
-use clearlink_assemblies::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
-use clearlink_assemblies::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
+use assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+use assemblies::clearlink::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 use cli_config::{CliArgs, set_io_data};
 
 /// The ClearLink to talk to unless one is given on the command line

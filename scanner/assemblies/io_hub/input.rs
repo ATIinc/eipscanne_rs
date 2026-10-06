@@ -1,6 +1,6 @@
 //! The input assembly of a Teknic IO-HUB-4-E (instance 100, 228 bytes): what the hub reports.
-//! ClearPath-IP Software Reference, Appendices A to D (error codes, registers, statusword) and
-//! H (EtherNet/IP assemblies).
+//! ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E T2O Input Assembly:
+//! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60
 //!
 //! Read only: these types are decoded from replies and never built, so none of the bitfields
 //! needs a builder.
@@ -15,6 +15,7 @@ use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 pub const INPUT_ASSEMBLY_INSTANCE: u8 = 0x64;
 
 /// Motor Statusword: the real-time status bits of one motor
+/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=49)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -79,6 +80,7 @@ pub struct MotorStatusword {
 }
 
 /// Motor Shutdown Register: which shutdowns (faults) are present
+/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=45)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -106,6 +108,7 @@ pub struct MotorShutdownRegister {
 }
 
 /// Motor Warning Register: non-critical warnings and why the last move was cancelled
+/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=47)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -143,6 +146,7 @@ pub struct MotorWarningRegister {
 }
 
 /// AOI Error Code: what `move_type_ack` carries when a move is rejected (values of 100 and up)
+/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=43)
 #[bitsize(8)]
 #[derive(TryFromBits, PartialEq, Copy, Clone, Debug)]
 pub enum AoiErrorCode {
@@ -184,7 +188,7 @@ pub struct MotorInputData {
     pub torque_measured: CipInt,
     pub position_target: CipDint,
     pub velocity_target: CipDint,
-    #[brw(pad_before = 2)]
+    pub torque_target: CipInt,
     pub read_parameter_id_echo: CipUint,
     pub read_parameter_value: CipDint,
     /// The move type of the last command, or an AOI error code when it was rejected
@@ -252,6 +256,7 @@ pub struct DigitalInputs {
 }
 
 /// The electrical mode of one I/O point, a 4-bit nibble
+/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=68)
 #[bitsize(4)]
 #[derive(TryFromBits, PartialEq, Copy, Clone, Debug)]
 pub enum IoConfigMode {

@@ -17,15 +17,16 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
 use scanner::session::Session;
 
-// The ClearLink assemblies, shared with the write-teknic-io example; each example uses a
-// different part of them
+// The ClearLink assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
-#[path = "../clearlink_assemblies.rs"]
-mod clearlink_assemblies;
+#[path = "../../assemblies"]
+mod assemblies {
+    pub mod clearlink;
+}
 
-use clearlink_assemblies::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
-use clearlink_assemblies::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyObject, MotorStatus};
-use clearlink_assemblies::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
+use assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+use assemblies::clearlink::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyObject, MotorStatus};
+use assemblies::clearlink::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
 
 type Error = Box<dyn std::error::Error>;
 
@@ -124,7 +125,7 @@ impl Homing {
     /// Changes the outputs of the motor being homed and writes the assembly
     async fn command(
         &mut self,
-        change: impl FnOnce(&mut clearlink_assemblies::output::MotorOutputData),
+        change: impl FnOnce(&mut assemblies::clearlink::output::MotorOutputData),
     ) -> Result<(), Error> {
         change(self.output.motor_output_mut(self.motor));
         self.write_output().await
