@@ -28,9 +28,9 @@ pub mod open;
 pub mod produce;
 pub mod udp;
 
-pub use close::{CloseError, forward_close};
-pub use config::{ConfigError, ConnectionConfig, DirectionConfig};
+pub use close::forward_close;
+pub use config::{ConnectionConfig, DirectionConfig};
 pub use consume::{Consumer, Discarded, Input};
-pub use open::{OpenConnection, OpenError, forward_open};
-pub use produce::{OutputsError, Producer, SizeError};
+pub use open::{OpenConnection, forward_open};
+pub use produce::Producer;
 pub use udp::{bind_io_socket, recv_io_packet, send_io_packet};

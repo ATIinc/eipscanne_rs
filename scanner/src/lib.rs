@@ -13,11 +13,15 @@
 //! ```
 //!
 //! The `read-identity` and `write-clearlink-io` examples use `session` and `explicit`; the
-//! `implicit-io` example uses `session` and `implicit`.
+//! `implicit-io` example uses `session` and `implicit`. Every fallible call returns the one
+//! [`Error`].
 
+mod error;
 pub mod explicit;
 pub mod implicit;
 pub mod session;
+
+pub use error::Error;
 
 /// One open connection to build the producer and consumer tests on
 #[cfg(test)]

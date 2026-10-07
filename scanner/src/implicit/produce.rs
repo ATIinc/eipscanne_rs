@@ -3,7 +3,6 @@
 //! The producer touches no socket: it turns output bytes into numbered packets, and the caller
 //! sends them every `period()`.
 
-use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
 
@@ -17,6 +16,7 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::IoPacket;
 
+use crate::Error;
 use crate::implicit::open::OpenConnection;
 
 /// Numbers and frames the output packets of one connection
@@ -35,23 +35,6 @@ pub struct Producer {
     data_size: u16,
     connection_size_type: ConnectionSizeType,
     period: Duration,
-}
-
-/// The outputs do not fit the connection
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct SizeError {
-    pub connection_size_type: ConnectionSizeType,
-    pub data_size: u16,
-    pub actual: usize,
-}
-
-/// Typed outputs that cannot be sent
-#[derive(Debug)]
-pub enum OutputsError {
-    /// The outputs did not encode
-    Encode(binrw::Error),
-    /// The encoded outputs do not fit the connection
-    Size(SizeError),
 }
 
 // ======= Start of Producer impl ========
@@ -89,7 +72,7 @@ impl Producer {
     /// Every packet gets a new encapsulation sequence number. The CIP sequence count only moves
     /// when the outputs differ from the last packet's: a resend of unchanged outputs keeps the
     /// count, which tells the adapter nothing new arrived.
-    pub fn next_packet(&mut self, outputs: &[u8], run: bool) -> Result<IoPacket, SizeError> {
+    pub fn next_packet(&mut self, outputs: &[u8], run: bool) -> Result<IoPacket, Error> {
         self.check_size(outputs.len())?;
 
         if self.last_outputs.as_deref() != Some(outputs) {
@@ -133,16 +116,16 @@ impl Producer {
 
     /// The next packet to send, carrying `outputs` (the caller's output assembly) encoded the
     /// way `explicit::send_request` encodes request data, with the run flag set to `run`
-    pub fn next_packet_from<T>(&mut self, outputs: &T, run: bool) -> Result<IoPacket, OutputsError>
+    pub fn next_packet_from<T>(&mut self, outputs: &T, run: bool) -> Result<IoPacket, Error>
     where
         T: for<'a> BinWrite<Args<'a> = ()>,
     {
         let mut bytes = Cursor::new(Vec::new());
         outputs.write_le(&mut bytes)?;
-        Ok(self.next_packet(&bytes.into_inner(), run)?)
+        self.next_packet(&bytes.into_inner(), run)
     }
 
-    fn check_size(&self, actual: usize) -> Result<(), SizeError> {
+    fn check_size(&self, actual: usize) -> Result<(), Error> {
         let fits = match self.connection_size_type {
             ConnectionSizeType::Fixed => actual == usize::from(self.data_size),
             ConnectionSizeType::Variable => actual <= usize::from(self.data_size),
@@ -150,7 +133,7 @@ impl Producer {
         if fits {
             Ok(())
         } else {
-            Err(SizeError {
+            Err(Error::OutputSize {
                 connection_size_type: self.connection_size_type,
                 data_size: self.data_size,
                 actual,
@@ -160,53 +143,6 @@ impl Producer {
 }
 
 // ^^^^^^^^ End of Producer impl ^^^^^^^^
-
-// ======= Start of SizeError impl ========
-
-impl fmt::Display for SizeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let expected = match self.connection_size_type {
-            ConnectionSizeType::Fixed => "exactly",
-            ConnectionSizeType::Variable => "at most",
-        };
-        write!(
-            f,
-            "{} output bytes given, the connection carries {expected} {}",
-            self.actual, self.data_size
-        )
-    }
-}
-
-impl std::error::Error for SizeError {}
-
-// ^^^^^^^^ End of SizeError impl ^^^^^^^^
-
-// ======= Start of OutputsError impl ========
-
-impl fmt::Display for OutputsError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OutputsError::Encode(error) => write!(f, "the outputs did not encode: {error}"),
-            OutputsError::Size(error) => error.fmt(f),
-        }
-    }
-}
-
-impl std::error::Error for OutputsError {}
-
-impl From<binrw::Error> for OutputsError {
-    fn from(error: binrw::Error) -> Self {
-        OutputsError::Encode(error)
-    }
-}
-
-impl From<SizeError> for OutputsError {
-    fn from(error: SizeError) -> Self {
-        OutputsError::Size(error)
-    }
-}
-
-// ^^^^^^^^ End of OutputsError impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
@@ -333,14 +269,14 @@ mod tests {
         let connection = sample_connection();
         let mut producer = Producer::new(&connection, 1);
 
-        assert_eq!(
-            producer.next_packet(&[0u8; 31], true).unwrap_err(),
-            SizeError {
+        assert!(matches!(
+            producer.next_packet(&[0u8; 31], true),
+            Err(Error::OutputSize {
                 connection_size_type: ConnectionSizeType::Fixed,
                 data_size: 32,
                 actual: 31
-            }
-        );
+            })
+        ));
         assert!(producer.next_packet(&[0u8; 33], true).is_err());
         assert!(producer.next_packet(&[0u8; 32], true).is_ok());
     }
@@ -380,7 +316,7 @@ mod tests {
 
         assert!(matches!(
             producer.next_packet_from(&[0u8; 31], true),
-            Err(OutputsError::Size(SizeError { actual: 31, .. }))
+            Err(Error::OutputSize { actual: 31, .. })
         ));
     }
 

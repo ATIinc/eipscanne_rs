@@ -1,8 +1,6 @@
 //! Everything the caller decides about a connection before opening it, and how that becomes a
 //! Forward_Open request.
 
-use std::fmt;
-
 use bilge::prelude::{u4, u9};
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
@@ -15,6 +13,8 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipUdint, CipUsint};
+
+use crate::Error;
 
 /// Tick time of the unconnected request timeout: 1 ms shifted left by 10, i.e. 1024 ms per tick
 const PRIORITY_TICK_TIME: u8 = 10;
@@ -63,20 +63,12 @@ pub struct ConnectionConfig {
     pub large_forward_open: bool,
 }
 
-/// A configuration that cannot be sent
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConfigError {
-    /// The connection size of a direction does not fit the 9 bits of a Forward_Open; a
-    /// Large_Forward_Open carries up to 65535 bytes
-    ConnectionSizeTooLarge { direction: &'static str, size: u16 },
-}
-
 // ======= Start of ConnectionConfig impl ========
 
 impl ConnectionConfig {
     /// The Forward_Open (or Large_Forward_Open) request that opens this connection: class 1
     /// point-to-point in both directions, exclusive owner, this scanner as the client
-    pub fn to_forward_open_request(&self) -> Result<ForwardOpenRequest, ConfigError> {
+    pub fn to_forward_open_request(&self) -> Result<ForwardOpenRequest, Error> {
         Ok(ForwardOpenRequest {
             priority_time_tick: PriorityTimeTick::builder()
                 .tick_time(u4::new(PRIORITY_TICK_TIME))
@@ -111,7 +103,7 @@ impl ConnectionConfig {
         &self,
         direction_name: &'static str,
         direction: &DirectionConfig,
-    ) -> Result<NetworkConnectionParameters, ConfigError> {
+    ) -> Result<NetworkConnectionParameters, Error> {
         let size = connection_size(
             direction.data_size,
             self.transport_class,
@@ -129,7 +121,7 @@ impl ConnectionConfig {
                     .build(),
             ))
         } else {
-            let size = u9::try_new(size).map_err(|_| ConfigError::ConnectionSizeTooLarge {
+            let size = u9::try_new(size).map_err(|_| Error::ConnectionSizeTooLarge {
                 direction: direction_name,
                 size,
             })?;
@@ -147,23 +139,6 @@ impl ConnectionConfig {
 }
 
 // ^^^^^^^^ End of ConnectionConfig impl ^^^^^^^^
-
-// ======= Start of ConfigError impl ========
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigError::ConnectionSizeTooLarge { direction, size } => write!(
-                f,
-                "the {direction} connection size of {size} bytes needs a Large_Forward_Open"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for ConfigError {}
-
-// ^^^^^^^^ End of ConfigError impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
@@ -258,13 +233,13 @@ mod tests {
         let mut config = opener_sample_config();
         config.t2o.data_size = 510; // 512 with the sequence count
 
-        assert_eq!(
+        assert!(matches!(
             config.to_forward_open_request(),
-            Err(ConfigError::ConnectionSizeTooLarge {
+            Err(Error::ConnectionSizeTooLarge {
                 direction: "T->O",
                 size: 512
             })
-        );
+        ));
 
         config.large_forward_open = true;
         assert!(config.to_forward_open_request().is_ok());

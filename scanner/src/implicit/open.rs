@@ -1,22 +1,20 @@
 //! Stage 2: opening the connection with a Forward_Open over the session.
 
-use std::fmt;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
-use eipscanne_rs::cip::connection_manager::response::{
-    ConnectionManagerExtendedStatus, ConnectionManagerResponse,
-};
-use eipscanne_rs::cip::message::response::ResponseStatusCode;
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerResponse;
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::implicit::config::{ConfigError, ConnectionConfig};
-use crate::session::{Session, SessionError};
+use crate::Error;
+use crate::implicit::config::ConnectionConfig;
+use crate::session::{Session, router_response};
 
 /// An open connection: what was asked for, what the adapter answered, and where the outputs go.
 /// The producer, the consumer and the Forward_Close take what they need from it.
@@ -31,25 +29,11 @@ pub struct OpenConnection {
     pub o2t_endpoint: SocketAddrV4,
 }
 
-/// Why a connection could not be opened
-#[derive(Debug)]
-pub enum OpenError {
-    Config(ConfigError),
-    Session(SessionError),
-    /// The adapter refused the connection
-    Rejected {
-        general_status: ResponseStatusCode,
-        extended_status: Option<ConnectionManagerExtendedStatus>,
-    },
-    /// The reply parsed, but was not a Forward_Open reply
-    UnexpectedReply(String),
-}
-
 /// Sends the Forward_Open (or Large_Forward_Open) for `config` and reads the adapter's reply
 pub async fn forward_open(
     session: &mut Session,
     config: ConnectionConfig,
-) -> Result<OpenConnection, OpenError> {
+) -> Result<OpenConnection, Error> {
     let request = config.to_forward_open_request()?;
 
     session
@@ -60,26 +44,22 @@ pub async fn forward_open(
         .await?;
     let reply = session.read_reply().await?;
 
-    let Some(router_response) = reply.response() else {
-        return Err(OpenError::UnexpectedReply(
-            "the reply carries no Message Router response".to_string(),
-        ));
-    };
+    let router_response = router_response(&reply)?;
     let response = ConnectionManagerResponse::from_message_router_response(router_response)
-        .map_err(|error| OpenError::UnexpectedReply(error.to_string()))?;
+        .map_err(|error| Error::UnexpectedReply(error.to_string()))?;
 
     let response = match response {
         ConnectionManagerResponse::ForwardOpen(response) => response,
         ConnectionManagerResponse::Unsuccessful(_) => {
-            return Err(OpenError::Rejected {
-                general_status: router_response.response_data.status,
-                extended_status: ConnectionManagerExtendedStatus::from_additional_status(
-                    &router_response.response_data.additional_status,
-                ),
-            });
+            let service = if config.large_forward_open {
+                ServiceCode::LargeForwardOpen
+            } else {
+                ServiceCode::ForwardOpen
+            };
+            return Err(Error::rejected(service, router_response));
         }
         ConnectionManagerResponse::ForwardClose(_) => {
-            return Err(OpenError::UnexpectedReply(
+            return Err(Error::UnexpectedReply(
                 "a Forward_Close reply answered the Forward_Open".to_string(),
             ));
         }
@@ -112,55 +92,6 @@ fn o2t_endpoint(reply: &EnIpPacket, target_ip: Ipv4Addr) -> SocketAddrV4 {
         None => SocketAddrV4::new(target_ip, ETHERNET_IP_IO_UDP_PORT),
     }
 }
-
-// ======= Start of OpenError impl ========
-
-impl fmt::Display for OpenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OpenError::Config(error) => write!(f, "{error}"),
-            OpenError::Session(error) => write!(f, "{error}"),
-            OpenError::Rejected {
-                general_status,
-                extended_status: Some(extended_status),
-            } => write!(
-                f,
-                "the adapter rejected the Forward_Open: {general_status}, {extended_status}"
-            ),
-            OpenError::Rejected {
-                general_status,
-                extended_status: None,
-            } => write!(f, "the adapter rejected the Forward_Open: {general_status}"),
-            OpenError::UnexpectedReply(what) => {
-                write!(f, "unexpected reply to the Forward_Open: {what}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for OpenError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            OpenError::Config(error) => Some(error),
-            OpenError::Session(error) => Some(error),
-            _ => None,
-        }
-    }
-}
-
-impl From<ConfigError> for OpenError {
-    fn from(error: ConfigError) -> Self {
-        OpenError::Config(error)
-    }
-}
-
-impl From<SessionError> for OpenError {
-    fn from(error: SessionError) -> Self {
-        OpenError::Session(error)
-    }
-}
-
-// ^^^^^^^^ End of OpenError impl ^^^^^^^^
 
 #[cfg(test)]
 mod tests {
