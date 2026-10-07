@@ -92,7 +92,8 @@ pub async fn forward_close(
 /// adapter), or the adapter on the I/O port
 fn o2t_endpoint(reply: &EnIpPacket, target_ip: Ipv4Addr) -> SocketAddrV4 {
     let o2t_socket_addr_info = reply
-        .send_rr_data()
+        .command_specific_data
+        .as_send_rr_data()
         .and_then(|rr_data| rr_data.socket_addr_info_items.o2t)
         .map(|info| info.socket_address());
 

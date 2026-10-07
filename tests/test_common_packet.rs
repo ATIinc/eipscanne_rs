@@ -130,7 +130,8 @@ fn test_response_assembly_with_trailing_socket_addr_item() {
 
     assert!(
         response_object
-            .send_rr_data()
+            .command_specific_data
+            .as_send_rr_data()
             .unwrap()
             .socket_addr_info_items
             .o2t
@@ -177,7 +178,8 @@ fn test_write_then_read_response() {
     assert_eq!(read_back.response(), response.response());
     assert!(
         read_back
-            .send_rr_data()
+            .command_specific_data
+            .as_send_rr_data()
             .unwrap()
             .socket_addr_info_items
             .o2t
