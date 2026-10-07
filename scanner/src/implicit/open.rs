@@ -1,57 +1,47 @@
 //! Stage 2: opening the connection with a Forward_Open over the session.
 
-use std::fmt;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
-use eipscanne_rs::cip::connection_manager::response::{
-    ConnectionManagerExtendedStatus, ConnectionManagerResponse,
-};
-use eipscanne_rs::cip::message::response::ResponseStatusCode;
+use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerResponse;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::implicit::config::{ConfigError, ConnectionConfig};
-use crate::session::{Session, SessionError};
+use crate::Error;
+use crate::session::{Session, router_response};
 
-/// An open connection: what was asked for, what the adapter answered, and where the outputs go.
-/// The producer, the consumer and the Forward_Close take what they need from it.
+/// An open connection: the Forward_Open that was sent, the reply the adapter sent back, and the
+/// real-time format of each direction, the one thing both ends agree on without the wire. Every
+/// other value the producer, the consumer and the Forward_Close need is read from these, never
+/// copied.
 #[derive(Debug)]
 pub struct OpenConnection {
-    pub config: ConnectionConfig,
     pub request: ForwardOpenRequest,
     pub response: ForwardOpenResponse,
+    /// How the outputs signal run/idle (an EDS file or the device manual says which one)
+    pub o2t_real_time_format: RealTimeFormat,
+    /// How the inputs signal run/idle
+    pub t2o_real_time_format: RealTimeFormat,
     /// The adapter's IP address: where the inputs come from
     pub target_ip: Ipv4Addr,
     /// Where the outputs are sent
     pub o2t_endpoint: SocketAddrV4,
 }
 
-/// Why a connection could not be opened
-#[derive(Debug)]
-pub enum OpenError {
-    Config(ConfigError),
-    Session(SessionError),
-    /// The adapter refused the connection
-    Rejected {
-        general_status: ResponseStatusCode,
-        extended_status: Option<ConnectionManagerExtendedStatus>,
-    },
-    /// The reply parsed, but was not a Forward_Open reply
-    UnexpectedReply(String),
-}
-
-/// Sends the Forward_Open (or Large_Forward_Open) for `config` and reads the adapter's reply
+/// Sends `request` (a Forward_Open or Large_Forward_Open, by the width of its connection
+/// parameters) and reads the adapter's reply. The real-time formats are not part of the request;
+/// they are kept with the connection so its packets can be framed and read.
 pub async fn forward_open(
     session: &mut Session,
-    config: ConnectionConfig,
-) -> Result<OpenConnection, OpenError> {
-    let request = config.to_forward_open_request()?;
-
+    request: ForwardOpenRequest,
+    o2t_real_time_format: RealTimeFormat,
+    t2o_real_time_format: RealTimeFormat,
+) -> Result<OpenConnection, Error> {
     session
         .send(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
@@ -60,26 +50,17 @@ pub async fn forward_open(
         .await?;
     let reply = session.read_reply().await?;
 
-    let Some(router_response) = reply.response() else {
-        return Err(OpenError::UnexpectedReply(
-            "the reply carries no Message Router response".to_string(),
-        ));
-    };
+    let router_response = router_response(&reply)?;
     let response = ConnectionManagerResponse::from_message_router_response(router_response)
-        .map_err(|error| OpenError::UnexpectedReply(error.to_string()))?;
+        .map_err(|error| Error::UnexpectedReply(error.to_string()))?;
 
     let response = match response {
         ConnectionManagerResponse::ForwardOpen(response) => response,
         ConnectionManagerResponse::Unsuccessful(_) => {
-            return Err(OpenError::Rejected {
-                general_status: router_response.response_data.status,
-                extended_status: ConnectionManagerExtendedStatus::from_additional_status(
-                    &router_response.response_data.additional_status,
-                ),
-            });
+            return Err(Error::rejected(request.service_code(), router_response));
         }
         ConnectionManagerResponse::ForwardClose(_) => {
-            return Err(OpenError::UnexpectedReply(
+            return Err(Error::UnexpectedReply(
                 "a Forward_Close reply answered the Forward_Open".to_string(),
             ));
         }
@@ -88,9 +69,10 @@ pub async fn forward_open(
     let target_ip = session.peer_ip();
     Ok(OpenConnection {
         o2t_endpoint: o2t_endpoint(&reply, target_ip),
-        config,
         request,
         response,
+        o2t_real_time_format,
+        t2o_real_time_format,
         target_ip,
     })
 }
@@ -113,61 +95,17 @@ fn o2t_endpoint(reply: &EnIpPacket, target_ip: Ipv4Addr) -> SocketAddrV4 {
     }
 }
 
-// ======= Start of OpenError impl ========
-
-impl fmt::Display for OpenError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            OpenError::Config(error) => write!(f, "{error}"),
-            OpenError::Session(error) => write!(f, "{error}"),
-            OpenError::Rejected {
-                general_status,
-                extended_status: Some(extended_status),
-            } => write!(
-                f,
-                "the adapter rejected the Forward_Open: {general_status}, {extended_status}"
-            ),
-            OpenError::Rejected {
-                general_status,
-                extended_status: None,
-            } => write!(f, "the adapter rejected the Forward_Open: {general_status}"),
-            OpenError::UnexpectedReply(what) => {
-                write!(f, "unexpected reply to the Forward_Open: {what}")
-            }
-        }
-    }
-}
-
-impl std::error::Error for OpenError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            OpenError::Config(error) => Some(error),
-            OpenError::Session(error) => Some(error),
-            _ => None,
-        }
-    }
-}
-
-impl From<ConfigError> for OpenError {
-    fn from(error: ConfigError) -> Self {
-        OpenError::Config(error)
-    }
-}
-
-impl From<SessionError> for OpenError {
-    fn from(error: SessionError) -> Self {
-        OpenError::Session(error)
-    }
-}
-
-// ^^^^^^^^ End of OpenError impl ^^^^^^^^
-
 #[cfg(test)]
 mod tests {
-    use eipscanne_rs::cip::types::CipUdint;
+    use binrw::BinWrite;
+    use hex_test_macros::prelude::*;
+
+    use eipscanne_rs::cip::types::{CipByte, CipUdint};
     use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
     use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
     use eipscanne_rs::eip::sockaddr::SockaddrInfo;
+
+    use crate::test_support::sample_request;
 
     use super::*;
 
@@ -229,5 +167,27 @@ mod tests {
         ]);
 
         assert_eq!(o2t_endpoint(&reply, TARGET_IP), other);
+    }
+
+    #[test]
+    fn sample_request_is_the_forward_open_of_the_captures() {
+        // The same bytes as the Forward_Open request test of the library, where Wireshark's
+        // dissection of them is documented; the producer and consumer tests build on this request
+        let expected_byte_array: Vec<CipByte> = vec![
+            0x6f, 0x00, 0x42, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x32, 0x00, 0x54, 0x02,
+            0x20, 0x06, 0x24, 0x01, 0x0a, 0x05, 0x00, 0x00, 0x00, 0x00, 0x78, 0x56, 0x34, 0x12,
+            0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42,
+            0x0f, 0x00, 0x26, 0x48, 0x40, 0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04,
+            0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
+        ];
+
+        let packet = RequestObjectAssembly::new_forward_open(SESSION_HANDLE, sample_request());
+        let mut bytes = std::io::Cursor::new(Vec::new());
+        packet.write(&mut bytes).unwrap();
+        let bytes = bytes.into_inner();
+
+        assert_eq_hex!(expected_byte_array, bytes);
     }
 }
