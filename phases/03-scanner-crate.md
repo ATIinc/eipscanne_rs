@@ -58,7 +58,7 @@ bracket an I/O connection, so they sit under `implicit`.
   the request the caller built (`request`), the reply as read (`response`), the real-time format
   of each direction (the one thing both ends agree on without the wire), the adapter's IP address
   and where the outputs go. An accepted input packet is returned as its Sequenced Address and its
-  `IoData` as read.
+  `CipIoData` as read.
 * `OpenConnection` holds no value twice. Connection IDs, intervals, the timeout multiplier, the
   transport class and the connection sizes are read from `request` and `response` where they are
   used; data size and input timeout are functions of the connection, not fields.
@@ -183,7 +183,7 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 ### Stage 3, outputs — `src/implicit/o2t.rs`
 
 * `build_o2t_packet(&OpenConnection, encapsulation_sequence_number: CipUdint,
-  cip_sequence_count: CipUint, outputs: CipDataOpt, run: bool) -> Result<IoPacket>`:
+  cip_sequence_count: CipUint, outputs: CipDataOpt, run: bool) -> Result<EnIpIoPacket>`:
   * encodes the outputs first (`CipDataOpt::Raw` bytes or a caller's `binrw` struct as
     `CipDataOpt::Typed`, so a typed value is an explicit choice), then checks their length against
     the O->T data size (`Error::OutputSize`);
@@ -191,7 +191,7 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
     the O->T real-time format is the 32-bit header;
   * addresses the packet with the O->T connection ID from the reply; its Connected Data Item is
     always `CipDataOpt::Raw`.
-* `send_io_packet(&UdpSocket, &IoPacket, to: SocketAddrV4) -> Result<()>`.
+* `send_io_packet(&UdpSocket, &EnIpIoPacket, to: SocketAddrV4) -> Result<()>`.
 * The numbering is the caller's: the encapsulation sequence number starts at a random number and
   moves on every packet; the CIP sequence count moves when the outputs change, so a resend of
   unchanged outputs keeps it. The caller sends one packet every
@@ -201,26 +201,26 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 
 * `bind_io_socket() -> Result<UdpSocket>`: `0.0.0.0:2222`, bound before the Forward_Open
   (adapters start sending as soon as they reply).
-* `recv_io_packet(&UdpSocket) -> Result<(IoPacket, SocketAddr)>`: one datagram parsed as an I/O
+* `recv_io_packet(&UdpSocket) -> Result<(EnIpIoPacket, SocketAddr)>`: one datagram parsed as an I/O
   packet, with its sender; cancel safe.
-* `accept_t2o_packet(&OpenConnection, last_sequence_number: Option<CipUdint>, &IoPacket,
-  from: SocketAddr) -> Result<(SequencedAddress, IoData)>`. A discarded packet is
+* `accept_t2o_packet(&OpenConnection, last_sequence_number: Option<CipUdint>, &EnIpIoPacket,
+  from: SocketAddr) -> Result<(SequencedAddress, CipIoData)>`. A discarded packet is
   `Error::UnexpectedPacket` with one message per check, in this order:
-  1. the packet has a Sequenced Address Item ("packet without a Sequenced Address Item") carrying
-     the T->O connection ID ("packet for another connection (0x…)");
+  1. its Sequenced Address carries the T->O connection ID ("packet for another connection
+     (0x…)");
   2. it comes from `target_ip`; the port is not checked ("packet from …, not the adapter");
   3. with a `last_sequence_number`, its encapsulation sequence number is newer, compared modulo
      2^32 ("stale sequence number … (last accepted …)"), and at most the allowed gap ahead
      ("sequence number … is more than … ahead of the last accepted …"). The allowed gap is
      `max(16, timeout multiplier + 1)`, with the multiplier as a factor (4 … 512, saturating).
      The first packet (`None`) is accepted whatever its number;
-  4. it has a raw Connected Data Item ("packet without a Connected Data Item") whose data, after
+  4. its Connected Data Item is raw ("packet whose Connected Data Item is not raw") and its data, after
      the sequence count and run/idle header, has the T->O data size ("… input bytes, the
      connection carries …", the length being 0 when the item is shorter than those).
 
-  The data is then decoded as `IoData` with the T->O transport class and real-time format; a
+  The data is then decoded as `CipIoData` with the T->O transport class and real-time format; a
   failure there is `Error::Parse`. An accepted packet returns its Sequenced Address and its
-  `IoData` as read, the run/idle header with all its bits included.
+  `CipIoData` as read, the run/idle header with all its bits included.
 * Unchanged inputs: the caller compares `cip_sequence_count` with the previous accepted packet's.
   A caller's `binrw` input assembly is read from the raw data with `T::read_le`.
 * `input_timeout(&OpenConnection) -> Duration`: timeout multiplier × T->O actual packet interval,
@@ -269,8 +269,7 @@ implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer st
   match the data size; variable-size ones may be shorter.
 * `t2o.rs`: four tests. Accepted inputs: the first packet with any sequence number from any
   sender port, variable-size data, a T->O run/idle header. The message of each discard by packet
-  content: no Sequenced Address Item, another connection, another host, no Connected Data Item,
-  data of the wrong size including an item shorter than the sequence count. Sequence numbers:
+  content: another connection, another host, data of the wrong size including an item shorter than the sequence count. Sequence numbers:
   repeated, older and back across the rollover are stale, forward across the rollover is
   accepted, and the allowed gap for small and large multipliers. `input_timeout` for the sample
   connection and without overflow for the largest multiplier and interval.

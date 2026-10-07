@@ -19,7 +19,7 @@ and keeps the ergonomic types.
 The implicit side takes the same structs through phase 3's stage 3 modules, which keep no state.
 `scanner::implicit::o2t::build_o2t_packet` takes the outputs as
 `CipDataOpt::Typed(Box::new(outputs))`, and `scanner::implicit::t2o::accept_t2o_packet` returns the
-inputs as an `IoData` whose data is the bytes on the wire (`CipDataOpt::Raw`), which the struct
+inputs as an `CipIoData` whose data is the bytes on the wire (`CipDataOpt::Raw`), which the struct
 reads with `T::read_le` (the implicit counterpart of `scanner::explicit::decode_reply`). Both
 belong to the `scanner` crate of phase 3; phase 5 has no code in `scanner/src/`.
 
