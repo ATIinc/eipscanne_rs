@@ -1,7 +1,4 @@
-use std::fmt;
-use std::io::Cursor;
-
-use binrw::{BinWrite, binrw};
+use binrw::binrw;
 
 use crate::cip::{
     message::{
@@ -112,24 +109,6 @@ pub enum ResponseStatusCode {
     Unknown(CipUsint),
 }
 
-// ======= Start of ResponseStatusCode impl ========
-
-/// The status name with its code: `PathSegmentError (0x04)`
-impl fmt::Display for ResponseStatusCode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut code = Cursor::new(Vec::new());
-        // Every variant, `Unknown` included, writes its one-byte code
-        self.write_le(&mut code).map_err(|_| fmt::Error)?;
-        let code = code.into_inner()[0];
-        match self {
-            ResponseStatusCode::Unknown(_) => write!(f, "unknown general status ({code:#04x})"),
-            _ => write!(f, "{self:?} ({code:#04x})"),
-        }
-    }
-}
-
-// ^^^^^^^^ End of ResponseStatusCode impl ^^^^^^^^
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -195,23 +174,5 @@ impl Rejection {
         })
     }
 }
-
-/// `the adapter rejected GetAttributeAll: PathSegmentError (0x04)`, with the Additional
-/// Status words after it when the reply carries any
-impl fmt::Display for Rejection {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "the adapter rejected {:?}: {}",
-            self.service, self.general_status
-        )?;
-        if !self.additional_status.is_empty() {
-            write!(f, ", additional status {:#06x?}", self.additional_status)?;
-        }
-        Ok(())
-    }
-}
-
-impl std::error::Error for Rejection {}
 
 // ^^^^^^^^ End of Rejection impl ^^^^^^^^

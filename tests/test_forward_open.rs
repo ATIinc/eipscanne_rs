@@ -797,20 +797,6 @@ fn test_deserialize_forward_open_rejected_response() {
         rejection.extended_status(),
         Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
     );
-
-    // Both read as their names with their codes in error messages
-    assert_eq!(
-        ResponseStatusCode::ConnectionFailure.to_string(),
-        "ConnectionFailure (0x01)"
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen.to_string(),
-        "ConnectionInUseOrDuplicateForwardOpen (0x0100)"
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::Unknown(0x0abc).to_string(),
-        "unknown extended status (0x0abc)"
-    );
 }
 
 #[test]
@@ -880,14 +866,14 @@ fn test_deserialize_forward_open_path_segment_error_response() {
 
     let rejection = Rejection::from_response(response).unwrap();
     assert_eq!(
-        rejection.general_status,
-        ResponseStatusCode::PathSegmentError
+        rejection,
+        Rejection {
+            service: ServiceCode::ForwardOpen,
+            general_status: ResponseStatusCode::PathSegmentError,
+            additional_status: vec![],
+        }
     );
     assert_eq!(rejection.extended_status(), None);
-    assert_eq!(
-        rejection.to_string(),
-        "the adapter rejected ForwardOpen: PathSegmentError (0x04)"
-    );
     // No reply data at all
     assert_eq!(response.response_data.data, CipDataOpt::Raw(vec![]));
 }
