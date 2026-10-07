@@ -60,8 +60,8 @@ ends the exchange early; the connection is still closed and the session unregist
 Assemblies are plain `binrw` structs written by hand in `scanner/assemblies/<device>/`, so they
 keep groups, named bits, enums and helpers. The same struct then decodes an explicit
 Get_Attribute_Single reply (`decode_reply`) and the data of an implicit input packet
-(`T::read_le` on the bytes `accept_input` returns), and is sent as implicit outputs with
-`output_packet(.., CipDataOpt::Typed(Box::new(outputs)), ..)`.
+(`T::read_le` on the bytes `t2o::accept_t2o_packet` returns), and is sent as implicit outputs with
+`o2t::build_o2t_packet(.., CipDataOpt::Typed(Box::new(outputs)), ..)`.
 
 1. Print the layout, one line per member with its byte offset, size, type, param, units, help
    and bit names:
