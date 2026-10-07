@@ -15,7 +15,9 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use eds_parser::{BridgeError, Eds, OriginatorSettings, to_forward_open};
+use eds_parser::Eds;
+use eds_parser::error::BridgeError;
+use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
 

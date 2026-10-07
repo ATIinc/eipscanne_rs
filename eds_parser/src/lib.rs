@@ -11,7 +11,7 @@
 //! 4     one Connection       ForwardOpenRequest + real-time formats      to_forward_open
 //! ```
 //!
-//! [`Eds::parse`] runs steps 1 to 3; [`to_forward_open`] is step 4. Nothing here touches
+//! [`Eds::parse`] runs steps 1 to 3; [`to_forward_open`](to_forward_open::to_forward_open) is step 4. Nothing here touches
 //! the network: the `eds-implicit-io` example feeds the result to the scanner.
 
 pub mod assembly;
@@ -21,12 +21,11 @@ pub mod error;
 pub mod params;
 pub mod to_forward_open;
 
-pub use assembly::Assembly;
-pub use connection::{Connection, ConnectionParameters, DirectionSpec, TriggerAndTransport};
-pub use document::{Document, Entry, Field, Section};
-pub use error::{BridgeError, EdsError};
-pub use params::Param;
-pub use to_forward_open::{OriginatorSettings, to_forward_open};
+use assembly::Assembly;
+use connection::Connection;
+use document::Document;
+use error::EdsError;
+use params::Param;
 
 /// An EDS file read into its document and typed sections
 #[derive(Debug, Clone, PartialEq)]

@@ -26,7 +26,8 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-use eds_parser::{Eds, OriginatorSettings, to_forward_open};
+use eds_parser::Eds;
+use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
