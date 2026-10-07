@@ -7,10 +7,10 @@ use bilge::prelude::u2;
 use hex_test_macros::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::parameters::{RealTimeFormat, TransportClass};
-use eipscanne_rs::cip::io_data::{IoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::io_packet::{IoPacket, SequencedAddress};
+use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use common::{
     IO_DATA_SIZE, O2T_CONNECTION_SIZE, O2T_NETWORK_CONNECTION_ID, T2O_CONNECTION_SIZE,
@@ -19,8 +19,8 @@ use common::{
 
 /// The data of the first packet the scanner sends: sequence count 1, the 32-bit header with the
 /// run flag set, then the output bytes 0x00 to 0x1f
-fn o2t_sample_io_data() -> IoData {
-    IoData {
+fn o2t_sample_io_data() -> CipIoData {
+    CipIoData {
         cip_sequence_count: Some(1),
         run_idle_header: Some(
             RunIdleHeader::builder()
@@ -35,8 +35,8 @@ fn o2t_sample_io_data() -> IoData {
 
 /// The data of the first packet the adapter sends: sequence count 1, no header, then the input
 /// bytes 0x1f down to 0x00
-fn t2o_sample_io_data() -> IoData {
-    IoData {
+fn t2o_sample_io_data() -> CipIoData {
+    CipIoData {
         cip_sequence_count: Some(1),
         run_idle_header: None,
         data: CipDataOpt::Raw((0..IO_DATA_SIZE as u8).rev().collect()),
@@ -71,7 +71,7 @@ fn test_o2t_io_packet_with_32bit_header() {
         0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
     ];
 
-    let packet = IoPacket::new(
+    let packet = EnIpIoPacket::new(
         O2T_NETWORK_CONNECTION_ID,
         1,
         CipDataOpt::Typed(Box::new(o2t_sample_io_data())),
@@ -86,7 +86,7 @@ fn test_o2t_io_packet_with_32bit_header() {
     // Read back, the Connected Data Item keeps its bytes raw; they compare equal to the typed data
     let byte_cursor = std::io::Cursor::new(expected_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let deserialized = IoPacket::read(&mut buf_reader).unwrap();
+    let deserialized = EnIpIoPacket::read(&mut buf_reader).unwrap();
 
     assert_eq!(
         deserialized.sequenced_address,
@@ -104,7 +104,7 @@ fn test_o2t_io_packet_with_32bit_header() {
             deserialized.connected_data
         );
     };
-    let io_data = IoData::read_le_args(
+    let io_data = CipIoData::read_le_args(
         &mut std::io::Cursor::new(raw_data),
         (
             O2T_CONNECTION_SIZE,
@@ -145,7 +145,7 @@ fn test_t2o_io_packet_modeless() {
         0x06, 0x05, 0x04, 0x03, 0x02, 0x01, 0x00,
     ];
 
-    let packet = IoPacket::new(
+    let packet = EnIpIoPacket::new(
         T2O_NETWORK_CONNECTION_ID,
         1,
         CipDataOpt::Typed(Box::new(t2o_sample_io_data())),
@@ -160,7 +160,7 @@ fn test_t2o_io_packet_modeless() {
     // Read back, the Connected Data Item keeps its bytes raw; they compare equal to the typed data
     let byte_cursor = std::io::Cursor::new(expected_byte_array);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let deserialized = IoPacket::read(&mut buf_reader).unwrap();
+    let deserialized = EnIpIoPacket::read(&mut buf_reader).unwrap();
 
     assert_eq!(
         deserialized.sequenced_address,
@@ -178,7 +178,7 @@ fn test_t2o_io_packet_modeless() {
             deserialized.connected_data
         );
     };
-    let io_data = IoData::read_le_args(
+    let io_data = CipIoData::read_le_args(
         &mut std::io::Cursor::new(raw_data),
         (
             T2O_CONNECTION_SIZE,

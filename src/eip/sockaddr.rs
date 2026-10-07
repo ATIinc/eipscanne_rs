@@ -155,7 +155,7 @@ impl BinWrite for SockaddrInfoItems {
                     type_id,
                     packet_length: Some(SOCKADDR_INFO_LENGTH),
                 };
-                descriptor.write_options(writer, endian, (SOCKADDR_INFO_LENGTH,))?;
+                descriptor.write_options(writer, endian, Default::default())?;
                 info.write_options(writer, endian, ())?;
             }
         }
