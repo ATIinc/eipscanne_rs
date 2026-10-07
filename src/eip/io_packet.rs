@@ -62,7 +62,6 @@ pub struct EnIpIoPacket {
             && sequenced_address_item.packet_length == Some(SEQUENCED_ADDRESS_LENGTH),
         "expected a Sequenced Address Item with a Length of 8"
     ))]
-    #[bw(args(SEQUENCED_ADDRESS_LENGTH))]
     pub sequenced_address_item: CommonPacketDescriptor,
 
     pub sequenced_address: SequencedAddress,
@@ -71,7 +70,7 @@ pub struct EnIpIoPacket {
         connected_data_item.type_id == CommonPacketItemId::ConnectedTransportPacket,
         "expected a Connected Data Item"
     ))]
-    #[bw(args(serialized_length(connected_data)?))]
+    #[bw(args { data_length: serialized_length(connected_data)? })]
     pub connected_data_item: CommonPacketDescriptor,
 
     #[br(args(connected_data_item.packet_length.unwrap_or_default()))]
