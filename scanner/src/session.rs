@@ -105,8 +105,10 @@ impl Session {
         let reply = self.read_reply().await?;
 
         let response = reply.response().ok_or(Error::NoResponse)?;
-        if let Some(CipMessage::Request(request)) =
-            packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+        if let Some(CipMessage::Request(request)) = packet
+            .command_specific_data
+            .as_send_rr_data()
+            .map(|rr_data| &rr_data.cip_message)
         {
             let requested = request.service_container.service();
             let answered = response.service_container.service();
