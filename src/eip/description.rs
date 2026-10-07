@@ -1,13 +1,14 @@
-use std::io::{Cursor, Read, Seek};
+use std::io::Cursor;
 
 use binrw::{
     BinRead, // trait for reading
     BinResult,
     BinWrite, // trait for writing
     Endian,
+    binrw, // #[binrw] attribute
 };
 
-use crate::cip::types::{CipUint, CipUsint};
+use crate::cip::types::CipUint;
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -24,52 +25,30 @@ pub enum CommonPacketItemId {
     SequencedAddressItem = 0x8002,
 }
 
-/// Reads an item: its Type ID, then Length bytes of data
-pub(crate) fn read_any_item<R: Read + Seek>(
-    reader: &mut R,
-    endian: Endian,
-) -> BinResult<(CommonPacketItemId, Vec<CipUsint>)> {
-    let type_id = CommonPacketItemId::read_options(reader, endian, ())?;
-    let length = CipUint::read_options(reader, endian, ())?;
+/// The header of a Common Packet Format item: its Type ID and the Length of its data
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Copy, Clone)]
+#[bw(import(data_length: CipUint))]
+pub struct CommonPacketDescriptor {
+    pub type_id: CommonPacketItemId,
 
-    let mut data = vec![0; length as usize];
-    reader.read_exact(&mut data)?;
-
-    Ok((type_id, data))
+    // Written as stored, or as `data_length` (the size of the item's data) when None
+    #[bw(map = |length: &Option<CipUint>| length.unwrap_or(data_length))]
+    pub packet_length: Option<CipUint>,
 }
 
-/// Reads an item that must have the Type ID `expected`, and its data as a `T` of Length bytes
-#[binrw::parser(reader, endian)]
-pub(crate) fn read_item<T>(expected: CommonPacketItemId) -> BinResult<T>
-where
-    T: for<'a> BinRead<Args<'a> = (CipUint,)>,
-{
-    let pos = reader.stream_position()?;
-    let (type_id, data) = read_any_item(reader, endian)?;
-
-    if type_id != expected {
-        return Err(binrw::Error::AssertFail {
-            pos,
-            message: format!("expected a {expected:?}, found a {type_id:?}"),
-        });
-    }
-
-    T::read_options(&mut Cursor::new(&data), endian, (data.len() as CipUint,))
-}
-
-/// Writes an item: `type_id`, the Length of `data` once serialized, then `data`
-#[binrw::writer(writer, endian)]
-pub(crate) fn write_item<T>(data: &T, type_id: CommonPacketItemId) -> BinResult<()>
+/// The number of bytes `data` serializes to: the Length of an item carrying it
+pub(crate) fn serialized_length<T>(data: &T) -> BinResult<CipUint>
 where
     T: BinWrite,
     for<'a> T::Args<'a>: Default,
 {
     let mut buffer = Vec::new();
-    data.write_options(&mut Cursor::new(&mut buffer), endian, Default::default())?;
-
-    type_id.write_options(writer, endian, ())?;
-    (buffer.len() as CipUint).write_options(writer, endian, ())?;
-    writer.write_all(&buffer)?;
-
-    Ok(())
+    data.write_options(
+        &mut Cursor::new(&mut buffer),
+        Endian::Little,
+        Default::default(),
+    )?;
+    Ok(buffer.len() as CipUint)
 }

@@ -17,15 +17,17 @@
 //!         Interface Handle                           .interface_handle
 //!         Timeout                                    .timeout
 //!         Item Count                                 (not stored: 2 + the Sockaddr Info items)
-//!             Type ID: Null Address Item (0x0000)    (not stored)
-//!                 Length                               (not stored: always 0)
+//!             Type ID: Null Address Item (0x0000)    .null_address_item.type_id
+//!                 Length                               .null_address_item.packet_length
 //!             Type ID: Unconnected Data Item (0x00b2)
-//!                 Length                               (not stored: size of the written message)
+//!                                                    .unconnected_data_item.type_id
+//!                 Length                               .unconnected_data_item.packet_length
+//!                                                      (computed on write when None)
 //!             Type ID: Socket Address Info O->T (0x8000)
 //!                                                    .sockaddr_info_items.o2t: Some(SockaddrInfo)
 //!             Type ID: Socket Address Info T->O (0x8001)
 //!                                                    .sockaddr_info_items.t2o: Some(SockaddrInfo)
-//! Common Industrial Protocol                     .unconnected_data: CipMessage::Request / ::Response
+//! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
 //! ```
 //!
 //! The one structural difference: Wireshark shows the CIP message as its own top-level tree, while
@@ -148,7 +150,7 @@ impl EnIpPacket {
     /// The CIP message carried by the Unconnected Data Item, if any
     pub fn cip_message(&self) -> Option<&CipMessage> {
         match &self.command_specific_data {
-            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.unconnected_data),
+            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.cip_message),
             _ => None,
         }
     }
