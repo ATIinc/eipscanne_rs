@@ -8,20 +8,27 @@
 //!
 //! `cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host 172.31.19.18 --motor 0`
 
-use std::time::Instant;
+use std::io::Cursor;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
+use bilge::prelude::u4;
+use binrw::BinRead;
 use clap::Parser;
 
-use eipscanne_rs::cip::connection_manager::parameters::ConnectionTimeoutMultiplier;
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionTimeoutMultiplier, PriorityTimeTick,
+};
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::implicit::{
-    Consumer, Producer, bind_io_socket, forward_close, forward_open, recv_io_packet, send_io_packet,
+    FIRST_PACKET_GRACE, accept_input, bind_io_socket, forward_close, forward_open, input_timeout,
+    output_packet, recv_io_packet, send_io_packet,
 };
 use scanner::session::Session;
 
-use eds_parser::{Eds, OriginatorSettings, check_assembly, to_connection_config};
+use eds_parser::{Eds, OriginatorSettings, check_assembly, to_forward_open};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -75,9 +82,16 @@ async fn main() -> anyhow::Result<()> {
     let connection = eds
         .first_exclusive_owner_connection()
         .context("the EDS offers no exclusive-owner connection")?;
-    let config = to_connection_config(
+    let (request, o2t_real_time_format, t2o_real_time_format) = to_forward_open(
         connection,
         OriginatorSettings {
+            // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself
+            // times out
+            priority_time_tick: PriorityTimeTick::builder()
+                .tick_time(u4::new(10))
+                .priority(false)
+                .build(),
+            timeout_ticks: 5,
             connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
             t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
             connection_triad: ConnectionTriad {
@@ -89,22 +103,24 @@ async fn main() -> anyhow::Result<()> {
         },
     )?;
     println!(
-        "{} ({}): O->T assembly {}, T->O assembly {}",
+        "{} ({}): path {}",
         connection.name,
         connection.keyword,
-        config.o2t.connection_point,
-        config.t2o.connection_point
+        hex(&connection.path)
     );
 
     // ========= Check the structs against the EDS ============
-    // The connection must carry the assemblies the structs are written for, with their layout
-    if config.t2o.connection_point != INPUT_ASSEMBLY_INSTANCE
-        || config.o2t.connection_point != OUTPUT_ASSEMBLY_INSTANCE
-    {
+    // The connection must carry the assemblies the structs are written for, with their layout.
+    // The path ends with the two connection points: 2C <O->T> 2C <T->O>
+    if !connection.path.ends_with(&[
+        0x2C,
+        OUTPUT_ASSEMBLY_INSTANCE,
+        0x2C,
+        INPUT_ASSEMBLY_INSTANCE,
+    ]) {
         bail!(
-            "the connection carries assemblies {} and {}, the structs are for {INPUT_ASSEMBLY_INSTANCE} and {OUTPUT_ASSEMBLY_INSTANCE}",
-            config.t2o.connection_point,
-            config.o2t.connection_point
+            "the connection path {} does not end with the assemblies the structs are for ({OUTPUT_ASSEMBLY_INSTANCE} and {INPUT_ASSEMBLY_INSTANCE})",
+            hex(&connection.path)
         );
     }
     let (Some(input_format), Some(output_format)) =
@@ -134,7 +150,13 @@ async fn main() -> anyhow::Result<()> {
     // The socket first: the adapter starts sending as soon as it has replied
     let socket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let connection = forward_open(&mut session, config).await?;
+    let connection = forward_open(
+        &mut session,
+        request,
+        o2t_real_time_format,
+        t2o_real_time_format,
+    )
+    .await?;
     let established_at = Instant::now();
     println!(
         "  outputs every {} us, inputs every {} us",
@@ -143,12 +165,19 @@ async fn main() -> anyhow::Result<()> {
     );
 
     // ========= 3. Exchange I/O ============
-    // A random starting number so a restarted scanner does not repeat what the adapter last saw
-    let mut producer = Producer::new(&connection, rand::random());
-    let mut consumer = Consumer::new(&connection, established_at);
+    // The outputs never change, so the CIP sequence count stays put after the first packet;
+    // every packet gets the next encapsulation sequence number, starting at a random one so a
+    // restarted scanner does not repeat what the adapter last saw
+    let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
+        connection.response.o2t_actual_packet_interval,
+    )));
+    let mut encapsulation_sequence_number: u32 = rand::random();
+    let cip_sequence_count: u16 = 1;
 
-    let mut send_timer = tokio::time::interval(producer.period());
-    let outputs = OutputAssemblyHub4E::default();
+    let timeout = input_timeout(&connection);
+    let mut last_sequence_number = None;
+    let mut deadline = established_at + FIRST_PACKET_GRACE.max(timeout);
+
     let mut last_line: Option<String> = None;
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
@@ -162,21 +191,34 @@ async fn main() -> anyhow::Result<()> {
                     break;
                 }
                 cycle += 1;
-                let packet = producer.next_packet_from(&outputs, args.run)?;
+                let packet = output_packet(
+                    &connection,
+                    encapsulation_sequence_number,
+                    cip_sequence_count,
+                    CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default())),
+                    args.run,
+                )?;
+                encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
             }
 
             received = recv_io_packet(&socket) => {
                 let (packet, from) = received?;
-                let input = match consumer.accept(&packet, from, Instant::now()) {
-                    Ok(input) => input,
+                let (address, inputs) = match accept_input(&connection, last_sequence_number, &packet, from) {
+                    Ok(accepted) => accepted,
                     Err(discarded) => {
                         eprintln!("[{cycle:>4}] DISCARDED {discarded}");
                         continue;
                     }
                 };
-                // The same struct `io-hub-homing` reads with Get_Attribute_Single
-                let inputs = match input.decode::<InputAssemblyHub4E>() {
+                last_sequence_number = Some(address.encapsulation_sequence_number);
+                deadline = Instant::now() + timeout;
+                // Read from the wire, so the data is raw bytes; the same struct `io-hub-homing`
+                // reads with Get_Attribute_Single
+                let CipDataOpt::Raw(data) = &inputs.data else {
+                    continue;
+                };
+                let inputs = match InputAssemblyHub4E::read_le(&mut Cursor::new(data)) {
                     Ok(inputs) => inputs,
                     Err(error) => {
                         eprintln!("[{cycle:>4}] UNDECODED {error}");
@@ -202,7 +244,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
 
-            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(consumer.deadline())) => {
+            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
                 eprintln!("the connection timed out: no input packet in time");
                 break;
             }
@@ -223,4 +265,12 @@ async fn main() -> anyhow::Result<()> {
     session.unregister().await?;
 
     Ok(())
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|byte| format!("{byte:02X}"))
+        .collect::<Vec<_>>()
+        .join(" ")
 }
