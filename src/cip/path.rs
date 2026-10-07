@@ -60,7 +60,7 @@ pub enum LogicalSegmentFormat {
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct LogicalPathDefinition {
-    // For some reason, the segment sections need to be inverted... Should be u3, u3, u2
+    // Least significant bits first: format (bits 0-1), logical type (2-4), segment type (5-7)
     pub logical_segment_format: LogicalSegmentFormat,
     pub logical_segment_type: LogicalSegmentType,
     pub segment_type: SegmentType,
