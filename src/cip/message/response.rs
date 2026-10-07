@@ -1,4 +1,7 @@
-use binrw::binrw;
+use std::fmt;
+use std::io::Cursor;
+
+use binrw::{BinWrite, binrw};
 
 use crate::cip::{
     message::{
@@ -8,7 +11,7 @@ use crate::cip::{
     types::{CipUint, CipUsint},
 };
 
-use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceContainer};
+use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 
 /// General Status of a Message Router response.
 ///
@@ -109,6 +112,36 @@ pub enum ResponseStatusCode {
     Unknown(CipUsint),
 }
 
+// ======= Start of ResponseStatusCode impl ========
+
+/// The status in words with its code: `path segment error (0x04)`
+impl fmt::Display for ResponseStatusCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut code = Cursor::new(Vec::new());
+        // Every variant, `Unknown` included, writes its one-byte code
+        self.write_le(&mut code).map_err(|_| fmt::Error)?;
+        let code = code.into_inner()[0];
+        match self {
+            ResponseStatusCode::Unknown(_) => write!(f, "unknown general status ({code:#04x})"),
+            _ => write!(f, "{} ({code:#04x})", variant_words(&format!("{self:?}"))),
+        }
+    }
+}
+
+// ^^^^^^^^ End of ResponseStatusCode impl ^^^^^^^^
+
+/// A variant name in lowercase words: `PathSegmentError` -> `path segment error`
+pub(crate) fn variant_words(name: &str) -> String {
+    let mut words = String::new();
+    for (index, character) in name.chars().enumerate() {
+        if character.is_uppercase() && index > 0 {
+            words.push(' ');
+        }
+        words.push(character.to_ascii_lowercase());
+    }
+    words
+}
+
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
@@ -149,3 +182,48 @@ impl MessageRouterResponse {
 }
 
 // ^^^^^^^^ End of MessageRouterResponse impl ^^^^^^^^
+
+/// A request the adapter refused: the service it answered, its general status and the
+/// Additional Status words, whose meaning depends on the object that refused it
+#[derive(Debug, PartialEq, Clone)]
+pub struct Rejection {
+    pub service: ServiceCode,
+    pub general_status: ResponseStatusCode,
+    pub additional_status: Vec<CipUint>,
+}
+
+// ======= Start of Rejection impl ========
+
+impl Rejection {
+    /// The rejection `response` carries; `None` when its general status is success
+    pub fn from_response(response: &MessageRouterResponse) -> Option<Rejection> {
+        if response.is_success() {
+            return None;
+        }
+        Some(Rejection {
+            service: response.service_container.service(),
+            general_status: response.response_data.status,
+            additional_status: response.response_data.additional_status.clone(),
+        })
+    }
+}
+
+/// `the adapter rejected GetAttributeAll: path segment error (0x04)`, with the Additional
+/// Status words after it when the reply carries any
+impl fmt::Display for Rejection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the adapter rejected {:?}: {}",
+            self.service, self.general_status
+        )?;
+        if !self.additional_status.is_empty() {
+            write!(f, ", additional status {:#06x?}", self.additional_status)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Rejection {}
+
+// ^^^^^^^^ End of Rejection impl ^^^^^^^^
