@@ -236,7 +236,8 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 `tokio::select!` loop over the O->T send timer (`response.o2t_actual_packet_interval`), received
 packets, the input deadline and Ctrl+C, for a given number of cycles; then `forward_close` and
 `unregister`. Received inputs are printed, with "(unchanged)" when the CIP sequence count did not
-move; a discarded packet is printed with its error. The outputs differ every cycle, so the CIP
+move; a discarded packet, or a datagram that does not parse as an I/O packet, is printed with
+its error and the loop goes on. The outputs differ every cycle, so the CIP
 sequence count moves every cycle. `Args::forward_open_request()` builds every field of the
 request; `network_connection_parameters(size)` picks the 16-bit or, with `--large`, the 32-bit
 parameter word, and without `--large` fails with "a N-byte connection needs --large" when the size
