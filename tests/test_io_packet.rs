@@ -90,19 +90,19 @@ fn test_o2t_io_packet_with_32bit_header() {
 
     assert_eq!(deserialized, packet);
     assert_eq!(
-        deserialized.sequenced_address(),
-        Some(&SequencedAddress {
+        deserialized.sequenced_address,
+        SequencedAddress {
             connection_id: O2T_NETWORK_CONNECTION_ID,
             encapsulation_sequence_number: 1,
-        })
+        }
     );
 
     // The raw bytes decoded with what the connection says about them; the length of the item is
     // the connection size
-    let Some(CipDataOpt::Raw(raw_data)) = deserialized.connected_data() else {
+    let CipDataOpt::Raw(raw_data) = &deserialized.connected_data else {
         panic!(
             "expected a raw Connected Data Item, got {:?}",
-            deserialized.connected_data()
+            deserialized.connected_data
         );
     };
     let io_data = IoData::read_le_args(
@@ -165,19 +165,19 @@ fn test_t2o_io_packet_modeless() {
 
     assert_eq!(deserialized, packet);
     assert_eq!(
-        deserialized.sequenced_address(),
-        Some(&SequencedAddress {
+        deserialized.sequenced_address,
+        SequencedAddress {
             connection_id: T2O_NETWORK_CONNECTION_ID,
             encapsulation_sequence_number: 1,
-        })
+        }
     );
 
     // The raw bytes decoded with what the connection says about them; the length of the item is
     // the connection size
-    let Some(CipDataOpt::Raw(raw_data)) = deserialized.connected_data() else {
+    let CipDataOpt::Raw(raw_data) = &deserialized.connected_data else {
         panic!(
             "expected a raw Connected Data Item, got {:?}",
-            deserialized.connected_data()
+            deserialized.connected_data
         );
     };
     let io_data = IoData::read_le_args(
