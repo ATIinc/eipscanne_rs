@@ -16,17 +16,16 @@
 //!     Command Specific Data                        .command_specific_data: CommandSpecificData::SendRrData
 //!         Interface Handle                           .interface_handle
 //!         Timeout                                    .timeout
-//!         Item Count                                 (not stored: written from .items.len())
-//!             Type ID: Null Address Item (0x0000)    .items[0]: CommonPacketItem::NullAddressItem
+//!         Item Count                                 (not stored: 2 + the Sockaddr Info items)
+//!             Type ID: Null Address Item (0x0000)    (not stored)
 //!                 Length                               (not stored: always 0)
 //!             Type ID: Unconnected Data Item (0x00b2)
-//!                                                    .items[1]: CommonPacketItem::UnconnectedDataItem(..)
 //!                 Length                               (not stored: size of the written message)
 //!             Type ID: Socket Address Info O->T (0x8000)
-//!                                                    .items[2..]: CommonPacketItem::O2TSockAddrInfo(..)
+//!                                                    .sockaddr_info_items.o2t: Some(SockaddrInfo)
 //!             Type ID: Socket Address Info T->O (0x8001)
-//!                                                    .items[2..]: CommonPacketItem::T2OSockAddrInfo(..)
-//! Common Industrial Protocol                     the CipMessage::Request / ::Response inside UnconnectedDataItem
+//!                                                    .sockaddr_info_items.t2o: Some(SockaddrInfo)
+//! Common Industrial Protocol                     .unconnected_data: CipMessage::Request / ::Response
 //! ```
 //!
 //! The one structural difference: Wireshark shows the CIP message as its own top-level tree, while
@@ -51,7 +50,7 @@ use crate::cip::types::{CipByte, CipUdint, CipUint};
 
 use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
 use super::constants as eip_constants;
-use super::description::CommonPacketItem;
+use super::sockaddr::SockaddrInfoItems;
 
 #[binwrite]
 #[binread]
@@ -146,15 +145,10 @@ impl EnIpPacket {
         )
     }
 
-    /// The Common Packet Format items (empty for commands without them)
-    fn items(&self) -> &[CommonPacketItem] {
-        self.command_specific_data.items()
-    }
-
     /// The CIP message carried by the Unconnected Data Item, if any
     pub fn cip_message(&self) -> Option<&CipMessage> {
         match &self.command_specific_data {
-            CommandSpecificData::SendRrData(rr_data) => rr_data.cip_message(),
+            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.unconnected_data),
             _ => None,
         }
     }
@@ -170,8 +164,7 @@ impl EnIpPacket {
     /// Reads a packet sent by a scanner: a SendRRData packet must carry a Message Router request.
     /// Only available with the `adapter` feature.
     ///
-    /// Unlike `read`, which keeps an unexpected or unparsable message as an `Unknown` item, this
-    /// fails when the request is missing.
+    /// Unlike `read`, which accepts either, this fails when the message is a response.
     #[cfg(feature = "adapter")]
     pub fn read_request<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
         Self::read_expecting(reader, "a Message Router request", |packet| {
@@ -207,11 +200,12 @@ impl EnIpPacket {
         Ok(packet)
     }
 
-    /// The Sockaddr Info items of the packet, if any
-    pub fn sockaddr_info_items(&self) -> impl Iterator<Item = &CommonPacketItem> {
-        self.items()
-            .iter()
-            .filter(|item| item.sockaddr_info().is_some())
+    /// The Sockaddr Info items carried by a Send RR Data packet
+    pub fn sockaddr_info_items(&self) -> Option<&SockaddrInfoItems> {
+        match &self.command_specific_data {
+            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.sockaddr_info_items),
+            _ => None,
+        }
     }
 }
 

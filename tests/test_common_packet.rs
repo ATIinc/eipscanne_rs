@@ -21,7 +21,6 @@ use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     NO_ENCAPSULATION_TIMEOUT,
 };
-use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EncapsulationHeader;
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
@@ -63,39 +62,6 @@ fn test_serialize_sockaddr_info_big_endian_fields() {
 
     assert_eq!(deserialized, sockaddr_info);
     assert_eq!(deserialized.socket_address(), sample_address());
-}
-
-#[test]
-fn test_serialize_t2o_sockaddr_info_item() {
-    /*
-    Type ID: Socket Address Info T->O (0x8001)
-        Length: 16
-        Socket Address ...
-    */
-    let expected_byte_array: Vec<CipByte> = vec![
-        0x01, 0x80, 0x10, 0x00, 0x00, 0x02, 0x08, 0xae, 0xc0, 0xa8, 0x01, 0x0a, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00,
-    ];
-
-    let item = CommonPacketItem::T2OSockAddrInfo(sample_address().into());
-
-    let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
-    item.write(&mut writer).unwrap();
-
-    assert_eq_hex!(expected_byte_array, byte_array_buffer);
-
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let deserialized = CommonPacketItem::read(&mut buf_reader).unwrap();
-
-    assert_eq!(deserialized, item);
-    assert_eq!(
-        deserialized
-            .sockaddr_info()
-            .map(SockaddrInfo::socket_address),
-        Some(sample_address())
-    );
 }
 
 #[test]
@@ -210,9 +176,7 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
                     },
                 },
             );
-            rr_data
-                .items
-                .push(CommonPacketItem::O2TSockAddrInfo(sample_address().into()));
+            rr_data.sockaddr_info_items.o2t = Some(sample_address().into());
             rr_data
         }),
     };
@@ -222,7 +186,7 @@ fn test_response_assembly_with_trailing_sockaddr_item() {
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
     assert_eq!(expected_response, response_object);
-    assert_eq!(response_object.sockaddr_info_items().count(), 1);
+    assert!(response_object.sockaddr_info_items().unwrap().o2t.is_some());
 
     // Writing the parsed object must reproduce the packet, including the lengths and the item count
     let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -284,9 +248,7 @@ fn test_write_then_read_response() {
     let mut response =
         ResponseObjectAssembly::new_send_rr_data(0x3, NO_ENCAPSULATION_TIMEOUT, forward_open_reply);
     if let CommandSpecificData::SendRrData(rr_data) = &mut response.command_specific_data {
-        rr_data
-            .items
-            .push(CommonPacketItem::O2TSockAddrInfo(sample_address().into()));
+        rr_data.sockaddr_info_items.o2t = Some(sample_address().into());
     }
 
     let mut written_bytes: Vec<u8> = Vec::new();
@@ -304,5 +266,5 @@ fn test_write_then_read_response() {
         read_back.command_specific_data,
         response.command_specific_data
     );
-    assert_eq!(read_back.sockaddr_info_items().count(), 1);
+    assert!(read_back.sockaddr_info_items().unwrap().o2t.is_some());
 }

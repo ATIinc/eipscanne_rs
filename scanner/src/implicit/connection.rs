@@ -13,7 +13,6 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     connection_size,
 };
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
-use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
@@ -92,10 +91,10 @@ pub async fn forward_close(
 /// Where the outputs go: the reply's O->T Sockaddr Info address (`0.0.0.0` meaning the
 /// adapter), or the adapter on the I/O port
 fn o2t_endpoint(reply: &EnIpPacket, target_ip: Ipv4Addr) -> SocketAddrV4 {
-    let o2t_sockaddr_info = reply.sockaddr_info_items().find_map(|item| match item {
-        CommonPacketItem::O2TSockAddrInfo(info) => Some(info.socket_address()),
-        _ => None,
-    });
+    let o2t_sockaddr_info = reply
+        .sockaddr_info_items()
+        .and_then(|items| items.o2t)
+        .map(|info| info.socket_address());
 
     match o2t_sockaddr_info {
         Some(address) if address.ip().is_unspecified() => {
@@ -243,14 +242,14 @@ pub(crate) mod test_support {
 mod tests {
     use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
     use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
-    use eipscanne_rs::eip::sockaddr::SockaddrInfo;
+    use eipscanne_rs::eip::sockaddr::{SockaddrInfo, SockaddrInfoItems};
 
     use test_support::TARGET_IP;
 
     use super::*;
 
-    /// A SendRRData reply with the given Sockaddr Info items appended
-    fn reply_with_items(items: Vec<CommonPacketItem>) -> EnIpPacket {
+    /// A SendRRData reply with the given Sockaddr Info items
+    fn reply_with_items(items: SockaddrInfoItems) -> EnIpPacket {
         let mut reply = EnIpPacket::new_send_rr_data(
             0x03,
             NO_ENCAPSULATION_TIMEOUT,
@@ -260,39 +259,49 @@ mod tests {
             ),
         );
         if let CommandSpecificData::SendRrData(RRPacketData {
-            items: existing, ..
+            sockaddr_info_items,
+            ..
         }) = &mut reply.command_specific_data
         {
-            existing.extend(items);
+            *sockaddr_info_items = items;
         }
         reply
     }
 
     #[test]
     fn o2t_endpoint_follows_the_sockaddr_info() {
-        let o2t = |address| CommonPacketItem::O2TSockAddrInfo(SockaddrInfo::from(address));
+        let o2t = |address| Some(SockaddrInfo::from(address));
         let other = SocketAddrV4::new(Ipv4Addr::new(172, 28, 0, 20), 2222);
 
         // None: the target on the I/O port
         assert_eq!(
-            o2t_endpoint(&reply_with_items(vec![]), TARGET_IP),
+            o2t_endpoint(&reply_with_items(SockaddrInfoItems::default()), TARGET_IP),
             SocketAddrV4::new(TARGET_IP, 2222)
         );
         // 0.0.0.0: the target on the given port
         assert_eq!(
             o2t_endpoint(
-                &reply_with_items(vec![o2t(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 2223))]),
+                &reply_with_items(SockaddrInfoItems {
+                    o2t: o2t(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 2223)),
+                    t2o: None,
+                }),
                 TARGET_IP
             ),
             SocketAddrV4::new(TARGET_IP, 2223)
         );
         // Any other address as given; the T->O item is not where outputs go
-        let t2o = CommonPacketItem::T2OSockAddrInfo(SockaddrInfo::from(SocketAddrV4::new(
+        let t2o = Some(SockaddrInfo::from(SocketAddrV4::new(
             Ipv4Addr::new(172, 28, 0, 30),
             2222,
         )));
         assert_eq!(
-            o2t_endpoint(&reply_with_items(vec![t2o, o2t(other)]), TARGET_IP),
+            o2t_endpoint(
+                &reply_with_items(SockaddrInfoItems {
+                    o2t: o2t(other),
+                    t2o
+                }),
+                TARGET_IP
+            ),
             other
         );
     }

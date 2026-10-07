@@ -23,6 +23,9 @@ pub const CIP_INTERFACE_HANDLE: CipUdint = 0;
 /// Timeout of Send RR Data: 0 relies on the CIP timeout, which is always the case for CIP
 pub const NO_ENCAPSULATION_TIMEOUT: CipUint = 0;
 
+/// Items every Send RR Data packet starts with: an address item followed by a data item
+pub const SEND_RR_DATA_REQUIRED_ITEM_COUNT: CipUint = 2;
+
 /// Protocol version requested by Register Session
 pub const ENCAPSULATION_PROTOCOL_VERSION: CipUint = 1;
 
