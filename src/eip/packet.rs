@@ -46,7 +46,7 @@ use crate::cip::message::CipMessage;
 use crate::cip::message::response::MessageRouterResponse;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData};
+use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
 use super::constants as eip_constants;
 
 #[binwrite]
@@ -142,19 +142,11 @@ impl EnIpPacket {
         )
     }
 
-    /// The command specific data of a Send RR Data packet
-    pub fn send_rr_data(&self) -> Option<&RRPacketData> {
-        match &self.command_specific_data {
-            CommandSpecificData::SendRrData(rr_data) => Some(rr_data),
-            _ => None,
-        }
-    }
-
     /// The Message Router response carried by the packet, if it carries one
     pub fn response(&self) -> Option<&MessageRouterResponse> {
-        match self.send_rr_data().map(|rr_data| &rr_data.cip_message) {
-            Some(CipMessage::Response(response)) => Some(response),
-            _ => None,
+        match &self.command_specific_data.as_send_rr_data()?.cip_message {
+            CipMessage::Response(response) => Some(response),
+            CipMessage::Request(_) => None,
         }
     }
 }
