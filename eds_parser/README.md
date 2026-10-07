@@ -36,8 +36,8 @@ whether to use a Large_Forward_Open. The client/server bit
 of the trigger mask is ignored (vendors disagree on it; a Forward_Open's originator is always the
 client), and configuration data the EDS declares is kept but never sent.
 
-Not parsed: `{ }` nested fields, `L"..."` strings, `0b` numbers, string escapes. Such a file
-fails with pest's line and column.
+Not parsed: `{ }` nested fields, `L"..."` strings and escaped quotes inside strings. Such a file
+fails with pest's line and column. A `0b` number reads as a word.
 
 ## Running `eds-implicit-io`
 
@@ -61,4 +61,4 @@ ends the exchange early; the connection is still closed and the session unregist
   the path and configuration data to be ignored.
 * `tests/sample_adapter.rs`: the fixture end to end, down to the Forward_Open bytes of the
   library's captured request.
-* Against a device's own file: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -p eds_parser -- --ignored`.
+* Against a device's own file: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`.
