@@ -167,19 +167,6 @@ impl MessageRouterResponse {
     pub fn is_success(&self) -> bool {
         self.response_data.status == ResponseStatusCode::Success
     }
-
-    /// The response when its general status is success; why the adapter refused the request
-    /// otherwise
-    pub fn error_for_status(&self) -> Result<&Self, Rejection> {
-        if self.is_success() {
-            return Ok(self);
-        }
-        Err(Rejection {
-            service: self.service_container.service(),
-            general_status: self.response_data.status,
-            additional_status: self.response_data.additional_status.clone(),
-        })
-    }
 }
 
 // ^^^^^^^^ End of MessageRouterResponse impl ^^^^^^^^
@@ -194,6 +181,20 @@ pub struct Rejection {
 }
 
 // ======= Start of Rejection impl ========
+
+impl Rejection {
+    /// The rejection `response` carries; `None` when its general status is success
+    pub fn from_response(response: &MessageRouterResponse) -> Option<Rejection> {
+        if response.is_success() {
+            return None;
+        }
+        Some(Rejection {
+            service: response.service_container.service(),
+            general_status: response.response_data.status,
+            additional_status: response.response_data.additional_status.clone(),
+        })
+    }
+}
 
 /// `the adapter rejected GetAttributeAll: PathSegmentError (0x04)`, with the Additional
 /// Status words after it when the reply carries any
