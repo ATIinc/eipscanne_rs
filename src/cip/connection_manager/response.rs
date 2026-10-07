@@ -1,10 +1,9 @@
 //! Reply side of the Connection Manager services: why one was refused. The reply data of an
 //! accepted one is a `ForwardOpenResponse` or `ForwardCloseResponse`, read like any other reply.
 
-use std::fmt;
 use std::io::Cursor;
 
-use binrw::{BinRead, BinWrite, binrw};
+use binrw::{BinRead, binrw};
 
 use crate::cip::message::response::Rejection;
 use crate::cip::message::shared::ServiceCode;
@@ -113,26 +112,6 @@ pub enum ConnectionManagerExtendedStatus {
     InvalidProduceConsumeDataFormat,
     Unknown(CipUint),
 }
-
-// ======= Start of ConnectionManagerExtendedStatus impl ========
-
-/// The extended status name with its code: `ConnectionInUseOrDuplicateForwardOpen (0x0100)`
-impl fmt::Display for ConnectionManagerExtendedStatus {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut code = Cursor::new(Vec::new());
-        // Every variant, `Unknown` included, writes its 16-bit code
-        self.write_le(&mut code).map_err(|_| fmt::Error)?;
-        let code = u16::from_le_bytes([code.get_ref()[0], code.get_ref()[1]]);
-        match self {
-            ConnectionManagerExtendedStatus::Unknown(_) => {
-                write!(f, "unknown extended status ({code:#06x})")
-            }
-            _ => write!(f, "{self:?} ({code:#06x})"),
-        }
-    }
-}
-
-// ^^^^^^^^ End of ConnectionManagerExtendedStatus impl ^^^^^^^^
 
 // ======= Start of Rejection impl ========
 
