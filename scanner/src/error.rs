@@ -30,12 +30,6 @@ pub enum Error {
     },
     /// The reply parsed, but is not the reply to what was sent
     UnexpectedReply(String),
-    /// The connection size of a direction does not fit the 9 bits of a Forward_Open; a
-    /// Large_Forward_Open carries up to 65535 bytes
-    ConnectionSizeTooLarge {
-        direction: &'static str,
-        size: u16,
-    },
     /// The outputs do not fit the connection
     OutputSize {
         connection_size_type: ConnectionSizeType,
@@ -98,10 +92,6 @@ impl fmt::Display for Error {
                 }
             }
             Error::UnexpectedReply(what) => write!(f, "unexpected reply: {what}"),
-            Error::ConnectionSizeTooLarge { direction, size } => write!(
-                f,
-                "the {direction} connection size of {size} bytes needs a Large_Forward_Open"
-            ),
             Error::OutputSize {
                 connection_size_type,
                 data_size,
