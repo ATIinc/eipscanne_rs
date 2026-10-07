@@ -275,7 +275,7 @@ mod tests {
 
         // None: the target on the I/O port
         assert_eq!(
-            o2t_endpoint(&reply_with_items(SockaddrInfoItems::default()), TARGET_IP),
+            o2t_endpoint(&reply_with_items(SockaddrInfoItems::empty()), TARGET_IP),
             SocketAddrV4::new(TARGET_IP, 2222)
         );
         // 0.0.0.0: the target on the given port
