@@ -13,7 +13,7 @@ packet and no other protocol feature.
 * **Dependencies** — `bilge` 0.5 (bitfield builders through `BuilderBits`; generated `new`
   constructors are private unless declared `new = pub`), `binrw` 0.15; dev-dependencies `tokio`
   1.53, `clap` 4.6 and `pretty_assertions` 1.4; the `hex_test_macros` crate depends on
-  `pretty-hex` 0.4.2. Both crates use Rust edition 2024.
+  `pretty-hex` 0.4.2. Both crates use Rust edition 2024; `eipscanne_rs` is version 0.3.0.
 * **Module layout** — `src/cip.rs`, `src/cip/message.rs` and `src/eip.rs` declare their submodules,
   which live in `src/cip/`, `src/cip/message/` and `src/eip/`; there are no `mod.rs` files.
 * **Named constants** — `src/cip/object_ids.rs` holds the Identity, Assembly and Connection Manager
@@ -100,7 +100,7 @@ packet and no other protocol feature.
   * `RequestObjectAssembly` / `ResponseObjectAssembly` are both aliases of `EnIpPacket` that only
     document the direction; `RequestObjectAssembly::new_identity` and `new_service_request` build
     a request to an object.
-* **README** — "Related projects" section.
+* **README** — what the library covers, and the "Related projects" section.
 
 ## Tests
 
