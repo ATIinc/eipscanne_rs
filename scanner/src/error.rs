@@ -6,10 +6,7 @@ use std::fmt;
 use std::net::IpAddr;
 
 use eipscanne_rs::cip::connection_manager::parameters::ConnectionSizeType;
-use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
-use eipscanne_rs::cip::message::shared::ServiceCode;
-use eipscanne_rs::cip::types::CipUint;
+use eipscanne_rs::cip::message::response::Rejection;
 use eipscanne_rs::eip::command::EncapsStatusCode;
 
 /// What can go wrong while talking to an adapter
@@ -22,12 +19,10 @@ pub enum Error {
     EncapsulationStatus(EncapsStatusCode),
     /// The adapter's address is not an IPv4 address, which is all I/O connections support
     NotIpv4(IpAddr),
-    /// The adapter answered `service` with a general status other than success
-    Rejected {
-        service: ServiceCode,
-        general_status: ResponseStatusCode,
-        additional_status: Vec<CipUint>,
-    },
+    /// The adapter refused the request
+    Rejected(Rejection),
+    /// The reply carries no Message Router response
+    NoResponse,
     /// The reply parsed, but is not the reply to what was sent
     UnexpectedReply(String),
     /// The outputs do not fit the connection
@@ -46,17 +41,6 @@ const _: () = {
 
 // ======= Start of Error impl ========
 
-impl Error {
-    /// The rejection of `service` that `response` carries
-    pub(crate) fn rejected(service: ServiceCode, response: &MessageRouterResponse) -> Self {
-        Error::Rejected {
-            service,
-            general_status: response.response_data.status,
-            additional_status: response.response_data.additional_status.clone(),
-        }
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -71,26 +55,25 @@ impl fmt::Display for Error {
             Error::NotIpv4(address) => {
                 write!(f, "the adapter's address {address} is not an IPv4 address")
             }
-            Error::Rejected {
-                service,
-                general_status,
-                additional_status,
-            } => {
-                write!(f, "the adapter rejected {service:?}: {general_status}")?;
-                // The Connection Manager says why in its extended status; any other object's
-                // additional status is its own, so it is printed as it came
-                let connection_manager = matches!(
-                    service,
-                    ServiceCode::ForwardOpen
-                        | ServiceCode::LargeForwardOpen
-                        | ServiceCode::ForwardClose
-                );
-                match ConnectionManagerExtendedStatus::from_additional_status(additional_status) {
-                    Some(extended_status) if connection_manager => write!(f, ", {extended_status}"),
-                    _ if additional_status.is_empty() => Ok(()),
-                    _ => write!(f, ", additional status {additional_status:#06x?}"),
+            Error::Rejected(rejection) => {
+                write!(
+                    f,
+                    "the adapter rejected {:?}: {:?}",
+                    rejection.service, rejection.general_status
+                )?;
+                // The Connection Manager's reason by name; any other object's Additional Status
+                // words as they came
+                match rejection.extended_status() {
+                    Some(extended_status) => write!(f, ", {extended_status:?}"),
+                    None if rejection.additional_status.is_empty() => Ok(()),
+                    None => write!(
+                        f,
+                        ", additional status {:#06x?}",
+                        rejection.additional_status
+                    ),
                 }
             }
+            Error::NoResponse => write!(f, "the reply carries no Message Router response"),
             Error::UnexpectedReply(what) => write!(f, "unexpected reply: {what}"),
             Error::OutputSize {
                 connection_size_type,
@@ -129,6 +112,12 @@ impl From<std::io::Error> for Error {
 impl From<binrw::Error> for Error {
     fn from(error: binrw::Error) -> Self {
         Error::Parse(error)
+    }
+}
+
+impl From<Rejection> for Error {
+    fn from(rejection: Rejection) -> Self {
+        Error::Rejected(rejection)
     }
 }
 

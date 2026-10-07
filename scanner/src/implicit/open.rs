@@ -6,14 +6,14 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
-use eipscanne_rs::cip::connection_manager::response::ConnectionManagerResponse;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::Error;
-use crate::session::{Session, router_response};
+use crate::explicit::decode_reply;
+use crate::session::Session;
 
 /// An open connection: the Forward_Open that was sent, the reply the adapter sent back, and the
 /// real-time format of each direction, the one thing both ends agree on without the wire. Every
@@ -42,29 +42,13 @@ pub async fn forward_open(
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
 ) -> Result<OpenConnection, Error> {
-    session
-        .send(&RequestObjectAssembly::new_forward_open(
+    let reply = session
+        .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
             request.clone(),
         ))
         .await?;
-    let reply = session.read_reply().await?;
-
-    let router_response = router_response(&reply)?;
-    let response = ConnectionManagerResponse::from_message_router_response(router_response)
-        .map_err(|error| Error::UnexpectedReply(error.to_string()))?;
-
-    let response = match response {
-        ConnectionManagerResponse::ForwardOpen(response) => response,
-        ConnectionManagerResponse::Unsuccessful(_) => {
-            return Err(Error::rejected(request.service_code(), router_response));
-        }
-        ConnectionManagerResponse::ForwardClose(_) => {
-            return Err(Error::UnexpectedReply(
-                "a Forward_Close reply answered the Forward_Open".to_string(),
-            ));
-        }
-    };
+    let response: ForwardOpenResponse = decode_reply(&reply)?;
 
     let target_ip = session.peer_ip();
     Ok(OpenConnection {
