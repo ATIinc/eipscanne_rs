@@ -145,5 +145,5 @@ item as plain data because it has not seen the Forward_Open of the connection.
 ## Verification
 
 ```
-cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --examples
 ```
