@@ -1,7 +1,5 @@
-//! The five stages against a fake adapter on the loopback interface: the fake answers a
-//! RegisterSession, a Forward_Open (with a Socket Address Info O->T item pointing at its own
-//! UDP port), echoes one I/O packet, then answers the Forward_Close and reads the
-//! UnregisterSession. No real adapter is needed; `tests/integration` has the OpENer steps.
+//! The five stages against a fake adapter on the loopback interface, which echoes one I/O
+//! packet. `tests/integration` has the steps for a real adapter.
 
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -65,8 +63,7 @@ fn parameters(connection_size: u16) -> NetworkConnectionParameters {
     )
 }
 
-/// 4 output bytes behind a sequence count and a run/idle header (10), 4 input bytes behind a
-/// sequence count (6), both every 100 ms
+/// 4 bytes each way (10 and 6 with overhead), every 100 ms
 fn request() -> ForwardOpenRequest {
     ForwardOpenRequest {
         priority_time_tick: PriorityTimeTick::builder()
@@ -165,8 +162,7 @@ fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
     ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (false,)).unwrap()
 }
 
-/// Plays the adapter for one connection: the sequence number of the output packet it received
-/// and the outputs themselves are returned so the test can check them
+/// Plays the adapter for one connection; returns the output packet's sequence number and data
 async fn fake_adapter(
     listener: TcpListener,
     io_socket: UdpSocket,
@@ -189,8 +185,7 @@ async fn fake_adapter(
     )
     .await;
 
-    // 2. Forward_Open: grant the requested intervals, pick the O->T connection ID and say
-    //    which port the outputs go to
+    // 2. Forward_Open: grant the intervals, pick the O->T ID and the outputs' port
     let request = read_request(&mut stream).await;
     assert_eq!(request.header.session_handle, SESSION_HANDLE);
     let forward_open = forward_open_request_of(&request);
@@ -277,7 +272,7 @@ async fn one_connection_against_a_fake_adapter() {
     let listener = TcpListener::bind((LOCALHOST, 0)).await.unwrap();
     let adapter_port = listener.local_addr().unwrap().port();
     let adapter_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
-    // An ephemeral port instead of 2222, so the test never collides with a running scanner
+    // An ephemeral port, so the test never collides with a running scanner
     let scanner_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
     let scanner_io_port = scanner_io_socket.local_addr().unwrap().port();
 

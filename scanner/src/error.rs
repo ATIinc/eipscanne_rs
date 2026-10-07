@@ -1,6 +1,4 @@
-//! The one error type of the scanner: everything that can stop a call, from a broken socket to an
-//! adapter that says no, to an input packet that is not the next one of the connection. An
-//! application wraps it however it handles errors.
+//! The one error type of the scanner, from a broken socket to a refused request.
 
 use std::fmt;
 use std::net::IpAddr;
@@ -20,7 +18,7 @@ pub enum Error {
     Parse(binrw::Error),
     /// The adapter answered with an encapsulation status other than success
     EncapsulationStatus(EncapsStatusCode),
-    /// The adapter's address is not an IPv4 address, which is all I/O connections support
+    /// The adapter's address is not IPv4, the only kind I/O connections support
     NotIpv4(IpAddr),
     /// The adapter refused the request
     Rejected(Rejection),
@@ -28,8 +26,7 @@ pub enum Error {
     NoResponse,
     /// The reply parsed, but is not the reply to what was sent
     UnexpectedReply(String),
-    /// An I/O packet that is not the next input of the connection; the caller reports it and
-    /// waits for the next one
+    /// An I/O packet that is not the next input of the connection; the caller skips it
     UnexpectedPacket(String),
     /// The outputs do not fit the connection
     OutputSize {
