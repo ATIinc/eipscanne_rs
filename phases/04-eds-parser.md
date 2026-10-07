@@ -135,8 +135,9 @@ FIRST_PACKET_GRACE}`).
 3. Register, `bind_io_socket`, `forward_open` with the request and the two real-time formats, the
    cyclic loop, `forward_close`, `unregister`. Each send tick builds the outputs with
    `build_o2t_packet` and sends them with `send_io_packet`; each received packet goes through
-   `recv_io_packet` and `accept_t2o_packet`, and an `Error::UnexpectedPacket` is printed as
-   `DISCARDED` and the loop goes on; the deadline is `input_timeout` after the last accepted
+   `recv_io_packet` and `accept_t2o_packet`, and an `Error::UnexpectedPacket`, or an
+   `Error::Parse` for a datagram that is not an I/O packet, is printed as `DISCARDED` and the
+   loop goes on; the deadline is `input_timeout` after the last accepted
    packet (at least `FIRST_PACKET_GRACE` after the Forward_Open reply for the first). The loop
    follows `implicit-io` and is repeated on purpose so the example reads top to bottom; the
    outputs never change, so the CIP sequence count stays at 1.
