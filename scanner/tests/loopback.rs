@@ -42,9 +42,9 @@ use eipscanne_rs::eip::io_packet::IoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 
-use scanner::implicit::{
-    accept_input, forward_close, forward_open, output_packet, recv_io_packet, send_io_packet,
-};
+use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
+use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
 use scanner::session::Session;
 
 const SESSION_HANDLE: CipUdint = 0x0000_0042;
@@ -310,13 +310,14 @@ async fn one_connection_against_a_fake_adapter() {
 
     // 3. One cycle each way
     let outputs = [0xde, 0xad, 0xbe, 0xef];
-    let packet = output_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
+    let packet =
+        build_o2t_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
     send_io_packet(&scanner_io_socket, &packet, connection.o2t_endpoint)
         .await
         .unwrap();
 
     let (packet, from) = recv_io_packet(&scanner_io_socket).await.unwrap();
-    let (address, inputs) = accept_input(&connection, None, &packet, from).unwrap();
+    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from).unwrap();
     assert_eq!(address.encapsulation_sequence_number, 1);
     assert_eq!(inputs.cip_sequence_count, Some(1));
     assert_eq!(inputs.run_idle_header, None);

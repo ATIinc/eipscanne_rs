@@ -22,9 +22,10 @@ use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use scanner::implicit::{
-    FIRST_PACKET_GRACE, accept_input, bind_io_socket, forward_close, forward_open, input_timeout,
-    output_packet, recv_io_packet, send_io_packet,
+use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
+use scanner::implicit::t2o::{
+    FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
 use scanner::session::Session;
 
@@ -234,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
-                let packet = output_packet(
+                let packet = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
@@ -248,7 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             received = recv_io_packet(&socket) => {
                 let (packet, from) = received?;
-                match accept_input(&connection, last_sequence_number, &packet, from) {
+                match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
                     Ok((address, inputs)) => {
                         last_sequence_number = Some(address.encapsulation_sequence_number);
                         deadline = Instant::now() + timeout;

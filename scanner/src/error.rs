@@ -1,6 +1,6 @@
 //! The one error type of the scanner: everything that can stop a call, from a broken socket to an
-//! adapter that says no. An application wraps it however it handles errors; `Discarded` is not
-//! here because a discarded input packet stops nothing.
+//! adapter that says no. An application wraps it however it handles errors. A discarded input
+//! packet is not here: it stops nothing, so `t2o::accept_t2o_packet` only reports why.
 
 use std::fmt;
 use std::net::IpAddr;
