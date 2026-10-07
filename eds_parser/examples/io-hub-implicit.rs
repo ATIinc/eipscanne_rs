@@ -22,6 +22,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use scanner::error::Error;
 use scanner::implicit::connection::{forward_close, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
@@ -204,7 +205,15 @@ async fn main() -> anyhow::Result<()> {
             }
 
             received = recv_io_packet(&socket) => {
-                let (packet, from) = received?;
+                // A datagram that is not an I/O packet is logged and skipped, like a discarded one
+                let (packet, from) = match received {
+                    Ok(received) => received,
+                    Err(Error::Parse(error)) => {
+                        eprintln!("[{cycle:>4}] DISCARDED a datagram that does not parse: {error}");
+                        continue;
+                    }
+                    Err(error) => return Err(error.into()),
+                };
                 let (address, inputs) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
                     Ok(accepted) => accepted,
                     Err(discarded) => {
