@@ -2,7 +2,7 @@ mod common;
 
 use std::io::Cursor;
 
-use binrw::BinWrite;
+use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
 
@@ -105,7 +105,7 @@ fn test_deserialize_register_session_response_packet_description() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let session_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,
@@ -170,7 +170,7 @@ fn test_deserialize_register_session_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let session_response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let session_response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_session_header = EncapsulationHeader {
         command: EnIpCommand::RegisterSession,

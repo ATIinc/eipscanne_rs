@@ -17,7 +17,6 @@ hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
 pretty_assertions = "1.4.1"
 
 [features]
-default = []            # Comment to enable adapter support
-# default = ["adapter"]   # UN-Comment to enable adapter support
-# Adapter-side helpers, e.g. reading the requests a scanner sends (`EnIpPacket::read_request`)
-adapter = []
+default = []            # Comment to enable async support
+# default = ["async"]   # UN-Comment to enable async support for testing
+async = []

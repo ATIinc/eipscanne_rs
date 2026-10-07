@@ -67,10 +67,12 @@ fn sample_request() -> ForwardCloseRequest {
 /// The request data of a packet read from the wire, parsed as a Forward_Close request (what an
 /// adapter does with the packet)
 fn forward_close_request_of(packet: &RequestObjectAssembly) -> ForwardCloseRequest {
-    let Some(CipMessage::Request(message)) = packet.cip_message() else {
+    let Some(CipMessage::Request(message)) =
+        packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    else {
         panic!(
             "expected a Message Router request, got {:?}",
-            packet.cip_message()
+            packet.command_specific_data
         );
     };
     // A packet read from the wire keeps its request data raw
@@ -316,7 +318,7 @@ fn test_deserialize_forward_close_success_response() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // The reply data as the typed reply
     let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
