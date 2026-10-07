@@ -17,7 +17,9 @@ use eipscanne_rs::eip::constants::{
     ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
     UNREGISTERED_SESSION_HANDLE,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -99,18 +101,28 @@ fn test_deserialize_cip_identity_request() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterRequest {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
+            },
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(10),
+            },
+            cip_message: MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
                 request_data: RequestData::new(
                     Some(0x4),
                     CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
                     None,
                 ),
-            },
-        )),
+            }
+            .into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }),
     };
 
     // Assert equality

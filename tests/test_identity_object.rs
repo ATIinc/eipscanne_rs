@@ -18,7 +18,9 @@ use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     NO_ENCAPSULATION_TIMEOUT,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -374,12 +376,19 @@ fn test_deserialize_full_identity_response() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll)
-                    .into(),
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
+            },
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(28),
+            },
+            cip_message: MessageRouterResponse {
+                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0x0,
@@ -397,8 +406,10 @@ fn test_deserialize_full_identity_response() {
                         product_name: CipShortString::from("ClearLink".to_string()),
                     })),
                 },
-            },
-        )),
+            }
+            .into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }),
     };
 
     // Assert equality

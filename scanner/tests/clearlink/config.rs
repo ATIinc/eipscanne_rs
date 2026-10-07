@@ -16,7 +16,9 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
@@ -191,10 +193,18 @@ fn test_read_clearlink_config_assembly_object_response() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterResponse {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
+            },
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(4),
+            },
+            cip_message: MessageRouterResponse {
                 service_container: ServiceContainer::new_response(ServiceCode::SetAttributeSingle),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
@@ -202,8 +212,10 @@ fn test_read_clearlink_config_assembly_object_response() {
                     additional_status: vec![],
                     data: CipDataOpt::Raw(vec![]),
                 },
-            },
-        )),
+            }
+            .into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);

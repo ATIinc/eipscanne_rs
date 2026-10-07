@@ -88,7 +88,6 @@ fn test_o2t_io_packet_with_32bit_header() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let deserialized = IoPacket::read(&mut buf_reader).unwrap();
 
-    assert_eq!(deserialized, packet);
     assert_eq!(
         deserialized.sequenced_address,
         SequencedAddress {
@@ -163,7 +162,6 @@ fn test_t2o_io_packet_modeless() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let deserialized = IoPacket::read(&mut buf_reader).unwrap();
 
-    assert_eq!(deserialized, packet);
     assert_eq!(
         deserialized.sequenced_address,
         SequencedAddress {

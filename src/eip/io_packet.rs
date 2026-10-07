@@ -8,12 +8,13 @@
 //! ----------------------------------------------  --------------------------------------------------
 //! EtherNet/IP (Industrial Protocol)               IoPacket
 //!     Item Count                                    (not stored: always 2)
-//!         Type ID: Sequenced Address Item (0x8002)  .sequenced_address: SequencedAddress
-//!             Length                                  (not stored: always 8)
+//!         Type ID: Sequenced Address Item (0x8002)  .sequenced_address_item.type_id
+//!             Length                                  .sequenced_address_item.packet_length (8)
 //!             Connection ID                         .sequenced_address.connection_id
 //!             Encapsulation Sequence Number         .sequenced_address.encapsulation_sequence_number
-//!         Type ID: Connected Data Item (0x00b1)     (not stored)
-//!             Length                                  (not stored: size of the written data)
+//!         Type ID: Connected Data Item (0x00b1)     .connected_data_item.type_id
+//!             Length                                  .connected_data_item.packet_length
+//!                                                     (computed on write when None)
 //! Common Industrial Protocol, I/O                 .connected_data (see IoData)
 //! ```
 //!
@@ -26,7 +27,7 @@ use binrw::binrw;
 use crate::cip::message::data::CipDataOpt;
 use crate::cip::types::{CipUdint, CipUint};
 
-use super::description::{CommonPacketItemId, read_item, write_item};
+use super::description::{CommonPacketDescriptor, CommonPacketItemId, serialized_length};
 
 /// Items of an I/O packet: an address item followed by a data item
 const IO_PACKET_ITEM_COUNT: CipUint = 2;
@@ -37,10 +38,6 @@ const SEQUENCED_ADDRESS_LENGTH: CipUint = 8;
 /// packet's number on that connection
 #[binrw]
 #[brw(little)]
-#[br(import(length: CipUint), assert(
-    length == SEQUENCED_ADDRESS_LENGTH,
-    "a Sequenced Address Item has a Length of 8"
-))]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SequencedAddress {
     pub connection_id: CipUdint,
@@ -60,12 +57,24 @@ pub struct IoPacket {
     #[bw(calc = IO_PACKET_ITEM_COUNT)]
     item_count: CipUint,
 
-    #[br(parse_with = read_item, args(CommonPacketItemId::SequencedAddressItem))]
-    #[bw(write_with = write_item, args(CommonPacketItemId::SequencedAddressItem))]
+    #[br(assert(
+        sequenced_address_item.type_id == CommonPacketItemId::SequencedAddressItem
+            && sequenced_address_item.packet_length == Some(SEQUENCED_ADDRESS_LENGTH),
+        "expected a Sequenced Address Item with a Length of 8"
+    ))]
+    #[bw(args(SEQUENCED_ADDRESS_LENGTH))]
+    pub sequenced_address_item: CommonPacketDescriptor,
+
     pub sequenced_address: SequencedAddress,
 
-    #[br(parse_with = read_item, args(CommonPacketItemId::ConnectedTransportPacket))]
-    #[bw(write_with = write_item, args(CommonPacketItemId::ConnectedTransportPacket))]
+    #[br(assert(
+        connected_data_item.type_id == CommonPacketItemId::ConnectedTransportPacket,
+        "expected a Connected Data Item"
+    ))]
+    #[bw(args(serialized_length(connected_data)?))]
+    pub connected_data_item: CommonPacketDescriptor,
+
+    #[br(args(connected_data_item.packet_length.unwrap_or_default()))]
     pub connected_data: CipDataOpt,
 }
 
@@ -79,9 +88,17 @@ impl IoPacket {
         data: CipDataOpt,
     ) -> Self {
         IoPacket {
+            sequenced_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::SequencedAddressItem,
+                packet_length: Some(SEQUENCED_ADDRESS_LENGTH),
+            },
             sequenced_address: SequencedAddress {
                 connection_id,
                 encapsulation_sequence_number,
+            },
+            connected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::ConnectedTransportPacket,
+                packet_length: None,
             },
             connected_data: data,
         }
