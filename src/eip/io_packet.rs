@@ -29,7 +29,7 @@ use crate::cip::types::{CipUdint, CipUint};
 use super::description::CommonPacketItem;
 
 /// Length of the data carried by a Sequenced Address Item
-pub const SEQUENCED_ADDRESS_LENGTH: CipUint = 8;
+pub(crate) const SEQUENCED_ADDRESS_LENGTH: CipUint = 8;
 
 /// The data of a Sequenced Address Item: the connection an I/O packet belongs to and the
 /// packet's number on that connection
