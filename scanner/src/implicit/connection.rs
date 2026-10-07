@@ -128,7 +128,8 @@ pub(crate) fn data_size(
 }
 
 /// Whether `data_len` bytes fit a direction of `data_size` bytes: exactly for a fixed size, at
-/// most for a variable one
+/// most for a variable one. A fixed-size direction therefore rejects the empty packet that
+/// signals idle in the `ZeroLength` real-time format, so the scanner neither sends nor accepts it.
 pub(crate) fn data_len_matches_connection(
     data_len: usize,
     data_size: u16,
