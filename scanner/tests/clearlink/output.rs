@@ -17,7 +17,9 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
 
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::types::CipUdint;
@@ -345,26 +347,41 @@ fn test_read_output_assembly_object_response() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeSingle),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::Success,
-                    additional_status_size: 0,
-                    additional_status: vec![],
-                    data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
-                        io_output_data: IOOutputData::new_digital_outputs(DigitalOutputs::default()),
-                        motor0_output_data: MotorOutputData::new(),
-                        motor1_output_data: MotorOutputData::new(),
-                        motor2_output_data: MotorOutputData::new(),
-                        motor3_output_data: MotorOutputData::new(),
-                        serial_ascii_output_data: SerialAsciiOutputData::new(),
-                    })),
-                },
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
             },
-        )),
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(284),
+            },
+            cip_message:
+                MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(
+                        ServiceCode::GetAttributeSingle,
+                    ),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Typed(Box::new(OutputAssemblyObject {
+                            io_output_data: IOOutputData::new_digital_outputs(
+                                DigitalOutputs::default(),
+                            ),
+                            motor0_output_data: MotorOutputData::new(),
+                            motor1_output_data: MotorOutputData::new(),
+                            motor2_output_data: MotorOutputData::new(),
+                            motor3_output_data: MotorOutputData::new(),
+                            serial_ascii_output_data: SerialAsciiOutputData::new(),
+                        })),
+                    },
+                }
+                .into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
@@ -421,10 +438,18 @@ fn test_read_output_assembly_object_raw_request() {
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterRequest {
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
+            },
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(288),
+            },
+            cip_message: MessageRouterRequest {
                 service_container: ServiceContainer::new_request(ServiceCode::SetAttributeSingle),
                 request_data: RequestData::new(
                     Some(0x3),
@@ -448,8 +473,10 @@ fn test_read_output_assembly_object_raw_request() {
                         serial_ascii_output_data: SerialAsciiOutputData::new(),
                     })),
                 ),
-            },
-        )),
+            }
+            .into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }),
     };
 
     // Assert equality
