@@ -29,7 +29,7 @@ pub enum CommonPacketItemId {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]
-#[bw(import(data_length: CipUint))]
+#[bw(import { data_length: CipUint = 0 })]
 pub struct CommonPacketDescriptor {
     pub type_id: CommonPacketItemId,
 
