@@ -256,7 +256,7 @@ async fn fake_adapter(
                 application_reply_size: 0,
                 application_reply: vec![],
             },
-            SockaddrInfoItems::default(),
+            SockaddrInfoItems::empty(),
         ),
     )
     .await;

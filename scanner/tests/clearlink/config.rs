@@ -214,7 +214,7 @@ fn test_read_clearlink_config_assembly_object_response() {
                 },
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 

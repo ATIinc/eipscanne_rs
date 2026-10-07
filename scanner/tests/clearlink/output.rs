@@ -380,7 +380,7 @@ fn test_read_output_assembly_object_response() {
                     },
                 }
                 .into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 
@@ -475,7 +475,7 @@ fn test_read_output_assembly_object_raw_request() {
                 ),
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 
