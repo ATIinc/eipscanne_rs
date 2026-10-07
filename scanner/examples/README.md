@@ -141,10 +141,11 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
     * the send timer fires every O->T actual packet interval: `o2t::build_o2t_packet` frames the
       outputs with the loop's encapsulation sequence number and CIP sequence count, and
       `o2t::send_io_packet` sends them to the O->T endpoint
-    * a datagram arrives: `t2o::accept_t2o_packet` checks the connection ID, the sender, the
-      sequence number against the last accepted one and the size, and returns the Sequenced
-      Address and the I/O data as read; the loop prints the inputs and moves the deadline, or says
-      why the packet was discarded
+    * a datagram arrives: `t2o::recv_io_packet` reads it as an I/O packet and
+      `t2o::accept_t2o_packet` checks the connection ID, the sender, the sequence number against
+      the last accepted one and the size, and returns the Sequenced Address and the I/O data as
+      read; the loop prints the inputs and moves the deadline, or says why the datagram was
+      discarded (one that does not parse as an I/O packet included) and keeps listening
     * the deadline passes: no input packet arrived within timeout multiplier × packet interval
       (`t2o::input_timeout`), the connection is considered timed out and the loop ends
     * Ctrl+C: the loop ends early; the connection is still closed and the session unregistered
