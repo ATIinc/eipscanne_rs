@@ -114,7 +114,7 @@ pub enum ResponseStatusCode {
 
 // ======= Start of ResponseStatusCode impl ========
 
-/// The status in words with its code: `path segment error (0x04)`
+/// The status name with its code: `PathSegmentError (0x04)`
 impl fmt::Display for ResponseStatusCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut code = Cursor::new(Vec::new());
@@ -123,24 +123,12 @@ impl fmt::Display for ResponseStatusCode {
         let code = code.into_inner()[0];
         match self {
             ResponseStatusCode::Unknown(_) => write!(f, "unknown general status ({code:#04x})"),
-            _ => write!(f, "{} ({code:#04x})", variant_words(&format!("{self:?}"))),
+            _ => write!(f, "{self:?} ({code:#04x})"),
         }
     }
 }
 
 // ^^^^^^^^ End of ResponseStatusCode impl ^^^^^^^^
-
-/// A variant name in lowercase words: `PathSegmentError` -> `path segment error`
-pub(crate) fn variant_words(name: &str) -> String {
-    let mut words = String::new();
-    for (index, character) in name.chars().enumerate() {
-        if character.is_uppercase() && index > 0 {
-            words.push(' ');
-        }
-        words.push(character.to_ascii_lowercase());
-    }
-    words
-}
 
 #[binrw]
 #[brw(little)]
@@ -179,6 +167,19 @@ impl MessageRouterResponse {
     pub fn is_success(&self) -> bool {
         self.response_data.status == ResponseStatusCode::Success
     }
+
+    /// The response when its general status is success; why the adapter refused the request
+    /// otherwise
+    pub fn error_for_status(&self) -> Result<&Self, Rejection> {
+        if self.is_success() {
+            return Ok(self);
+        }
+        Err(Rejection {
+            service: self.service_container.service(),
+            general_status: self.response_data.status,
+            additional_status: self.response_data.additional_status.clone(),
+        })
+    }
 }
 
 // ^^^^^^^^ End of MessageRouterResponse impl ^^^^^^^^
@@ -194,21 +195,7 @@ pub struct Rejection {
 
 // ======= Start of Rejection impl ========
 
-impl Rejection {
-    /// The rejection `response` carries; `None` when its general status is success
-    pub fn from_response(response: &MessageRouterResponse) -> Option<Rejection> {
-        if response.is_success() {
-            return None;
-        }
-        Some(Rejection {
-            service: response.service_container.service(),
-            general_status: response.response_data.status,
-            additional_status: response.response_data.additional_status.clone(),
-        })
-    }
-}
-
-/// `the adapter rejected GetAttributeAll: path segment error (0x04)`, with the Additional
+/// `the adapter rejected GetAttributeAll: PathSegmentError (0x04)`, with the Additional
 /// Status words after it when the reply carries any
 impl fmt::Display for Rejection {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
