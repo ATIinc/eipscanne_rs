@@ -1,5 +1,5 @@
 //! Reply side of the Connection Manager services. Which reply data a Message Router response
-//! carries is decided by its service and general status.
+//! carries is decided by its service; a refused request carries a `Rejection` instead.
 
 use std::fmt;
 use std::io::Cursor;
@@ -8,8 +8,7 @@ use binrw::{BinRead, BinResult, BinWrite, binrw};
 
 use crate::cip::connection_manager::forward_close::ForwardCloseResponse;
 use crate::cip::connection_manager::forward_open::ForwardOpenResponse;
-use crate::cip::connection_manager::shared::UnsuccessfulResponse;
-use crate::cip::message::response::{MessageRouterResponse, ResponseStatusCode, variant_words};
+use crate::cip::message::response::{MessageRouterResponse, Rejection, variant_words};
 use crate::cip::message::shared::ServiceCode;
 use crate::cip::types::CipUint;
 
@@ -117,39 +116,21 @@ pub enum ConnectionManagerExtendedStatus {
     Unknown(CipUint),
 }
 
-/// Reply data of a Connection Manager service, chosen by the service and general status of the
-/// Message Router response that carries it
+/// Reply data of a successful Connection Manager service, chosen by the service of the Message
+/// Router response that carries it
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
-#[br(import(service: ServiceCode, status: ResponseStatusCode))]
+#[br(import(service: ServiceCode))]
 pub enum ConnectionManagerResponse {
-    #[br(pre_assert(
-        status == ResponseStatusCode::Success
-            && matches!(service, ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen)
-    ))]
+    #[br(pre_assert(matches!(service, ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen)))]
     ForwardOpen(ForwardOpenResponse),
 
-    #[br(pre_assert(status == ResponseStatusCode::Success && service == ServiceCode::ForwardClose))]
+    #[br(pre_assert(service == ServiceCode::ForwardClose))]
     ForwardClose(ForwardCloseResponse),
-
-    #[br(pre_assert(status != ResponseStatusCode::Success))]
-    Unsuccessful(UnsuccessfulResponse),
 }
 
 // ======= Start of ConnectionManagerExtendedStatus impl ========
-
-impl ConnectionManagerExtendedStatus {
-    /// The extended status carried by the Additional Status words of a Message Router response:
-    /// the first word, read through `binrw`; `None` when the reply carried no Additional Status
-    pub fn from_additional_status(
-        additional_status: &[CipUint],
-    ) -> Option<ConnectionManagerExtendedStatus> {
-        let word = additional_status.first()?;
-        // Reading a 16-bit word cannot fail: every value without a variant of its own is `Unknown`
-        ConnectionManagerExtendedStatus::read_le(&mut Cursor::new(word.to_le_bytes())).ok()
-    }
-}
 
 /// The extended status in words with its code: `connection in use or duplicate forward open
 /// (0x0100)`
@@ -170,28 +151,47 @@ impl fmt::Display for ConnectionManagerExtendedStatus {
 
 // ^^^^^^^^ End of ConnectionManagerExtendedStatus impl ^^^^^^^^
 
+// ======= Start of Rejection impl ========
+
+impl Rejection {
+    /// Why the Connection Manager refused a Forward_Open, Large_Forward_Open or Forward_Close: the
+    /// first Additional Status word. `None` for any other service, whose Additional Status means
+    /// something else, and when the reply carries no Additional Status.
+    pub fn extended_status(&self) -> Option<ConnectionManagerExtendedStatus> {
+        if !is_connection_manager_service(self.service) {
+            return None;
+        }
+        let word = self.additional_status.first()?;
+        // Reading a 16-bit word cannot fail: every value without a variant of its own is `Unknown`
+        ConnectionManagerExtendedStatus::read_le(&mut Cursor::new(word.to_le_bytes())).ok()
+    }
+}
+
+// ^^^^^^^^ End of Rejection impl ^^^^^^^^
+
 // ======= Start of ConnectionManagerResponse impl ========
 
 impl ConnectionManagerResponse {
-    /// Interprets the reply to a Forward_Open, Large_Forward_Open or Forward_Close.
-    ///
-    /// A rejected request parses as `Unsuccessful`; its general status and Additional Status words
-    /// stay on the Message Router response (see
-    /// `ConnectionManagerExtendedStatus::from_additional_status`). The reply to any other service
-    /// is an error.
+    /// Interprets the reply to a successful Forward_Open, Large_Forward_Open or Forward_Close. A
+    /// refused request carries no reply data to interpret, so callers check
+    /// `Rejection::from_response` first; a refused reply, or the reply to any other service, is
+    /// an error here.
     pub fn from_message_router_response(
         response: &MessageRouterResponse,
     ) -> BinResult<ConnectionManagerResponse> {
         let service = response.service_container.service();
-        if !matches!(
-            service,
-            ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen | ServiceCode::ForwardClose
-        ) {
+        if !is_connection_manager_service(service) {
             return Err(binrw::Error::AssertFail {
                 pos: 0,
                 message: format!(
                     "not a Forward_Open, Large_Forward_Open or Forward_Close reply: {service:?}"
                 ),
+            });
+        }
+        if let Some(rejection) = Rejection::from_response(response) {
+            return Err(binrw::Error::AssertFail {
+                pos: 0,
+                message: rejection.to_string(),
             });
         }
 
@@ -201,8 +201,15 @@ impl ConnectionManagerResponse {
         response.response_data.data.write_le_args(&mut data, (0,))?;
         data.set_position(0);
 
-        ConnectionManagerResponse::read_le_args(&mut data, (service, response.response_data.status))
+        ConnectionManagerResponse::read_le_args(&mut data, (service,))
     }
 }
 
 // ^^^^^^^^ End of ConnectionManagerResponse impl ^^^^^^^^
+
+fn is_connection_manager_service(service: ServiceCode) -> bool {
+    matches!(
+        service,
+        ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen | ServiceCode::ForwardClose
+    )
+}
