@@ -27,15 +27,16 @@ pub struct RunIdleHeader {
     reserved: u28,
 }
 
-/// The data of a Connected Data Item. What precedes the application data depends on the
-/// connection, so reading takes the length of the item, the transport class and the real-time
-/// format of the direction, which the receiver looks up by the connection ID of the Sequenced
-/// Address Item. On the wire the sequence count comes first, then the header, then the data.
+/// The data of a Connected Data Item (Wireshark: "Common Industrial Protocol, I/O"). What
+/// precedes the application data depends on the connection, so reading takes the length of the
+/// item, the transport class and the real-time format of the direction, which the receiver looks
+/// up by the connection ID of the Sequenced Address Item. On the wire the sequence count comes
+/// first, then the header, then the data.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
 #[br(import(byte_len: u16, transport_class: TransportClass, real_time_format: RealTimeFormat))]
-pub struct IoData {
+pub struct CipIoData {
     /// CIP Sequence Count: carried by transport classes 1, 2 and 3. It changes only with new data
     /// (a resend keeps it), so a receiver can drop duplicates.
     #[br(if(matches!(

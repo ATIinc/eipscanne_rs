@@ -71,14 +71,13 @@ pub struct RRPacketData {
         null_address_item.type_id == CommonPacketItemId::NullAddr,
         "expected a Null Address Item"
     ))]
-    #[bw(args(0))]
     pub null_address_item: CommonPacketDescriptor,
 
     #[br(assert(
         unconnected_data_item.type_id == CommonPacketItemId::UnconnectedMessage,
         "expected an Unconnected Data Item"
     ))]
-    #[bw(args(serialized_length(cip_message)?))]
+    #[bw(args { data_length: serialized_length(cip_message)? })]
     pub unconnected_data_item: CommonPacketDescriptor,
 
     #[br(args(unconnected_data_item.packet_length.unwrap_or_default()))]

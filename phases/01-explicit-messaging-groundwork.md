@@ -3,8 +3,8 @@
 ## Goal
 
 The explicit-messaging packet types that the Connection Manager traffic of the later phases is
-built on: a path of any number of logical segments, a Common Packet Format modelled as one list of
-items, a CIP message that is either a request or a response, rejected requests as plain data, named
+built on: a path of any number of logical segments, a Common Packet Format whose items are named
+fields, a CIP message that is either a request or a response, rejected requests as plain data, named
 constants, and bitfields built with their builders. The phase contains no Connection Manager
 packet and no other protocol feature.
 
@@ -70,30 +70,30 @@ packet and no other protocol feature.
   * `write_path_with_word_size`, a `write_with` function that prefixes a path with its size in
     16-bit words, writes the Request Path Size and Request Path of `RequestData`.
 * **Common Packet Format** — `src/eip/description.rs`, `src/eip/command.rs`, `src/eip/packet.rs`,
-  `src/object_assembly.rs`. Every address and data item of a packet is modelled the same way, as an
-  item of one list:
-  * `CommonPacketItemId` names the item Type IDs and keeps any other ID as `Unknown(u16)`;
-  * `CommonPacketItem`: one enum for every item — Null Address Item, Unconnected Data Item
-    (carrying a `CipMessage`), Socket Address Info O->T and T->O, and an `Unknown { type_id, data }`
-    fallback; variant and Type ID names follow Wireshark. The Type ID and Length are derived from
-    the variant on write. An item of an unknown type, or whose data does not fit its variant
-    (including an unparsable CIP message), is read as `Unknown`, skipped by its Length and
-    re-serialized unchanged;
+  `src/object_assembly.rs`. Each item of a packet is a named field, in the order Wireshark shows:
+  * `CommonPacketItemId` names the item Type IDs;
+  * `CommonPacketDescriptor { type_id, packet_length: Option<CipUint> }` is an item header. The
+    Length is written as stored, or as the size of the item's data when `None`
+    (`serialized_length`); the struct holding a descriptor checks its Type ID on read;
   * `CipMessage` (`src/cip/message.rs`): `Request(MessageRouterRequest)` or
     `Response(MessageRouterResponse)`, chosen on read by the Request/Response bit of the service
     code byte, so no type is generic over the message;
   * `src/eip/sockaddr.rs`, used when opening an I/O connection: `SockaddrInfo` (family, port and
     address in big endian; zero padding) with conversions from and to `SocketAddrV4`, and
-    `CommonPacketItem::sockaddr_info()`;
-  * `RRPacketData` holds the interface handle, the timeout and `items`; the item count is read
-    from the wire and written from `items.len()`. `RRPacketData::new_unconnected` builds the Null
-    Address Item followed by the Unconnected Data Item;
+    `SockaddrInfoItems { o2t, t2o }`, the optional Socket Address Info items after a
+    Forward_Open request or reply. They are read in either order, each at most once and with a
+    Length of 16, and written O->T first;
+  * `RRPacketData`: the interface handle, the timeout, `null_address_item` and
+    `unconnected_data_item` (descriptors), `cip_message` and `sockaddr_info_items`. The item count
+    is not stored: it is read and checked to be at least `SEND_RR_DATA_REQUIRED_ITEM_COUNT` (2),
+    and written as 2 plus the Sockaddr Info items. `RRPacketData::new_unconnected` leaves the
+    message's Length `None`;
   * `EnIpPacket` is the whole packet: `EncapsulationHeader` plus `CommandSpecificData`. The
     header's `length` is written from the size of the command specific data when it is `None`.
     `src/eip/packet.rs` starts with a map from the Wireshark tree to the Rust fields. Constructors:
     `new_registration`, `new_unregistration`, `new_send_rr_data`. `read_request` / `read_response`
     fail when a SendRRData packet does not carry a Message Router request / response, while plain
-    `read` accepts either and keeps a message it cannot parse as an `Unknown` item. `read_request`
+    `read` accepts either. `read_request`
     is only compiled with the `adapter` feature (adapter-side helpers). `cip_message()`,
     `response()` and `sockaddr_info_items()` give the carried message, the Message Router
     response and the Sockaddr Info items;
@@ -108,9 +108,10 @@ packet and no other protocol feature.
   `test_object_assembly`, `test_request_object`, `test_response_object`, `test_session_object`)
   compare Register Session, Unregister Session, Identity and assembly packets, and the Message
   Router messages inside them, byte for byte; a packet is compared whole: the encapsulation header,
-  the command specific data and its items, CIP message included. Their expected values build the
-  item list with `RRPacketData::new_unconnected` or `RequestObjectAssembly::new_send_rr_data`.
-* `tests/test_common_packet.rs` — Sockaddr Info byte order, a T->O Sockaddr Info item, and
+  the command specific data, CIP message included. A packet that is read is expected as an
+  `RRPacketData` struct literal with the item lengths from the wire; a packet that is written is
+  built with `RRPacketData::new_unconnected` or `RequestObjectAssembly::new_send_rr_data`.
+* `tests/test_common_packet.rs` — Sockaddr Info byte order and
   `read_response` rejecting a request that plain `read` keeps. Replies carrying Sockaddr Info items
   are tested in phase 2 with Forward_Open reply bodies.
 * `tests/test_cip_path.rs` — the assembly connection path written and read, and the rejection of a
