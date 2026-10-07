@@ -1,9 +1,6 @@
 //! The input assembly of a Teknic IO-HUB-4-E (instance 100, 228 bytes): what the hub reports.
 //! ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E T2O Input Assembly:
 //! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60
-//!
-//! Read only: these types are decoded from replies and never built, so none of the bitfields
-//! needs a builder.
 
 use binrw::{BinRead, BinWrite, binrw};
 

@@ -1,8 +1,5 @@
 //! The ClearLink input assembly (instance 0x64): what the device reports back.
 //! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30
-//!
-//! Read only: these types are decoded from replies and never built, so none of the bitfields
-//! needs a builder.
 
 use binrw::{BinRead, BinWrite, binrw};
 

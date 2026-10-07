@@ -61,9 +61,7 @@ pub enum CommonPacketItem {
     /// on that connection
     SequencedAddressItem(SequencedAddress),
 
-    /// Connected Data Item: the data of an I/O packet. Always raw when read, because its layout
-    /// (sequence count, run/idle header, application data) depends on the connection it belongs
-    /// to; `IoData` decodes it once the connection is known
+    /// Connected Data Item: the data of an I/O packet
     ConnectedDataItem(CipDataOpt),
 
     /// Any other item: the raw data is kept so the packet can be re-serialized unchanged
