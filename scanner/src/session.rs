@@ -17,7 +17,7 @@ use eipscanne_rs::eip::command::EncapsStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::error::Error;
+use crate::error::{Error, Result};
 
 /// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet the session sends or reads
 /// is printed to stderr as hex (`REQUEST 6f 00 ...`, `REPLY 6f 00 ...`), ready for
@@ -42,7 +42,7 @@ pub struct Session {
 
 impl Session {
     /// Stage 1: connects to the adapter and registers a session with it
-    pub async fn register(address: impl ToSocketAddrs) -> Result<Session, Error> {
+    pub async fn register(address: impl ToSocketAddrs) -> Result<Session> {
         let stream = TcpStream::connect(address).await?;
         let peer_ip = match stream.peer_addr()?.ip() {
             IpAddr::V4(ip) => ip,
@@ -74,7 +74,7 @@ impl Session {
     }
 
     /// Writes one encapsulation packet to the adapter
-    pub async fn send(&mut self, packet: &EnIpPacket) -> Result<(), Error> {
+    pub async fn send(&mut self, packet: &EnIpPacket) -> Result<()> {
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes)?;
         dump_if_requested("REQUEST", bytes.get_ref());
@@ -84,7 +84,7 @@ impl Session {
 
     /// Reads one encapsulation packet from the adapter: the 24-byte header, then exactly as many
     /// bytes as its Length field says. Fails when the encapsulation status is not success.
-    pub async fn read_reply(&mut self) -> Result<EnIpPacket, Error> {
+    pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
         let mut bytes = vec![0u8; ENCAPSULATION_HEADER_LEN];
         self.stream.read_exact(&mut bytes).await?;
 
@@ -106,7 +106,7 @@ impl Session {
 
     /// Sends a Message Router request and reads its reply: the reply to the same service, once
     /// the adapter accepted the request
-    pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket, Error> {
+    pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket> {
         self.send(packet).await?;
         let reply = self.read_reply().await?;
 
@@ -128,7 +128,7 @@ impl Session {
     }
 
     /// Stage 5: tells the adapter the session is over and closes the connection
-    pub async fn unregister(mut self) -> Result<(), Error> {
+    pub async fn unregister(mut self) -> Result<()> {
         self.send(&RequestObjectAssembly::new_unregistration(
             self.session_handle,
         ))

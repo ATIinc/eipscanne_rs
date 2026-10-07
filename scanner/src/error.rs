@@ -1,6 +1,6 @@
 //! The one error type of the scanner: everything that can stop a call, from a broken socket to an
-//! adapter that says no. An application wraps it however it handles errors. A discarded input
-//! packet is not here: it stops nothing, so `t2o::accept_t2o_packet` only reports why.
+//! adapter that says no, to an input packet that is not the next one of the connection. An
+//! application wraps it however it handles errors.
 
 use std::fmt;
 use std::net::IpAddr;
@@ -8,6 +8,9 @@ use std::net::IpAddr;
 use eipscanne_rs::cip::connection_manager::parameters::ConnectionSizeType;
 use eipscanne_rs::cip::message::response::Rejection;
 use eipscanne_rs::eip::command::EncapsStatusCode;
+
+/// What every fallible call of the scanner returns
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// What can go wrong while talking to an adapter
 #[derive(Debug)]
@@ -25,6 +28,9 @@ pub enum Error {
     NoResponse,
     /// The reply parsed, but is not the reply to what was sent
     UnexpectedReply(String),
+    /// An I/O packet that is not the next input of the connection; the caller reports it and
+    /// waits for the next one
+    UnexpectedPacket(String),
     /// The outputs do not fit the connection
     OutputSize {
         connection_size_type: ConnectionSizeType,
@@ -75,6 +81,7 @@ impl fmt::Display for Error {
             }
             Error::NoResponse => write!(f, "the reply carries no Message Router response"),
             Error::UnexpectedReply(what) => write!(f, "unexpected reply: {what}"),
+            Error::UnexpectedPacket(what) => write!(f, "unexpected packet: {what}"),
             Error::OutputSize {
                 connection_size_type,
                 data_size,

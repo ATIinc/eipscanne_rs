@@ -16,7 +16,7 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::error::Error;
+use crate::error::{Error, Result};
 use crate::session::Session;
 
 /// Sends `service` on `request_path` with the optional request `data` and returns the reply
@@ -26,7 +26,7 @@ pub async fn send_request(
     request_path: CipPath,
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
-) -> Result<EnIpPacket, Error> {
+) -> Result<EnIpPacket> {
     session
         .request(&RequestObjectAssembly::new_service_request(
             session.session_handle(),
@@ -38,7 +38,7 @@ pub async fn send_request(
 }
 
 /// The data of a reply's Message Router response, decoded as a `T` declared by the caller
-pub fn decode_reply<T>(reply: &EnIpPacket) -> Result<T, Error>
+pub fn decode_reply<T>(reply: &EnIpPacket) -> Result<T>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
@@ -57,7 +57,7 @@ where
 }
 
 /// Get_Attributes_All on the Identity object: who the adapter is
-pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse, Error> {
+pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse> {
     let reply = send_request(
         session,
         CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
