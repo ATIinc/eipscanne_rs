@@ -19,7 +19,7 @@ use eipscanne_rs::eip::constants::{
 };
 use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -121,7 +121,7 @@ fn test_deserialize_cip_identity_request() {
                 ),
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 

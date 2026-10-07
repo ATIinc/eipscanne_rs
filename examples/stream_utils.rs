@@ -34,7 +34,7 @@ pub async fn read_object_assembly(
     let response_byte_cursor = std::io::Cursor::new(response_buffer);
     let mut response_reader = BufReader::new(response_byte_cursor);
 
-    ResponseObjectAssembly::read_response(&mut response_reader)
+    ResponseObjectAssembly::read(&mut response_reader)
 }
 
 pub async fn read_typed_object_assembly<T>(

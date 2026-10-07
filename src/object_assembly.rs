@@ -7,11 +7,11 @@ use crate::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use crate::eip::packet::EnIpPacket;
 
 /// An encapsulated packet sent by the scanner. The same type as [`ResponseObjectAssembly`]; the
-/// name only documents the direction. Read it with `EnIpPacket::read_request` (`adapter` feature).
+/// name only documents the direction.
 pub type RequestObjectAssembly = EnIpPacket;
 
 /// An encapsulated packet received from the adapter. The same type as [`RequestObjectAssembly`];
-/// the name only documents the direction. Read it with [`EnIpPacket::read_response`].
+/// the name only documents the direction.
 pub type ResponseObjectAssembly = EnIpPacket;
 
 // ======= Start of RequestObjectAssembly impl ========
