@@ -229,7 +229,7 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
                 packet_length: Some(28),
             },
             cip_message: identity_response_message().into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 
@@ -304,7 +304,7 @@ fn test_deserialize_identity_object_response() {
                 packet_length: Some(28),
             },
             cip_message: identity_response_message().into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 

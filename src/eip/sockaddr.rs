@@ -71,7 +71,7 @@ impl From<SockaddrInfo> for SocketAddrV4 {
 /// The Socket Address Info items of a Forward_Open request or reply, after its Unconnected Data
 /// Item. Each one is optional, and they may come in either order: the Type ID of an item says
 /// which one it is. They are written O->T first.
-#[derive(Debug, PartialEq, Default)]
+#[derive(Debug, PartialEq)]
 pub struct SockaddrInfoItems {
     /// Socket Address Info O->T (0x8000): where the scanner sends its I/O data
     pub o2t: Option<SockaddrInfo>,
@@ -82,6 +82,14 @@ pub struct SockaddrInfoItems {
 // ======= Start of SockaddrInfoItems impl ========
 
 impl SockaddrInfoItems {
+    /// No Socket Address Info items
+    pub const fn empty() -> Self {
+        SockaddrInfoItems {
+            o2t: None,
+            t2o: None,
+        }
+    }
+
     /// The number of items present
     pub(crate) fn count(&self) -> CipUint {
         self.o2t.is_some() as CipUint + self.t2o.is_some() as CipUint
@@ -105,7 +113,7 @@ impl BinRead for SockaddrInfoItems {
         endian: Endian,
         (count,): Self::Args<'_>,
     ) -> BinResult<Self> {
-        let mut items = SockaddrInfoItems::default();
+        let mut items = SockaddrInfoItems::empty();
 
         for _ in 0..count {
             let pos = reader.stream_position()?;
