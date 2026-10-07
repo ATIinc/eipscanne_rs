@@ -148,8 +148,10 @@ fn connection_manager_reply(
 
 /// The Forward_Open request inside a packet, as the adapter parses it
 fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) =
-        packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    let Some(CipMessage::Request(message)) = packet
+        .command_specific_data
+        .as_send_rr_data()
+        .map(|rr_data| &rr_data.cip_message)
     else {
         panic!("expected a request, got {:?}", packet.command_specific_data);
     };
@@ -242,8 +244,10 @@ async fn fake_adapter(
 
     // 4. Forward_Close
     let request = read_request(&mut stream).await;
-    let Some(CipMessage::Request(message)) =
-        request.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    let Some(CipMessage::Request(message)) = request
+        .command_specific_data
+        .as_send_rr_data()
+        .map(|rr_data| &rr_data.cip_message)
     else {
         panic!("expected a Forward_Close request");
     };

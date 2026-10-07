@@ -161,6 +161,14 @@ impl CommandSpecificData {
             message,
         ))
     }
+
+    /// The data of a Send RR Data command, `None` for any other command
+    pub fn as_send_rr_data(&self) -> Option<&RRPacketData> {
+        match self {
+            Self::SendRrData(rr_data) => Some(rr_data),
+            _ => None,
+        }
+    }
 }
 
 // ^^^^^^^^ End of CommandSpecificData impl ^^^^^^^^
