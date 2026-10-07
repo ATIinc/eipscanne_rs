@@ -1,8 +1,6 @@
-//! Opens a class 1 connection to an adapter, exchanges cyclic I/O with it for a number of cycles
-//! and closes it again. `main` is the five stages of implicit messaging in order.
-//!
-//! The defaults match the OpENer sample application (`tests/integration`), which copies the
-//! outputs it receives on assembly 150 into the inputs it sends from assembly 100:
+//! Opens a class 1 connection, exchanges cyclic I/O for a number of cycles and closes it; `main`
+//! is the five stages in order. The defaults match the OpENer sample (`tests/integration`), which
+//! echoes the outputs of assembly 150 as the inputs of assembly 100:
 //!
 //! `cargo run --example implicit-io -- --host 172.28.0.10`
 
@@ -29,16 +27,14 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-/// Who this scanner says it is in the Forward_Open; the adapter matches the Forward_Close
-/// against the same values
+/// Who this scanner is in the Forward_Open; the Forward_Close repeats it
 const ORIGINATOR_VENDOR_ID: u16 = 342;
 const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
 const CONNECTION_SERIAL_NUMBER: u16 = 1;
 /// The connection ID the adapter puts on every input packet
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
-/// How each direction signals run/idle. Not part of the Forward_Open: both ends agree on it
-/// beforehand (an EDS file or the device manual says which one). The OpENer sample takes a
-/// run/idle header on the outputs and sends none on the inputs.
+/// How each direction signals run/idle, agreed off the wire (EDS file or device manual). The
+/// OpENer sample takes a run/idle header on the outputs only.
 const O2T_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Header32Bit;
 const T2O_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Modeless;
 
@@ -84,8 +80,7 @@ struct Args {
 }
 
 impl Args {
-    /// The Forward_Open for a class 1 cyclic connection, point-to-point both ways, timing out
-    /// after four missed packets
+    /// A class 1 cyclic, point-to-point Forward_Open that times out after four missed packets
     fn forward_open_request(&self) -> Result<ForwardOpenRequest, Box<dyn std::error::Error>> {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
@@ -101,8 +96,7 @@ impl Args {
         );
 
         Ok(ForwardOpenRequest {
-            // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself
-            // times out
+            // 5 ticks of 1024 ms until the request itself times out
             priority_time_tick: PriorityTimeTick::builder()
                 .tick_time(u4::new(10))
                 .priority(false)
@@ -134,8 +128,7 @@ impl Args {
         })
     }
 
-    /// The parameter word of one direction: 32 bits for a Large_Forward_Open, otherwise 16 bits
-    /// with only 9 for the size
+    /// One direction's parameter word: 32 bits for a Large_Forward_Open, otherwise 16
     fn network_connection_parameters(
         &self,
         size: u16,
@@ -200,9 +193,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ========= 3. Exchange I/O ============
-    // The outputs: every packet gets the next encapsulation sequence number, starting at a
-    // random one so a restarted scanner does not repeat what the adapter last saw; the CIP
-    // sequence count moves whenever the outputs change, which here is every cycle
+    // The outputs: the encapsulation sequence number starts at random and advances every
+    // packet; the CIP sequence count advances when the outputs change, here every cycle
     let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
@@ -216,11 +208,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_cip_sequence_count = None;
     let mut deadline = established_at + FIRST_PACKET_GRACE.max(timeout);
 
-    // One loop drives both directions. Production code may instead send the outputs from a task
-    // of its own, so a slow input handler can never delay an output packet.
+    // One loop drives both directions; production code may send outputs from their own task
     let mut cycle: u32 = 0;
-    // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
-    // Ctrl+C ends the exchange and the connection is still closed below
+    // One Ctrl+C future for the whole loop, so no press is lost; the connection is still closed
     let ctrl_c = tokio::signal::ctrl_c();
     tokio::pin!(ctrl_c);
     loop {

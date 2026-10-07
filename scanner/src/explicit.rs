@@ -1,8 +1,5 @@
-//! Explicit (unconnected) messaging: one request, one reply, over the session.
-//!
-//! The request is a Message Router request for a service on a path; the reply's general status
-//! says whether the service was done, and its data (if any) is whatever the service returns,
-//! declared by the caller as a `binrw` type.
+//! Explicit (unconnected) messaging: one Message Router request, one reply, over the session.
+//! The caller declares the reply data as a `binrw` type.
 
 use std::io::Cursor;
 
@@ -19,8 +16,7 @@ use eipscanne_rs::object_assembly::RequestObjectAssembly;
 use crate::error::{Error, Result};
 use crate::session::Session;
 
-/// Sends `service` on `request_path` with the optional request `data` and returns the reply
-/// once the adapter accepted the request
+/// Sends `service` on `request_path` with optional `data` and returns the accepted reply
 pub async fn send_request(
     session: &mut Session,
     request_path: CipPath,
@@ -37,7 +33,7 @@ pub async fn send_request(
         .await
 }
 
-/// The data of a reply's Message Router response, decoded as a `T` declared by the caller
+/// The data of a reply's Message Router response, decoded as `T`
 pub fn decode_reply<T>(reply: &EnIpPacket) -> Result<T>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
