@@ -58,11 +58,7 @@ pub fn accept_t2o_packet(
     from: SocketAddr,
 ) -> Result<(SequencedAddress, IoData)> {
     // 1. It is for this connection
-    let Some(address) = packet.sequenced_address().copied() else {
-        return Err(Error::UnexpectedPacket(
-            "packet without a Sequenced Address Item".to_string(),
-        ));
-    };
+    let address = packet.sequenced_address;
     if address.connection_id != connection.response.t2o_network_connection_id {
         return Err(Error::UnexpectedPacket(format!(
             "packet for another connection ({:#010x})",
@@ -100,9 +96,9 @@ pub fn accept_t2o_packet(
     }
 
     // 4. Its data has the agreed size and decodes in this direction's shape
-    let Some(CipDataOpt::Raw(bytes)) = packet.connected_data() else {
+    let CipDataOpt::Raw(bytes) = &packet.connected_data else {
         return Err(Error::UnexpectedPacket(
-            "packet without a Connected Data Item".to_string(),
+            "packet whose Connected Data Item is not raw".to_string(),
         ));
     };
     let transport_class = connection.request.transport_type_trigger.transport_class();
@@ -149,7 +145,6 @@ mod tests {
     };
     use eipscanne_rs::cip::io_data::RunIdleHeader;
     use eipscanne_rs::cip::types::CipUint;
-    use eipscanne_rs::eip::description::CommonPacketItem;
 
     use crate::implicit::connection::test_support::{
         T2O_NETWORK_CONNECTION_ID, TARGET_IP, sample_connection, standard_parameters,
@@ -262,18 +257,6 @@ mod tests {
     #[test]
     fn foreign_and_malformed_packets_are_discarded() {
         let stranger = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(172, 28, 0, 99), 2222));
-        let without_address = IoPacket {
-            items: vec![CommonPacketItem::ConnectedDataItem(CipDataOpt::Raw(vec![
-                0;
-                34
-            ]))],
-        };
-        let without_data = IoPacket {
-            items: vec![CommonPacketItem::SequencedAddressItem(SequencedAddress {
-                connection_id: T2O_NETWORK_CONNECTION_ID,
-                encapsulation_sequence_number: 1,
-            })],
-        };
         let cases = [
             (
                 IoPacket::new(
@@ -288,16 +271,6 @@ mod tests {
                 input_packet(1, 1, &[0; 32]),
                 stranger,
                 "packet from 172.28.0.99:2222, not the adapter",
-            ),
-            (
-                without_address,
-                from_adapter(),
-                "packet without a Sequenced Address Item",
-            ),
-            (
-                without_data,
-                from_adapter(),
-                "packet without a Connected Data Item",
             ),
             (
                 input_packet(1, 1, &[0; 31]),

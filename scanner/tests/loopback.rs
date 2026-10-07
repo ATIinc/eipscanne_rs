@@ -35,10 +35,9 @@ use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
 };
-use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::io_packet::IoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
-use eipscanne_rs::eip::sockaddr::SockaddrInfo;
+use eipscanne_rs::eip::sockaddr::{SockaddrInfo, SockaddrInfoItems};
 
 use scanner::implicit::connection::{forward_close, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
@@ -121,11 +120,11 @@ fn header(command: EnIpCommand) -> EncapsulationHeader {
     }
 }
 
-/// A successful Connection Manager reply carrying `data`, plus any extra items
+/// A successful Connection Manager reply carrying `data` and `sockaddr_info_items`
 fn connection_manager_reply(
     service: ServiceCode,
     data: impl eipscanne_rs::cip::message::data::CipData + 'static,
-    extra_items: Vec<CommonPacketItem>,
+    sockaddr_info_items: SockaddrInfoItems,
 ) -> EnIpPacket {
     let mut rr_data = RRPacketData::new_unconnected(
         CIP_INTERFACE_HANDLE,
@@ -140,7 +139,7 @@ fn connection_manager_reply(
             },
         },
     );
-    rr_data.items.extend(extra_items);
+    rr_data.sockaddr_info_items = sockaddr_info_items;
     EnIpPacket {
         header: header(EnIpCommand::SendRrData),
         command_specific_data: CommandSpecificData::SendRrData(rr_data),
@@ -207,9 +206,13 @@ async fn fake_adapter(
                 application_reply_size: 0,
                 application_reply: vec![],
             },
-            vec![CommonPacketItem::O2TSockAddrInfo(SockaddrInfo::from(
-                SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, io_port),
-            ))],
+            SockaddrInfoItems {
+                o2t: Some(SockaddrInfo::from(SocketAddrV4::new(
+                    Ipv4Addr::UNSPECIFIED,
+                    io_port,
+                ))),
+                t2o: None,
+            },
         ),
     )
     .await;
@@ -217,10 +220,10 @@ async fn fake_adapter(
     // 3. One output packet in, the same bytes back as an input packet
     let (packet, _) = recv_io_packet(&io_socket).await.unwrap();
     assert_eq!(
-        packet.sequenced_address().unwrap().connection_id,
+        packet.sequenced_address.connection_id,
         O2T_NETWORK_CONNECTION_ID
     );
-    let Some(CipDataOpt::Raw(data)) = packet.connected_data() else {
+    let CipDataOpt::Raw(data) = &packet.connected_data else {
         panic!("expected raw connected data");
     };
     // Sequence count (2) and run/idle header (4) precede the outputs
@@ -253,7 +256,7 @@ async fn fake_adapter(
                 application_reply_size: 0,
                 application_reply: vec![],
             },
-            vec![],
+            SockaddrInfoItems::default(),
         ),
     )
     .await;
