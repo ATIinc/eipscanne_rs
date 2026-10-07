@@ -12,7 +12,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 * [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 
-`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`; `--features adapter` adds the adapter-side tests.
+`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.
 
 ## Reading PDF references
 
