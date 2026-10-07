@@ -6,7 +6,15 @@ This was created by using the [EIPScanner](https://github.com/nimbuscontrols/EIP
 
 The struct definitions/names heavily correlate to their Wireshark counterparts. See the [captures](./captures/) directory for some examples of Ethernet/IP traffic. 
 
-See the [examples](./scanner/examples/) directory for ideas on how to implement an Ethernet/IP Explicit and Implicit Messaging Scanner; the [`scanner`](./scanner/) crate they live in holds the session, connection and I/O helpers they are built on. The [`eds_parser`](./eds_parser/) crate reads a device's EDS file and derives the connection settings from it (`eds-implicit-io` example)
+## Workspace
+
+* `eipscanne_rs` (this directory): the packet library.
+* [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
+* [`eds_parser`](./eds_parser/README.md): turns a connection from a device's EDS file into the scanner's Forward_Open (`eds-implicit-io` example).
+  It also checks hand-written assembly structs against the EDS layouts (`eds-assemblies`, `io-hub-implicit` examples).
+* `hex_test_macros`: hex assertions for the byte-exact tests.
+
+`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`; `--features adapter` adds the adapter-side tests.
 
 ## Reading PDF references
 

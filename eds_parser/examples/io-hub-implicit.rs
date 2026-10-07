@@ -30,7 +30,9 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-use eds_parser::{Eds, OriginatorSettings, check_assembly, to_forward_open};
+use eds_parser::Eds;
+use eds_parser::check::check_assembly;
+use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]

@@ -2,7 +2,8 @@
 //! EDS, which stays local:
 //! `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`
 
-use eds_parser::{Eds, check_assembly};
+use eds_parser::Eds;
+use eds_parser::check::check_assembly;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
