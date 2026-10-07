@@ -282,7 +282,7 @@ implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer st
 ## Verification
 
 ```
-cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --features adapter && cargo test --examples
+cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --examples
 ```
 
 (`cargo test` and `cargo clippy` cover both default members; `--workspace` adds only
