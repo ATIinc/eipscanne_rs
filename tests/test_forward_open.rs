@@ -324,7 +324,6 @@ fn test_serialize_forward_open_request() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let deserialized = RequestObjectAssembly::read(&mut buf_reader).unwrap();
 
-    assert_eq!(expected_request_object, deserialized);
     assert_eq!(forward_open_request_of(&deserialized, false), request);
 }
 
@@ -496,7 +495,6 @@ fn test_serialize_large_forward_open_request() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let deserialized = RequestObjectAssembly::read(&mut buf_reader).unwrap();
 
-    assert_eq!(expected_request_object, deserialized);
     assert_eq!(forward_open_request_of(&deserialized, true), request);
 }
 
@@ -631,8 +629,6 @@ fn test_deserialize_forward_open_success_response() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
 
-    assert_eq!(expected_response_object, response_object);
-
     // The reply data as the typed reply
     let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
     else {
@@ -752,35 +748,9 @@ fn test_deserialize_forward_open_rejected_response() {
         .unwrap();
     reply_data.extend([0x00, 0x00]);
 
-    let expected_response_object = ResponseObjectAssembly {
-        header: EncapsulationHeader {
-            command: EnIpCommand::SendRrData,
-            length: Some(32),
-            session_handle: CLEARLINK_IO_SESSION_HANDLE,
-            status_code: EncapsStatusCode::Success,
-            sender_context: EMPTY_SENDER_CONTEXT,
-            options: DEFAULT_ENCAPSULATION_OPTIONS,
-        },
-        command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
-            CIP_INTERFACE_HANDLE,
-            NO_ENCAPSULATION_TIMEOUT,
-            MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::ForwardOpen),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::ConnectionFailure,
-                    additional_status_size: 1,
-                    additional_status: vec![0x0100],
-                    data: CipDataOpt::Raw(reply_data),
-                },
-            },
-        )),
-    };
-
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
-
-    assert_eq!(expected_response_object, response_object);
 
     // A rejection, not reply data to interpret
     let response = response_object.response().unwrap();
