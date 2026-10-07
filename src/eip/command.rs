@@ -108,7 +108,7 @@ impl RRPacketData {
                 packet_length: None,
             },
             cip_message: message.into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }
     }
 }

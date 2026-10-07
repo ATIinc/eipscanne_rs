@@ -121,7 +121,7 @@ fn test_deserialize_cip_identity_request() {
                 ),
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 
