@@ -17,7 +17,7 @@ Reference PDFs (e.g. protocol specifications) can be kept in the git-ignored [do
 
 ## Implicit messaging
 
-Class 1 implicit messaging (cyclic I/O) is being added in stages; the plan, the ground rules and the status of each stage live in [phases/](./phases/).
+The library also covers class 1 implicit messaging (cyclic I/O): Forward_Open and Forward_Close, and the I/O packets on UDP port 2222. Its plan and ground rules live in [phases/](./phases/).
 
 ## Related projects
 
