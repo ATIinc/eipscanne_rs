@@ -1,9 +1,10 @@
 //! Stage 3, T->O: the inputs. The caller hands every packet that arrives on the I/O socket to
 //! [`accept_t2o_packet`] with the sequence number of the last accepted one, and gets back the
-//! packet's Sequenced Address and Connected Data as they were on the wire, or an error saying why
-//! it was discarded, for the caller to report. The caller also keeps the deadline: the connection has timed out when no packet
-//! is accepted within [`input_timeout`] (and within [`FIRST_PACKET_GRACE`], if longer, of the
-//! Forward_Open reply). Nothing here keeps state.
+//! packet's Sequenced Address and Connected Data as they were on the wire, or
+//! `Error::UnexpectedPacket` saying why it was discarded, for the caller to report. The caller
+//! also keeps the deadline: the connection has timed out when no packet is accepted within
+//! [`input_timeout`] (and within [`FIRST_PACKET_GRACE`], if longer, of the Forward_Open reply).
+//! Nothing here keeps state.
 //!
 //! The inputs are always bytes, since only the caller knows their type; a `binrw` input assembly
 //! is read from them.
@@ -12,8 +13,7 @@ use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::time::Duration;
 
-use anyhow::bail;
-use binrw::{BinRead, BinResult};
+use binrw::BinRead;
 use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::parameters::connection_size;
@@ -23,6 +23,7 @@ use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::io_packet::{IoPacket, SequencedAddress};
 
+use crate::error::{Error, Result};
 use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
 
 /// The largest UDP payload, so no packet is cut short
@@ -30,17 +31,17 @@ const MAX_UDP_PAYLOAD: usize = 65_535;
 
 /// Binds the I/O socket on every interface. Bind it before the Forward_Open: adapters start
 /// sending as soon as they have replied.
-pub async fn bind_io_socket() -> std::io::Result<UdpSocket> {
-    UdpSocket::bind(SocketAddrV4::new(
+pub async fn bind_io_socket() -> Result<UdpSocket> {
+    Ok(UdpSocket::bind(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
         ETHERNET_IP_IO_UDP_PORT,
     ))
-    .await
+    .await?)
 }
 
 /// Waits for one datagram and parses it as an I/O packet, returning it with its sender. Cancel
 /// safe: a dropped call loses no datagram.
-pub async fn recv_io_packet(socket: &UdpSocket) -> BinResult<(IoPacket, SocketAddr)> {
+pub async fn recv_io_packet(socket: &UdpSocket) -> Result<(IoPacket, SocketAddr)> {
     let mut bytes = vec![0u8; MAX_UDP_PAYLOAD];
     let (len, from) = socket.recv_from(&mut bytes).await?;
     bytes.truncate(len);
@@ -63,21 +64,25 @@ pub fn accept_t2o_packet(
     last_sequence_number: Option<CipUdint>,
     packet: &IoPacket,
     from: SocketAddr,
-) -> anyhow::Result<(SequencedAddress, IoData)> {
+) -> Result<(SequencedAddress, IoData)> {
     // 1. It is for this connection
     let Some(address) = packet.sequenced_address().copied() else {
-        bail!("packet without a Sequenced Address Item");
+        return Err(Error::UnexpectedPacket(
+            "packet without a Sequenced Address Item".to_string(),
+        ));
     };
     if address.connection_id != connection.response.t2o_network_connection_id {
-        bail!(
+        return Err(Error::UnexpectedPacket(format!(
             "packet for another connection ({:#010x})",
             address.connection_id
-        );
+        )));
     }
 
     // 2. It comes from the adapter (whatever port it chose)
     if from.ip() != IpAddr::V4(connection.target_ip) {
-        bail!("packet from {from}, not the adapter");
+        return Err(Error::UnexpectedPacket(format!(
+            "packet from {from}, not the adapter"
+        )));
     }
 
     // 3. It is newer than the last accepted packet, but not unreasonably so: the distance
@@ -88,7 +93,9 @@ pub fn accept_t2o_packet(
         let received = address.encapsulation_sequence_number;
         let distance = received.wrapping_sub(last);
         if distance == 0 || distance >= 1 << 31 {
-            bail!("stale sequence number {received} (last accepted {last})");
+            return Err(Error::UnexpectedPacket(format!(
+                "stale sequence number {received} (last accepted {last})"
+            )));
         }
         let multiplier = connection
             .request
@@ -96,16 +103,18 @@ pub fn accept_t2o_packet(
             .multiplier();
         let allowed = MIN_ALLOWED_SEQUENCE_GAP.max(multiplier.saturating_add(1));
         if distance > allowed {
-            bail!(
+            return Err(Error::UnexpectedPacket(format!(
                 "sequence number {received} is more than {allowed} ahead of the last accepted {last}"
-            );
+            )));
         }
     }
 
     // 4. Its data has the agreed size and decodes with the shape of this direction: sequence
     //    count, run/idle header, then the data
     let Some(CipDataOpt::Raw(bytes)) = packet.connected_data() else {
-        bail!("packet without a Connected Data Item");
+        return Err(Error::UnexpectedPacket(
+            "packet without a Connected Data Item".to_string(),
+        ));
     };
     let transport_class = connection.request.transport_type_trigger.transport_class();
     let real_time_format = connection.t2o_real_time_format;
@@ -119,7 +128,9 @@ pub fn accept_t2o_packet(
     let overhead = usize::from(connection_size(0, transport_class, real_time_format));
     let data_len = bytes.len().saturating_sub(overhead);
     if bytes.len() < overhead || !data_len_matches_connection(data_len, expected, size_type) {
-        bail!("{data_len} input bytes, the connection carries {expected}");
+        return Err(Error::UnexpectedPacket(format!(
+            "{data_len} input bytes, the connection carries {expected}"
+        )));
     }
     // A Connected Data Item's length is a 16-bit field on the wire
     let inputs = IoData::read_le_args(
@@ -185,7 +196,7 @@ mod tests {
         connection: &OpenConnection,
         last: CipUdint,
         received: CipUdint,
-    ) -> anyhow::Result<(SequencedAddress, IoData)> {
+    ) -> Result<(SequencedAddress, IoData)> {
         accept_t2o_packet(
             connection,
             Some(last),
@@ -240,7 +251,7 @@ mod tests {
 
         assert_eq!(
             discarded(&sample_connection(), &packet, from_adapter()),
-            "packet for another connection (0x12345679)"
+            "unexpected packet: packet for another connection (0x12345679)"
         );
     }
 
@@ -254,7 +265,7 @@ mod tests {
                 &input_packet(1, 1, &[0; 32]),
                 stranger
             ),
-            "packet from 172.28.0.99:2222, not the adapter"
+            "unexpected packet: packet from 172.28.0.99:2222, not the adapter"
         );
     }
 
@@ -279,11 +290,11 @@ mod tests {
 
         assert_eq!(
             discarded_after(&connection, 10, 10),
-            "stale sequence number 10 (last accepted 10)"
+            "unexpected packet: stale sequence number 10 (last accepted 10)"
         );
         assert_eq!(
             discarded_after(&connection, 10, 9),
-            "stale sequence number 9 (last accepted 10)"
+            "unexpected packet: stale sequence number 9 (last accepted 10)"
         );
     }
 
@@ -296,7 +307,10 @@ mod tests {
         // Back across the rollover is stale
         assert_eq!(
             discarded_after(&connection, 1, CipUdint::MAX),
-            format!("stale sequence number {} (last accepted 1)", CipUdint::MAX)
+            format!(
+                "unexpected packet: stale sequence number {} (last accepted 1)",
+                CipUdint::MAX
+            )
         );
     }
 
@@ -308,7 +322,7 @@ mod tests {
         assert!(accept_after(&connection, 100, 116).is_ok());
         assert_eq!(
             discarded_after(&connection, 116, 133),
-            "sequence number 133 is more than 16 ahead of the last accepted 116"
+            "unexpected packet: sequence number 133 is more than 16 ahead of the last accepted 116"
         );
     }
 
@@ -320,7 +334,7 @@ mod tests {
         assert!(accept_after(&connection, 1000, 1513).is_ok());
         assert_eq!(
             discarded_after(&connection, 1513, 2027),
-            "sequence number 2027 is more than 513 ahead of the last accepted 1513"
+            "unexpected packet: sequence number 2027 is more than 513 ahead of the last accepted 1513"
         );
     }
 
@@ -330,11 +344,11 @@ mod tests {
 
         assert_eq!(
             discarded(&connection, &input_packet(1, 1, &[0; 31]), from_adapter()),
-            "31 input bytes, the connection carries 32"
+            "unexpected packet: 31 input bytes, the connection carries 32"
         );
         assert_eq!(
             discarded(&connection, &input_packet(1, 1, &[0; 33]), from_adapter()),
-            "33 input bytes, the connection carries 32"
+            "unexpected packet: 33 input bytes, the connection carries 32"
         );
         // Not even a sequence count
         assert_eq!(
@@ -343,7 +357,7 @@ mod tests {
                 &IoPacket::new(T2O_NETWORK_CONNECTION_ID, 1, CipDataOpt::Raw(vec![0])),
                 from_adapter()
             ),
-            "0 input bytes, the connection carries 32"
+            "unexpected packet: 0 input bytes, the connection carries 32"
         );
     }
 
@@ -379,7 +393,7 @@ mod tests {
 
         assert_eq!(
             discarded(&sample_connection(), &packet, from_adapter()),
-            "packet without a Connected Data Item"
+            "unexpected packet: packet without a Connected Data Item"
         );
     }
 
