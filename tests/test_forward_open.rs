@@ -140,10 +140,12 @@ fn sample_request(large: bool) -> ForwardOpenRequest {
 /// The request data of a packet read from the wire, parsed as a Forward_Open request of the
 /// given parameter width (what an adapter does with the packet)
 fn forward_open_request_of(packet: &RequestObjectAssembly, large: bool) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) = packet.cip_message() else {
+    let Some(CipMessage::Request(message)) =
+        packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    else {
         panic!(
             "expected a Message Router request, got {:?}",
-            packet.cip_message()
+            packet.command_specific_data
         );
     };
     // A packet read from the wire keeps its request data raw
@@ -627,7 +629,7 @@ fn test_deserialize_forward_open_success_response() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // The reply data as the typed reply
     let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
@@ -750,7 +752,7 @@ fn test_deserialize_forward_open_rejected_response() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // A rejection, not reply data to interpret
     let response = response_object.response().unwrap();
@@ -831,7 +833,7 @@ fn test_deserialize_forward_open_path_segment_error_response() {
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
     let response = response_object.response().unwrap();
 
     let rejection = Rejection::from_response(response).unwrap();

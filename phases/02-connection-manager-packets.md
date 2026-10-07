@@ -127,8 +127,8 @@ The devcontainer installs tshark.
 
 `tests/test_general_status.rs` holds rejected Forward_Open replies with one and two Additional
 Status words, read and written back unchanged. `tests/test_common_packet.rs` holds a Forward_Open
-reply followed by a Sockaddr Info item (read and written back, and built, written and read back),
-and, with the `adapter` feature, `read_request` accepting a request and rejecting a response.
+reply followed by a Socket Address Info item (read and written back, and built, written and read
+back).
 
 ### Class 1 I/O packets
 
@@ -145,5 +145,5 @@ item as plain data because it has not seen the Forward_Open of the connection.
 ## Verification
 
 ```
-cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --examples
 ```

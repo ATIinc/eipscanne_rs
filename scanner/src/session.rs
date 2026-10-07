@@ -96,7 +96,7 @@ impl Session {
             return Err(Error::EncapsulationStatus(header.status_code));
         }
 
-        Ok(EnIpPacket::read_response(&mut Cursor::new(&bytes))?)
+        Ok(EnIpPacket::read(&mut Cursor::new(&bytes))?)
     }
 
     /// Sends a Message Router request and returns the accepted reply to the same service
@@ -105,7 +105,9 @@ impl Session {
         let reply = self.read_reply().await?;
 
         let response = reply.response().ok_or(Error::NoResponse)?;
-        if let Some(CipMessage::Request(request)) = packet.cip_message() {
+        if let Some(CipMessage::Request(request)) =
+            packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+        {
             let requested = request.service_container.service();
             let answered = response.service_container.service();
             if answered != requested {

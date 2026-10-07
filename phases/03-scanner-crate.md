@@ -167,9 +167,9 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
   `ForwardCloseRequest` with the open request's priority/time tick, timeout ticks, connection
   triad and connection path, sent with `RequestObjectAssembly::new_forward_close` through
   `Session::request`, the reply decoded with `decode_reply`.
-* `o2t_endpoint(reply, target_ip)` (private): where the outputs are sent. The O->T Sockaddr Info
-  item of the reply if present (address `0.0.0.0` meaning `target_ip`), otherwise `target_ip` on
-  `ETHERNET_IP_IO_UDP_PORT`.
+* `o2t_endpoint(reply, target_ip)` (private): where the outputs are sent. The O->T Socket Address
+  Info item of the reply if present (address `0.0.0.0` meaning `target_ip`), otherwise `target_ip`
+  on `ETHERNET_IP_IO_UDP_PORT`.
 * `data_size(parameters, transport_class, real_time_format) -> (u16, ConnectionSizeType)`
   (crate-private): the connection size of a direction's parameter word minus
   `connection_size(0, transport class, real-time format)`, saturating at zero, with the size type.
@@ -262,7 +262,7 @@ implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer st
 
 ## Tests
 
-* `connection.rs`: one test of endpoint resolution with no Sockaddr Info, with `0.0.0.0`, and
+* `connection.rs`: one test of endpoint resolution with no Socket Address Info, with `0.0.0.0`, and
   with an address next to a T->O item.
 * `o2t.rs`: two tests. The first packet, raw or typed, has the bytes of the library's I/O packet
   test, and an idle packet differs only in the run flag. Fixed-size outputs, raw or typed, must
@@ -274,7 +274,7 @@ implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer st
   accepted, and the allowed gap for small and large multipliers. `input_timeout` for the sample
   connection and without overflow for the largest multiplier and interval.
 * `tests/loopback.rs`: the five stages against a fake adapter on the loopback interface
-  (RegisterSession, Forward_Open with a Sockaddr Info O->T item, one I/O packet each way,
+  (RegisterSession, Forward_Open with a Socket Address Info O->T item, one I/O packet each way,
   Forward_Close, UnregisterSession), on ephemeral ports, so the session framing, the open/close
   round trips, `send_io_packet`, `recv_io_packet` and `accept_t2o_packet` run without hardware.
 * `tests/clearlink/`: the ClearLink configuration and output assembly tests.
@@ -282,7 +282,7 @@ implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer st
 ## Verification
 
 ```
-cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --features adapter && cargo test --examples
+cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --examples
 ```
 
 (`cargo test` and `cargo clippy` cover both default members; `--workspace` adds only

@@ -146,7 +146,7 @@ followed and the doc comment says the documentation may be wrong:
 ## Verification
 
 ```
-cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --features adapter
+cargo fmt --all --check && cargo clippy --all-targets && cargo test
 EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored
 cargo run --example eds-assemblies -- --eds docs/IO-HUB-4-E_EDS_File.eds --assembly Assem100
 ```

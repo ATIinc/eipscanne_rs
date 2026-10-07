@@ -1,6 +1,6 @@
 # eipScanne-RS (Ethernet/IP Scanner - rust)
 
-This repository is an implementation of the Ethernet/IP **Explicit Messaging** protocol.
+`eipscanne_rs` reads and writes Ethernet/IP packets with [`binrw`](https://docs.rs/binrw) and [`bilge`](https://docs.rs/bilge): the encapsulation session and **explicit messaging**. Sockets and state belong to the caller.
 
 This was created by using the [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) library to communicate with an Ethernet/IP Adapter while monitoring the network traffic with Wireshark.
 
@@ -14,7 +14,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
   It also checks hand-written assembly structs against the EDS layouts (`eds-assemblies`, `io-hub-implicit` examples).
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 
-`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`; `--features adapter` adds the adapter-side tests.
+`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.
 
 ## Reading PDF references
 
