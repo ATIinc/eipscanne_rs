@@ -10,7 +10,6 @@ use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::PriorityTimeTick;
-use eipscanne_rs::cip::connection_manager::response::ConnectionManagerResponse;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -323,12 +322,13 @@ fn test_deserialize_forward_close_success_response() {
     assert_eq!(expected_response_object, response_object);
 
     // The reply data as the typed reply
+    let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
+    else {
+        panic!("a reply read from the wire holds its data raw");
+    };
     assert_eq!(
-        ConnectionManagerResponse::from_message_router_response(
-            response_object.response().unwrap()
-        )
-        .unwrap(),
-        ConnectionManagerResponse::ForwardClose(expected_response)
+        ForwardCloseResponse::read_le(&mut std::io::Cursor::new(reply_data)).unwrap(),
+        expected_response
     );
 
     // Writing the typed reply (what an adapter does) reproduces the packet, reserved byte included
