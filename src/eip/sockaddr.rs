@@ -1,6 +1,6 @@
 //! Socket address information exchanged while opening an I/O connection (implicit messaging).
 
-use std::io::{Cursor, Read, Seek, Write};
+use std::io::{Read, Seek, Write};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use binrw::meta::{EndianKind, ReadEndian, WriteEndian};
@@ -14,10 +14,10 @@ use binrw::{
 
 use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
 
-use super::description::{CommonPacketItemId, read_any_item, write_item};
+use super::description::{CommonPacketDescriptor, CommonPacketItemId};
 
 /// Length of the data carried by a Sockaddr Info item
-const SOCKADDR_INFO_LENGTH: usize = 16;
+const SOCKADDR_INFO_LENGTH: CipUint = 16;
 /// Only IPv4 socket addresses are allowed
 const SOCKADDR_FAMILY_INET: CipInt = 2;
 
@@ -109,7 +109,8 @@ impl BinRead for SockaddrInfoItems {
 
         for _ in 0..count {
             let pos = reader.stream_position()?;
-            let (type_id, data) = read_any_item(reader, endian)?;
+            let descriptor = CommonPacketDescriptor::read_options(reader, endian, ())?;
+            let type_id = descriptor.type_id;
 
             let item = match type_id {
                 CommonPacketItemId::O2TSockAddrInfo => &mut items.o2t,
@@ -121,18 +122,14 @@ impl BinRead for SockaddrInfoItems {
                     });
                 }
             };
-            if item.is_some() || data.len() != SOCKADDR_INFO_LENGTH {
+            if item.is_some() || descriptor.packet_length != Some(SOCKADDR_INFO_LENGTH) {
                 return Err(binrw::Error::AssertFail {
                     pos,
                     message: format!("a second or malformed {type_id:?}"),
                 });
             }
 
-            *item = Some(SockaddrInfo::read_options(
-                &mut Cursor::new(&data),
-                endian,
-                (),
-            )?);
+            *item = Some(SockaddrInfo::read_options(reader, endian, ())?);
         }
 
         Ok(items)
@@ -148,11 +145,19 @@ impl BinWrite for SockaddrInfoItems {
         endian: Endian,
         _args: Self::Args<'_>,
     ) -> BinResult<()> {
-        if let Some(info) = &self.o2t {
-            write_item(info, writer, endian, (CommonPacketItemId::O2TSockAddrInfo,))?;
-        }
-        if let Some(info) = &self.t2o {
-            write_item(info, writer, endian, (CommonPacketItemId::T2OSockAddrInfo,))?;
+        let items = [
+            (CommonPacketItemId::O2TSockAddrInfo, &self.o2t),
+            (CommonPacketItemId::T2OSockAddrInfo, &self.t2o),
+        ];
+        for (type_id, info) in items {
+            if let Some(info) = info {
+                let descriptor = CommonPacketDescriptor {
+                    type_id,
+                    packet_length: Some(SOCKADDR_INFO_LENGTH),
+                };
+                descriptor.write_options(writer, endian, (SOCKADDR_INFO_LENGTH,))?;
+                info.write_options(writer, endian, ())?;
+            }
         }
 
         Ok(())

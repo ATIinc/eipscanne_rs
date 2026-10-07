@@ -9,7 +9,7 @@ use crate::cip::types::{CipUdint, CipUint};
 use crate::cip::message::CipMessage;
 
 use super::constants as eip_constants;
-use super::description::{CommonPacketItemId, read_item, write_item};
+use super::description::{CommonPacketDescriptor, CommonPacketItemId, serialized_length};
 use super::sockaddr::SockaddrInfoItems;
 
 #[derive(BinRead, BinWrite)]
@@ -67,11 +67,22 @@ pub struct RRPacketData {
     #[bw(calc = eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT + sockaddr_info_items.count())]
     item_count: CipUint,
 
-    // Preceded by the Null Address Item: Type ID 0x0000, Length 0
-    #[brw(magic = 0u32)]
-    #[br(parse_with = read_item, args(CommonPacketItemId::UnconnectedMessage))]
-    #[bw(write_with = write_item, args(CommonPacketItemId::UnconnectedMessage))]
-    pub unconnected_data: CipMessage,
+    #[br(assert(
+        null_address_item.type_id == CommonPacketItemId::NullAddr,
+        "expected a Null Address Item"
+    ))]
+    #[bw(args(0))]
+    pub null_address_item: CommonPacketDescriptor,
+
+    #[br(assert(
+        unconnected_data_item.type_id == CommonPacketItemId::UnconnectedMessage,
+        "expected an Unconnected Data Item"
+    ))]
+    #[bw(args(serialized_length(cip_message)?))]
+    pub unconnected_data_item: CommonPacketDescriptor,
+
+    #[br(args(unconnected_data_item.packet_length.unwrap_or_default()))]
+    pub cip_message: CipMessage,
 
     #[br(args(item_count - eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT))]
     pub sockaddr_info_items: SockaddrInfoItems,
@@ -89,7 +100,15 @@ impl RRPacketData {
         RRPacketData {
             interface_handle,
             timeout,
-            unconnected_data: message.into(),
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
+            },
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: None,
+            },
+            cip_message: message.into(),
             sockaddr_info_items: SockaddrInfoItems::default(),
         }
     }
