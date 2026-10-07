@@ -15,9 +15,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
     TransportClass, TransportTypeTrigger, connection_size,
 };
-use eipscanne_rs::cip::connection_manager::response::{
-    ConnectionManagerExtendedStatus, ConnectionManagerResponse,
-};
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -636,12 +634,13 @@ fn test_deserialize_forward_open_success_response() {
     assert_eq!(expected_response_object, response_object);
 
     // The reply data as the typed reply
+    let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
+    else {
+        panic!("a reply read from the wire holds its data raw");
+    };
     assert_eq!(
-        ConnectionManagerResponse::from_message_router_response(
-            response_object.response().unwrap()
-        )
-        .unwrap(),
-        ConnectionManagerResponse::ForwardOpen(expected_response)
+        ForwardOpenResponse::read_le(&mut std::io::Cursor::new(reply_data)).unwrap(),
+        expected_response
     );
 
     // Writing the typed reply (what an adapter does) reproduces the packet, reserved byte included
@@ -785,7 +784,7 @@ fn test_deserialize_forward_open_rejected_response() {
 
     // A rejection, not reply data to interpret
     let response = response_object.response().unwrap();
-    let rejection = Rejection::from_response(response).unwrap();
+    let rejection = response.error_for_status().unwrap_err();
     assert_eq!(
         rejection,
         Rejection {
@@ -798,16 +797,15 @@ fn test_deserialize_forward_open_rejected_response() {
         rejection.extended_status(),
         Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
     );
-    assert!(ConnectionManagerResponse::from_message_router_response(response).is_err());
 
-    // Both read as words with their codes in error messages
+    // Both read as their names with their codes in error messages
     assert_eq!(
         ResponseStatusCode::ConnectionFailure.to_string(),
-        "connection failure (0x01)"
+        "ConnectionFailure (0x01)"
     );
     assert_eq!(
         ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen.to_string(),
-        "connection in use or duplicate forward open (0x0100)"
+        "ConnectionInUseOrDuplicateForwardOpen (0x0100)"
     );
     assert_eq!(
         ConnectionManagerExtendedStatus::Unknown(0x0abc).to_string(),
@@ -880,7 +878,7 @@ fn test_deserialize_forward_open_path_segment_error_response() {
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
     let response = response_object.response().unwrap();
 
-    let rejection = Rejection::from_response(response).unwrap();
+    let rejection = response.error_for_status().unwrap_err();
     assert_eq!(
         rejection.general_status,
         ResponseStatusCode::PathSegmentError
@@ -888,7 +886,7 @@ fn test_deserialize_forward_open_path_segment_error_response() {
     assert_eq!(rejection.extended_status(), None);
     assert_eq!(
         rejection.to_string(),
-        "the adapter rejected ForwardOpen: path segment error (0x04)"
+        "the adapter rejected ForwardOpen: PathSegmentError (0x04)"
     );
     // No reply data at all
     assert_eq!(response.response_data.data, CipDataOpt::Raw(vec![]));
