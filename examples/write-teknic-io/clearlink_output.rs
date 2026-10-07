@@ -636,10 +636,12 @@ mod tests {
         assert_eq!(request_object, expected_output_assembly_request);
         assert_eq!(
             request_object
-                .send_rr_data()
+                .command_specific_data
+                .as_send_rr_data()
                 .map(|rr_data| &rr_data.cip_message),
             expected_output_assembly_request
-                .send_rr_data()
+                .command_specific_data
+                .as_send_rr_data()
                 .map(|rr_data| &rr_data.cip_message)
         );
     }
