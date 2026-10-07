@@ -16,7 +16,6 @@ use super::description::CommonPacketItem;
 #[bw(little, repr = CipUint)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum EnIpCommand {
-    // Needs to be of type CipUint (u16)
     NOP = 0,
     ListServices = 0x0004,
     ListIdentity = 0x0063,
@@ -36,7 +35,6 @@ pub enum EnIpCommand {
 #[bw(little, repr = CipUdint)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum EncapsStatusCode {
-    // Needs to be of type CipUdint (u32)
     Success = 0x0000,
     UnsupportedCommand = 0x0001,
     InsufficientMemory = 0x0002,
