@@ -35,7 +35,7 @@ use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
 };
-use eipscanne_rs::eip::io_packet::IoPacket;
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::sockaddr::{SockaddrInfo, SockaddrInfoItems};
 
@@ -232,7 +232,7 @@ async fn fake_adapter(
     input_data.extend_from_slice(&outputs);
     send_io_packet(
         &io_socket,
-        &IoPacket::new(T2O_NETWORK_CONNECTION_ID, 1, CipDataOpt::Raw(input_data)),
+        &EnIpIoPacket::new(T2O_NETWORK_CONNECTION_ID, 1, CipDataOpt::Raw(input_data)),
         SocketAddrV4::new(LOCALHOST, scanner_io_port),
     )
     .await

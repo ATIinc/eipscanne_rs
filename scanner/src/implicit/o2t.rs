@@ -8,10 +8,10 @@ use binrw::BinWrite;
 use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::parameters::{RealTimeFormat, TransportClass};
-use eipscanne_rs::cip::io_data::{IoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
-use eipscanne_rs::eip::io_packet::IoPacket;
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 
 use crate::error::{Error, Result};
 use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
@@ -27,7 +27,7 @@ pub fn build_o2t_packet(
     cip_sequence_count: CipUint,
     outputs: CipDataOpt,
     run: bool,
-) -> Result<IoPacket> {
+) -> Result<EnIpIoPacket> {
     // A typed assembly's size is only known once it is written
     let mut outputs_bytes = Cursor::new(Vec::new());
     outputs.write_le_args(&mut outputs_bytes, (0,))?;
@@ -65,14 +65,14 @@ pub fn build_o2t_packet(
     };
 
     let mut bytes = Cursor::new(Vec::new());
-    IoData {
+    CipIoData {
         cip_sequence_count,
         run_idle_header,
         data: CipDataOpt::Raw(outputs),
     }
     .write_le(&mut bytes)?;
 
-    Ok(IoPacket::new(
+    Ok(EnIpIoPacket::new(
         connection.response.o2t_network_connection_id,
         encapsulation_sequence_number,
         CipDataOpt::Raw(bytes.into_inner()),
@@ -80,7 +80,11 @@ pub fn build_o2t_packet(
 }
 
 /// Sends one I/O packet to `to`
-pub async fn send_io_packet(socket: &UdpSocket, packet: &IoPacket, to: SocketAddrV4) -> Result<()> {
+pub async fn send_io_packet(
+    socket: &UdpSocket,
+    packet: &EnIpIoPacket,
+    to: SocketAddrV4,
+) -> Result<()> {
     let mut bytes = Cursor::new(Vec::new());
     packet.write(&mut bytes)?;
     socket.send_to(bytes.get_ref(), to).await?;

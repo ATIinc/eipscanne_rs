@@ -10,11 +10,11 @@ use binrw::BinRead;
 use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::parameters::connection_size;
-use eipscanne_rs::cip::io_data::IoData;
+use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
-use eipscanne_rs::eip::io_packet::{IoPacket, SequencedAddress};
+use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
 use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
@@ -33,12 +33,12 @@ pub async fn bind_io_socket() -> Result<UdpSocket> {
 }
 
 /// Receives one I/O packet and its sender. Cancel safe.
-pub async fn recv_io_packet(socket: &UdpSocket) -> Result<(IoPacket, SocketAddr)> {
+pub async fn recv_io_packet(socket: &UdpSocket) -> Result<(EnIpIoPacket, SocketAddr)> {
     let mut bytes = vec![0u8; MAX_UDP_PAYLOAD];
     let (len, from) = socket.recv_from(&mut bytes).await?;
     bytes.truncate(len);
 
-    let packet = IoPacket::read(&mut Cursor::new(&bytes))?;
+    let packet = EnIpIoPacket::read(&mut Cursor::new(&bytes))?;
     Ok((packet, from))
 }
 
@@ -54,9 +54,9 @@ const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 pub fn accept_t2o_packet(
     connection: &OpenConnection,
     last_sequence_number: Option<CipUdint>,
-    packet: &IoPacket,
+    packet: &EnIpIoPacket,
     from: SocketAddr,
-) -> Result<(SequencedAddress, IoData)> {
+) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is for this connection
     let address = packet.sequenced_address;
     if address.connection_id != connection.response.t2o_network_connection_id {
@@ -117,7 +117,7 @@ pub fn accept_t2o_packet(
         )));
     }
     // A Connected Data Item's length is a 16-bit field on the wire
-    let inputs = IoData::read_le_args(
+    let inputs = CipIoData::read_le_args(
         &mut Cursor::new(bytes),
         (bytes.len() as u16, transport_class, real_time_format),
     )?;
@@ -158,10 +158,10 @@ mod tests {
     }
 
     /// An input packet of the sample connection, as the wire delivers it: the data raw
-    fn input_packet(sequence_number: CipUdint, count: CipUint, data: &[u8]) -> IoPacket {
+    fn input_packet(sequence_number: CipUdint, count: CipUint, data: &[u8]) -> EnIpIoPacket {
         let mut bytes = count.to_le_bytes().to_vec();
         bytes.extend_from_slice(data);
-        IoPacket::new(
+        EnIpIoPacket::new(
             T2O_NETWORK_CONNECTION_ID,
             sequence_number,
             CipDataOpt::Raw(bytes),
@@ -173,7 +173,7 @@ mod tests {
         connection: &OpenConnection,
         last: CipUdint,
         received: CipUdint,
-    ) -> Result<(SequencedAddress, IoData)> {
+    ) -> Result<(SequencedAddress, CipIoData)> {
         accept_t2o_packet(
             connection,
             Some(last),
@@ -210,7 +210,7 @@ mod tests {
         );
         assert_eq!(
             inputs,
-            IoData {
+            CipIoData {
                 cip_sequence_count: Some(7),
                 run_idle_header: None,
                 data: CipDataOpt::Raw(data),
@@ -246,7 +246,7 @@ mod tests {
             accept_t2o_packet(&header, None, &input_packet(1, 1, &bytes), from_adapter()).unwrap();
         assert_eq!(
             inputs,
-            IoData {
+            CipIoData {
                 cip_sequence_count: Some(1),
                 run_idle_header: Some(idle_header),
                 data: CipDataOpt::Raw(vec![0; 32]),
@@ -259,7 +259,7 @@ mod tests {
         let stranger = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(172, 28, 0, 99), 2222));
         let cases = [
             (
-                IoPacket::new(
+                EnIpIoPacket::new(
                     T2O_NETWORK_CONNECTION_ID + 1,
                     1,
                     CipDataOpt::Raw(vec![0; 34]),
@@ -284,7 +284,7 @@ mod tests {
             ),
             // Not even a sequence count
             (
-                IoPacket::new(T2O_NETWORK_CONNECTION_ID, 1, CipDataOpt::Raw(vec![0])),
+                EnIpIoPacket::new(T2O_NETWORK_CONNECTION_ID, 1, CipDataOpt::Raw(vec![0])),
                 from_adapter(),
                 "0 input bytes, the connection carries 32",
             ),
