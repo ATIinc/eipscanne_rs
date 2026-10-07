@@ -800,14 +800,14 @@ fn test_deserialize_forward_open_rejected_response() {
     );
     assert!(ConnectionManagerResponse::from_message_router_response(response).is_err());
 
-    // Both read as words with their codes in error messages
+    // Both read as their names with their codes in error messages
     assert_eq!(
         ResponseStatusCode::ConnectionFailure.to_string(),
-        "connection failure (0x01)"
+        "ConnectionFailure (0x01)"
     );
     assert_eq!(
         ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen.to_string(),
-        "connection in use or duplicate forward open (0x0100)"
+        "ConnectionInUseOrDuplicateForwardOpen (0x0100)"
     );
     assert_eq!(
         ConnectionManagerExtendedStatus::Unknown(0x0abc).to_string(),
@@ -888,7 +888,7 @@ fn test_deserialize_forward_open_path_segment_error_response() {
     assert_eq!(rejection.extended_status(), None);
     assert_eq!(
         rejection.to_string(),
-        "the adapter rejected ForwardOpen: path segment error (0x04)"
+        "the adapter rejected ForwardOpen: PathSegmentError (0x04)"
     );
     // No reply data at all
     assert_eq!(response.response_data.data, CipDataOpt::Raw(vec![]));

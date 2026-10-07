@@ -8,7 +8,7 @@ use binrw::{BinRead, BinResult, BinWrite, binrw};
 
 use crate::cip::connection_manager::forward_close::ForwardCloseResponse;
 use crate::cip::connection_manager::forward_open::ForwardOpenResponse;
-use crate::cip::message::response::{MessageRouterResponse, Rejection, variant_words};
+use crate::cip::message::response::{MessageRouterResponse, Rejection};
 use crate::cip::message::shared::ServiceCode;
 use crate::cip::types::CipUint;
 
@@ -132,8 +132,7 @@ pub enum ConnectionManagerResponse {
 
 // ======= Start of ConnectionManagerExtendedStatus impl ========
 
-/// The extended status in words with its code: `connection in use or duplicate forward open
-/// (0x0100)`
+/// The extended status name with its code: `ConnectionInUseOrDuplicateForwardOpen (0x0100)`
 impl fmt::Display for ConnectionManagerExtendedStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut code = Cursor::new(Vec::new());
@@ -144,7 +143,7 @@ impl fmt::Display for ConnectionManagerExtendedStatus {
             ConnectionManagerExtendedStatus::Unknown(_) => {
                 write!(f, "unknown extended status ({code:#06x})")
             }
-            _ => write!(f, "{} ({code:#06x})", variant_words(&format!("{self:?}"))),
+            _ => write!(f, "{self:?} ({code:#06x})"),
         }
     }
 }
