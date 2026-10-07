@@ -15,15 +15,13 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
     TransportClass, TransportTypeTrigger, connection_size,
 };
-use eipscanne_rs::cip::connection_manager::response::{
-    ConnectionManagerExtendedStatus, ConnectionManagerResponse,
-};
-use eipscanne_rs::cip::connection_manager::shared::{ConnectionTriad, UnsuccessfulResponse};
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::response::{
-    MessageRouterResponse, ResponseData, ResponseStatusCode,
+    MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::object_ids::{CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID};
@@ -636,12 +634,13 @@ fn test_deserialize_forward_open_success_response() {
     assert_eq!(expected_response_object, response_object);
 
     // The reply data as the typed reply
+    let CipDataOpt::Raw(reply_data) = &response_object.response().unwrap().response_data.data
+    else {
+        panic!("a reply read from the wire holds its data raw");
+    };
     assert_eq!(
-        ConnectionManagerResponse::from_message_router_response(
-            response_object.response().unwrap()
-        )
-        .unwrap(),
-        ConnectionManagerResponse::ForwardOpen(expected_response)
+        ForwardOpenResponse::read_le(&mut std::io::Cursor::new(reply_data)).unwrap(),
+        expected_response
     );
 
     // Writing the typed reply (what an adapter does) reproduces the packet, reserved byte included
@@ -745,11 +744,13 @@ fn test_deserialize_forward_open_rejected_response() {
         0x01, 0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01, 0x00, 0x00, 0x00,
     ];
 
-    let expected_response = UnsuccessfulResponse {
-        connection_triad: Some(sample_connection_triad()),
-        remaining_path_size: Some(0),
-        reserved: Some(0),
-    };
+    // The reply data: the connection triad of the refused request, then Remaining Path Size and
+    // its reserved byte
+    let mut reply_data = Vec::new();
+    sample_connection_triad()
+        .write(&mut std::io::Cursor::new(&mut reply_data))
+        .unwrap();
+    reply_data.extend([0x00, 0x00]);
 
     let expected_response_object = ResponseObjectAssembly {
         header: EncapsulationHeader {
@@ -769,7 +770,7 @@ fn test_deserialize_forward_open_rejected_response() {
                     status: ResponseStatusCode::ConnectionFailure,
                     additional_status_size: 1,
                     additional_status: vec![0x0100],
-                    data: CipDataOpt::Typed(Box::new(expected_response.clone())),
+                    data: CipDataOpt::Raw(reply_data),
                 },
             },
         )),
@@ -781,37 +782,20 @@ fn test_deserialize_forward_open_rejected_response() {
 
     assert_eq!(expected_response_object, response_object);
 
-    // The reply data as the typed reply: a rejection parses as `Ok`, not as an error
+    // A rejection, not reply data to interpret
     let response = response_object.response().unwrap();
+    let rejection = Rejection::from_response(response).unwrap();
     assert_eq!(
-        ConnectionManagerResponse::from_message_router_response(response).unwrap(),
-        ConnectionManagerResponse::Unsuccessful(expected_response)
+        rejection,
+        Rejection {
+            service: ServiceCode::ForwardOpen,
+            general_status: ResponseStatusCode::ConnectionFailure,
+            additional_status: vec![0x0100],
+        }
     );
-
-    // The general status and the extended status stay on the Message Router response
     assert_eq!(
-        response.response_data.status,
-        ResponseStatusCode::ConnectionFailure
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::from_additional_status(
-            &response.response_data.additional_status
-        ),
+        rejection.extended_status(),
         Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
-    );
-
-    // Both read as words with their codes in error messages
-    assert_eq!(
-        ResponseStatusCode::ConnectionFailure.to_string(),
-        "connection failure (0x01)"
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen.to_string(),
-        "connection in use or duplicate forward open (0x0100)"
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::Unknown(0x0abc).to_string(),
-        "unknown extended status (0x0abc)"
     );
 }
 
@@ -875,33 +859,21 @@ fn test_deserialize_forward_open_path_segment_error_response() {
         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x04, 0x00, 0xd4, 0x00, 0x04, 0x00,
     ];
 
-    let expected_response = UnsuccessfulResponse {
-        connection_triad: None,
-        remaining_path_size: None,
-        reserved: None,
-    };
-
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
     let response = response_object.response().unwrap();
 
+    let rejection = Rejection::from_response(response).unwrap();
     assert_eq!(
-        response.response_data.status,
-        ResponseStatusCode::PathSegmentError
+        rejection,
+        Rejection {
+            service: ServiceCode::ForwardOpen,
+            general_status: ResponseStatusCode::PathSegmentError,
+            additional_status: vec![],
+        }
     );
-    assert_eq!(
-        response.response_data.status.to_string(),
-        "path segment error (0x04)"
-    );
-    assert_eq!(
-        ConnectionManagerResponse::from_message_router_response(response).unwrap(),
-        ConnectionManagerResponse::Unsuccessful(expected_response)
-    );
-    assert_eq!(
-        ConnectionManagerExtendedStatus::from_additional_status(
-            &response.response_data.additional_status
-        ),
-        None
-    );
+    assert_eq!(rejection.extended_status(), None);
+    // No reply data at all
+    assert_eq!(response.response_data.data, CipDataOpt::Raw(vec![]));
 }

@@ -17,10 +17,10 @@ use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::Error;
-use crate::session::{Session, router_response};
+use crate::session::Session;
 
-/// Sends `service` on `request_path` with the optional request `data`, reads the reply and
-/// returns it once its general status is success
+/// Sends `service` on `request_path` with the optional request `data` and returns the reply
+/// once the adapter accepted the request
 pub async fn send_request(
     session: &mut Session,
     request_path: CipPath,
@@ -28,21 +28,13 @@ pub async fn send_request(
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket, Error> {
     session
-        .send(&RequestObjectAssembly::new_service_request(
+        .request(&RequestObjectAssembly::new_service_request(
             session.session_handle(),
             request_path,
             service,
             data,
         ))
-        .await?;
-    let reply = session.read_reply().await?;
-
-    let response = router_response(&reply)?;
-    if !response.is_success() {
-        return Err(Error::rejected(service, response));
-    }
-
-    Ok(reply)
+        .await
 }
 
 /// The data of a reply's Message Router response, decoded as a `T` declared by the caller
@@ -51,7 +43,12 @@ where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
     // A reply read from the wire always holds its data raw
-    let CipDataOpt::Raw(raw) = &router_response(reply)?.response_data.data else {
+    let CipDataOpt::Raw(raw) = &reply
+        .response()
+        .ok_or(Error::NoResponse)?
+        .response_data
+        .data
+    else {
         return Err(Error::UnexpectedReply(
             "the reply's data is not raw bytes".to_string(),
         ));
