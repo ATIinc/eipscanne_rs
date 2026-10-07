@@ -11,7 +11,7 @@ use crate::cip::{
     types::{CipUint, CipUsint},
 };
 
-use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceContainer};
+use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 
 /// General Status of a Message Router response.
 ///
@@ -182,3 +182,48 @@ impl MessageRouterResponse {
 }
 
 // ^^^^^^^^ End of MessageRouterResponse impl ^^^^^^^^
+
+/// A request the adapter refused: the service it answered, its general status and the
+/// Additional Status words, whose meaning depends on the object that refused it
+#[derive(Debug, PartialEq, Clone)]
+pub struct Rejection {
+    pub service: ServiceCode,
+    pub general_status: ResponseStatusCode,
+    pub additional_status: Vec<CipUint>,
+}
+
+// ======= Start of Rejection impl ========
+
+impl Rejection {
+    /// The rejection `response` carries; `None` when its general status is success
+    pub fn from_response(response: &MessageRouterResponse) -> Option<Rejection> {
+        if response.is_success() {
+            return None;
+        }
+        Some(Rejection {
+            service: response.service_container.service(),
+            general_status: response.response_data.status,
+            additional_status: response.response_data.additional_status.clone(),
+        })
+    }
+}
+
+/// `the adapter rejected GetAttributeAll: path segment error (0x04)`, with the Additional
+/// Status words after it when the reply carries any
+impl fmt::Display for Rejection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the adapter rejected {:?}: {}",
+            self.service, self.general_status
+        )?;
+        if !self.additional_status.is_empty() {
+            write!(f, ", additional status {:#06x?}", self.additional_status)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for Rejection {}
+
+// ^^^^^^^^ End of Rejection impl ^^^^^^^^
