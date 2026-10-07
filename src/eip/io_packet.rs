@@ -6,7 +6,7 @@
 //! ```text
 //! Wireshark                                       Rust
 //! ----------------------------------------------  --------------------------------------------------
-//! EtherNet/IP (Industrial Protocol)               IoPacket
+//! EtherNet/IP (Industrial Protocol)               EnIpIoPacket
 //!     Item Count                                    (not stored: always 2)
 //!         Type ID: Sequenced Address Item (0x8002)  .sequenced_address_item.type_id
 //!             Length                                  .sequenced_address_item.packet_length (8)
@@ -15,12 +15,12 @@
 //!         Type ID: Connected Data Item (0x00b1)     .connected_data_item.type_id
 //!             Length                                  .connected_data_item.packet_length
 //!                                                     (computed on write when None)
-//! Common Industrial Protocol, I/O                 .connected_data (see IoData)
+//! Common Industrial Protocol, I/O                 .connected_data (see CipIoData)
 //! ```
 //!
 //! There is no encapsulation header: the packet starts with the item count. The data of the
 //! Connected Data Item is read raw, because its layout depends on the connection it belongs to;
-//! `IoData` decodes it once the connection is looked up by its ID.
+//! `CipIoData` decodes it once the connection is looked up by its ID.
 
 use binrw::binrw;
 
@@ -49,7 +49,7 @@ pub struct SequencedAddress {
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct IoPacket {
+pub struct EnIpIoPacket {
     #[br(temp, assert(
         item_count == IO_PACKET_ITEM_COUNT,
         "an I/O packet has exactly 2 items"
@@ -78,16 +78,16 @@ pub struct IoPacket {
     pub connected_data: CipDataOpt,
 }
 
-// ======= Start of IoPacket impl ========
+// ======= Start of EnIpIoPacket impl ========
 
-impl IoPacket {
-    /// A packet on the connection `connection_id` carrying `data` (typed, e.g. an `IoData`, or raw)
+impl EnIpIoPacket {
+    /// A packet on the connection `connection_id` carrying `data` (typed, e.g. an `CipIoData`, or raw)
     pub fn new(
         connection_id: CipUdint,
         encapsulation_sequence_number: CipUdint,
         data: CipDataOpt,
     ) -> Self {
-        IoPacket {
+        EnIpIoPacket {
             sequenced_address_item: CommonPacketDescriptor {
                 type_id: CommonPacketItemId::SequencedAddressItem,
                 packet_length: Some(SEQUENCED_ADDRESS_LENGTH),
@@ -105,4 +105,4 @@ impl IoPacket {
     }
 }
 
-// ^^^^^^^^ End of IoPacket impl ^^^^^^^^
+// ^^^^^^^^ End of EnIpIoPacket impl ^^^^^^^^
