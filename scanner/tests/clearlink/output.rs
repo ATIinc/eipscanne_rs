@@ -19,7 +19,7 @@ use eipscanne_rs::eip::command::{
 };
 use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::types::CipUdint;
@@ -380,14 +380,14 @@ fn test_read_output_assembly_object_response() {
                     },
                 }
                 .into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert_eq!(expected_output_assembly_response, response_object);
 }
@@ -475,14 +475,18 @@ fn test_read_output_assembly_object_raw_request() {
                 ),
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 
     // Assert equality
     assert_eq!(request_object, expected_output_assembly_request);
     assert_eq!(
-        request_object.cip_message(),
-        expected_output_assembly_request.cip_message()
+        request_object
+            .send_rr_data()
+            .map(|rr_data| &rr_data.cip_message),
+        expected_output_assembly_request
+            .send_rr_data()
+            .map(|rr_data| &rr_data.cip_message)
     );
 }

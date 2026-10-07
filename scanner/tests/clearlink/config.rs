@@ -2,7 +2,7 @@
 
 use std::vec;
 
-use binrw::BinWrite;
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
 use hex_test_macros::prelude::*;
@@ -18,7 +18,7 @@ use eipscanne_rs::eip::command::{
 };
 use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
@@ -214,14 +214,14 @@ fn test_read_clearlink_config_assembly_object_response() {
                 },
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert_eq!(expected_set_config_assembly_response, response_object);
 }
