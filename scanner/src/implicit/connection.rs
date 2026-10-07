@@ -18,7 +18,7 @@ use eipscanne_rs::eip::description::CommonPacketItem;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::error::Error;
+use crate::error::Result;
 use crate::explicit::decode_reply;
 use crate::session::Session;
 
@@ -47,7 +47,7 @@ pub async fn forward_open(
     request: ForwardOpenRequest,
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
-) -> Result<OpenConnection, Error> {
+) -> Result<OpenConnection> {
     let reply = session
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
@@ -73,7 +73,7 @@ pub async fn forward_open(
 pub async fn forward_close(
     session: &mut Session,
     connection: &OpenConnection,
-) -> Result<ForwardCloseResponse, Error> {
+) -> Result<ForwardCloseResponse> {
     // A Forward_Close names the connection by the triad and path of the Forward_Open that
     // opened it, with the same timing for the unconnected request itself
     let request = ForwardCloseRequest {
