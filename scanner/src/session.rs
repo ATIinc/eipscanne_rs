@@ -17,13 +17,13 @@ use eipscanne_rs::eip::command::EncapsStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::Error;
+use crate::error::Error;
 
 /// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet the session sends or reads
 /// is printed to stderr as hex (`REQUEST 6f 00 ...`, `REPLY 6f 00 ...`), ready for
 /// `scripts/dissect.sh`. This is how Claude sees a session's traffic where it cannot capture
 /// packets (the devcontainer has no capture permission):
-/// `EIP_DUMP=1 cargo run --example io-hub-implicit -- ...`
+/// `EIP_DUMP=1 cargo run --example implicit-io -- ...`
 const DUMP_VARIABLE: &str = "EIP_DUMP";
 
 /// Size of the encapsulation header on the wire: command, length, session handle, status, sender
