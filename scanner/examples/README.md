@@ -133,16 +133,19 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
 
 1. **Session**: registers a session over TCP 44818 (`Session::register`)
 1. **Open**: binds the UDP I/O socket on port 2222 first, because the adapter starts sending as
-   soon as it has replied; then sends the Forward_Open built from a `ConnectionConfig`
-   (`implicit::forward_open`) and keeps the reply as an `OpenConnection`
+   soon as it has replied; then sends the Forward_Open, built field by field from the flags,
+   together with the real-time format of each direction (`implicit::forward_open`), and keeps
+   request, reply and formats as an `OpenConnection`
 1. **Exchange**: one `tokio::select!` loop over three events
-    * the send timer fires every O->T packet interval: `Producer::next_packet` frames the outputs
-      (sequence numbers, run/idle header) and `send_io_packet` sends them to the O->T endpoint
-    * a datagram arrives: `Consumer::accept` checks the connection ID, the sender, the sequence
-      number and the size, decodes the inputs and prints them, or says why the packet was
-      discarded
-    * `Consumer::deadline` passes: no input packet arrived within timeout multiplier × packet
-      interval, the connection is considered timed out and the loop ends
+    * the send timer fires every O->T actual packet interval: `output_packet` frames the outputs
+      with the loop's encapsulation sequence number and CIP sequence count, and
+      `send_io_packet` sends them to the O->T endpoint
+    * a datagram arrives: `accept_input` checks the connection ID, the sender, the sequence
+      number against the last accepted one and the size, and returns the Sequenced Address and
+      the I/O data as read; the loop prints the inputs and moves the deadline, or says why the
+      packet was discarded
+    * the deadline passes: no input packet arrived within timeout multiplier × packet interval
+      (`input_timeout`), the connection is considered timed out and the loop ends
     * Ctrl+C: the loop ends early; the connection is still closed and the session unregistered
 1. **Close**: sends the Forward_Close matching the Forward_Open (`forward_close`)
 1. **End session**: unregisters the session

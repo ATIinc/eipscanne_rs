@@ -1,5 +1,5 @@
-//! Reads a device's EDS file and turns one of its connections into the `ConnectionConfig` the
-//! `scanner` crate opens. The code reads top to bottom in the order the work happens:
+//! Reads a device's EDS file and turns one of its connections into the Forward_Open the
+//! `scanner` crate sends. The code reads top to bottom in the order the work happens:
 //!
 //! ```text
 //! Step  From                 To                                          Module
@@ -8,10 +8,10 @@
 //! 2     the parse tree       Document: sections, entries, fields         document
 //! 3     the document         Param, Assembly, Connection (typed views    params, assembly,
 //!                            with their references resolved)             connection
-//! 4     one Connection       scanner::implicit::ConnectionConfig         to_connection_config
+//! 4     one Connection       ForwardOpenRequest + real-time formats      to_forward_open
 //! ```
 //!
-//! [`Eds::parse`] runs steps 1 to 3; [`to_connection_config`] is step 4. Nothing here touches
+//! [`Eds::parse`] runs steps 1 to 3; [`to_forward_open`] is step 4. Nothing here touches
 //! the network: the `eds-implicit-io` example feeds the result to the scanner.
 //!
 //! An [`Assembly`] also carries its members, the layout its `Display` prints. A caller's
@@ -25,7 +25,7 @@ pub mod connection;
 pub mod document;
 pub mod error;
 pub mod params;
-pub mod to_connection_config;
+pub mod to_forward_open;
 
 pub use assembly::{Assembly, Member};
 pub use check::{AssemblyMismatch, Finding, check_assembly};
@@ -33,7 +33,7 @@ pub use connection::{Connection, ConnectionParameters, DirectionSpec, TriggerAnd
 pub use document::{Document, Entry, Field, Section};
 pub use error::{BridgeError, EdsError};
 pub use params::{DataType, Param};
-pub use to_connection_config::{OriginatorSettings, to_connection_config};
+pub use to_forward_open::{OriginatorSettings, to_forward_open};
 
 /// An EDS file read into its document and typed sections
 #[derive(Debug, Clone, PartialEq)]

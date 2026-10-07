@@ -26,7 +26,7 @@ pub enum EdsError {
     UnknownReference { entry: String, reference: String },
 }
 
-/// A connection the bridge cannot turn into a `ConnectionConfig`
+/// A connection the bridge cannot turn into a Forward_Open
 #[derive(Debug, Clone, PartialEq)]
 pub enum BridgeError {
     /// The connection does not support what this scanner does (class 1, cyclic, exclusive owner,
@@ -39,6 +39,13 @@ pub enum BridgeError {
     },
     /// The connection path is not `20 04 24 cc 2C oo 2C tt`
     UnsupportedPath { connection: String, path: Vec<u8> },
+    /// A direction's connection size does not fit the 9 bits of a Forward_Open; a
+    /// Large_Forward_Open carries up to 65535 bytes
+    ConnectionSizeTooLarge {
+        connection: String,
+        direction: &'static str,
+        size: u16,
+    },
 }
 
 // ======= Start of EdsError impl ========
@@ -102,6 +109,14 @@ impl fmt::Display for BridgeError {
                     hex.join(" ")
                 )
             }
+            BridgeError::ConnectionSizeTooLarge {
+                connection,
+                direction,
+                size,
+            } => write!(
+                f,
+                "{connection}: the {direction} connection size of {size} bytes needs a Large_Forward_Open"
+            ),
         }
     }
 }

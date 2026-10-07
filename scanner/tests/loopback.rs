@@ -5,19 +5,21 @@
 
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::time::Instant;
 
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 
+use bilge::prelude::{u4, u9};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
+
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ProductionTrigger,
-    RealTimeFormat, TransportClass,
+    ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
+    NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RealTimeFormat,
+    RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
@@ -26,6 +28,7 @@ use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
@@ -40,8 +43,7 @@ use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::sockaddr::SockaddrInfo;
 
 use scanner::implicit::{
-    ConnectionConfig, Consumer, DirectionConfig, Producer, forward_close, forward_open,
-    recv_io_packet, send_io_packet,
+    accept_input, forward_close, forward_open, output_packet, recv_io_packet, send_io_packet,
 };
 use scanner::session::Session;
 
@@ -50,34 +52,46 @@ const O2T_NETWORK_CONNECTION_ID: CipUdint = 0xa1b2_c3d4;
 const T2O_NETWORK_CONNECTION_ID: CipUdint = 0x1234_5678;
 const LOCALHOST: Ipv4Addr = Ipv4Addr::LOCALHOST;
 
-fn config() -> ConnectionConfig {
-    ConnectionConfig {
-        configuration_instance: 151,
-        o2t: DirectionConfig {
-            connection_point: 150,
-            data_size: 4,
-            requested_packet_interval: 100_000,
-            real_time_format: RealTimeFormat::Header32Bit,
-            connection_size_type: ConnectionSizeType::Fixed,
-        },
-        t2o: DirectionConfig {
-            connection_point: 100,
-            data_size: 4,
-            requested_packet_interval: 100_000,
-            real_time_format: RealTimeFormat::Modeless,
-            connection_size_type: ConnectionSizeType::Fixed,
-        },
-        transport_class: TransportClass::Class1,
-        production_trigger: ProductionTrigger::Cyclic,
-        priority: ConnectionPriority::Scheduled,
-        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+/// The 16-bit parameter word of a point-to-point, exclusive-owner direction
+fn parameters(connection_size: u16) -> NetworkConnectionParameters {
+    NetworkConnectionParameters::Standard(
+        StandardNetworkConnectionParameters::builder()
+            .connection_size(u9::new(connection_size))
+            .connection_size_type(ConnectionSizeType::Fixed)
+            .priority(ConnectionPriority::Scheduled)
+            .connection_type(ConnectionType::PointToPoint)
+            .redundant_owner(RedundantOwner::Exclusive)
+            .build(),
+    )
+}
+
+/// 4 output bytes behind a sequence count and a run/idle header (10), 4 input bytes behind a
+/// sequence count (6), both every 100 ms
+fn request() -> ForwardOpenRequest {
+    ForwardOpenRequest {
+        priority_time_tick: PriorityTimeTick::builder()
+            .tick_time(u4::new(10))
+            .priority(false)
+            .build(),
+        timeout_ticks: 5,
+        o2t_network_connection_id: 0,
         t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
         connection_triad: ConnectionTriad {
             connection_serial_number: 1,
             originator_vendor_id: 342,
             originator_serial_number: 0x0001_2345,
         },
-        large_forward_open: false,
+        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_requested_packet_interval: 100_000,
+        o2t_network_connection_parameters: parameters(10),
+        t2o_requested_packet_interval: 100_000,
+        t2o_network_connection_parameters: parameters(6),
+        transport_type_trigger: TransportTypeTrigger::builder()
+            .transport_class(TransportClass::Class1)
+            .production_trigger(ProductionTrigger::Cyclic)
+            .direction(Direction::Client)
+            .build(),
+        connection_path: CipPath::new_assembly_connection(151, 150, 100),
     }
 }
 
@@ -275,8 +289,14 @@ async fn one_connection_against_a_fake_adapter() {
     assert_eq!(session.peer_ip(), LOCALHOST);
 
     // 2. Open
-    let connection = forward_open(&mut session, config()).await.unwrap();
-    let established_at = Instant::now();
+    let connection = forward_open(
+        &mut session,
+        request(),
+        RealTimeFormat::Header32Bit,
+        RealTimeFormat::Modeless,
+    )
+    .await
+    .unwrap();
     assert_eq!(
         connection.response.o2t_network_connection_id,
         O2T_NETWORK_CONNECTION_ID
@@ -289,20 +309,18 @@ async fn one_connection_against_a_fake_adapter() {
     );
 
     // 3. One cycle each way
-    let mut producer = Producer::new(&connection, 7);
-    let mut consumer = Consumer::new(&connection, established_at);
     let outputs = [0xde, 0xad, 0xbe, 0xef];
-    let packet = producer.next_packet(&outputs, true).unwrap();
+    let packet = output_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
     send_io_packet(&scanner_io_socket, &packet, connection.o2t_endpoint)
         .await
         .unwrap();
 
     let (packet, from) = recv_io_packet(&scanner_io_socket).await.unwrap();
-    let input = consumer.accept(&packet, from, Instant::now()).unwrap();
-    assert_eq!(input.data, outputs);
-    assert_eq!(input.run_idle, None);
-    assert!(input.new_data);
-    assert!(consumer.deadline() > established_at);
+    let (address, inputs) = accept_input(&connection, None, &packet, from).unwrap();
+    assert_eq!(address.encapsulation_sequence_number, 1);
+    assert_eq!(inputs.cip_sequence_count, Some(1));
+    assert_eq!(inputs.run_idle_header, None);
+    assert_eq!(inputs.data, CipDataOpt::Raw(outputs.to_vec()));
 
     // 4. Close, 5. End session
     forward_close(&mut session, &connection).await.unwrap();
