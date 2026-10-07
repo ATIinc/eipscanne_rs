@@ -784,7 +784,7 @@ fn test_deserialize_forward_open_rejected_response() {
 
     // A rejection, not reply data to interpret
     let response = response_object.response().unwrap();
-    let rejection = response.error_for_status().unwrap_err();
+    let rejection = Rejection::from_response(response).unwrap();
     assert_eq!(
         rejection,
         Rejection {
@@ -878,7 +878,7 @@ fn test_deserialize_forward_open_path_segment_error_response() {
     let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
     let response = response_object.response().unwrap();
 
-    let rejection = response.error_for_status().unwrap_err();
+    let rejection = Rejection::from_response(response).unwrap();
     assert_eq!(
         rejection.general_status,
         ResponseStatusCode::PathSegmentError
