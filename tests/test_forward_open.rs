@@ -107,9 +107,9 @@ fn sample_network_connection_parameters(
     }
 }
 
-/// The request of EIPScanner's implicit messaging example: 32-byte assemblies both ways, a 1 s
-/// packet interval, class 1 cyclic, point-to-point with scheduled priority, a 32-bit header on
-/// the originator to target data; a Large_Forward_Open when `large`
+/// The sample connection request: 32-byte assemblies both ways, a 1 s packet interval, class 1
+/// cyclic, point-to-point with scheduled priority, a 32-bit header on the originator to target
+/// data; a Large_Forward_Open when `large`
 fn sample_request(large: bool) -> ForwardOpenRequest {
     ForwardOpenRequest {
         priority_time_tick: sample_priority_time_tick(),
