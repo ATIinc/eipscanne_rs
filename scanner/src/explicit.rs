@@ -16,7 +16,7 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use crate::Error;
+use crate::error::Error;
 use crate::session::Session;
 
 /// Sends `service` on `request_path` with the optional request `data` and returns the reply

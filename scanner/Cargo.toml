@@ -8,6 +8,7 @@ description = "The scanner side built on eipscanne_rs: sessions, explicit reques
 
 [dependencies]
 eipscanne_rs = { path = ".." }
+anyhow = "1"
 bilge = "0.5.0"
 binrw = "0.15.2"
 tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time", "signal"] }
