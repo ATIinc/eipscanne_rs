@@ -8,7 +8,7 @@ use crate::cip::message::data::CipDataOpt;
 use crate::cip::types::CipUint;
 
 /// 32-bit Header: the word in front of the application data of a direction whose real-time
-/// format is [`RealTimeFormat::Header32Bit`]. Built with its builder; the reserved bits stay zero.
+/// format is [`RealTimeFormat::Header32Bit`].
 #[bitsize(32, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u32::into)]
@@ -31,9 +31,6 @@ pub struct RunIdleHeader {
 /// connection, so reading takes the length of the item, the transport class and the real-time
 /// format of the direction, which the receiver looks up by the connection ID of the Sequenced
 /// Address Item. On the wire the sequence count comes first, then the header, then the data.
-///
-/// Writing takes no arguments (the optional fields are written when set, the data as it is), so
-/// an `IoData` is a `CipData` and can be the typed data of a `ConnectedDataItem`.
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq)]

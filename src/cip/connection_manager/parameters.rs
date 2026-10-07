@@ -65,9 +65,6 @@ pub struct StandardNetworkConnectionParameters {
 }
 
 /// Network Connection Parameters of a Large_Forward_Open (32 bits).
-///
-/// Built by name: `LargeNetworkConnectionParameters::builder()`, every field set once, with the
-/// size from [`connection_size`].
 #[bitsize(32, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u32::into)]
