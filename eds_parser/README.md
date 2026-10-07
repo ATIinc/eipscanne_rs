@@ -9,7 +9,7 @@ happens:
 | 1 | `eds.pest` | The syntax: `[Section]` headers, `Keyword = field, ...;` entries spanning any number of lines, quoted strings (adjacent ones join), decimal and `0x` integers, words, `$` comments anywhere. A second rule reads a connection path (`"20 04 24 [Param3] 2C 96 2C 64"`). |
 | 2 | `document` | `Document { sections }` → `Section { name, entries }` → `Entry { keyword, fields, line }` → `Field::{Empty, Integer, Text, Word}`. No EDS meaning; lookups ignore case. |
 | 3 | `params`, `assembly`, `connection` | Typed views of `ParamN`, `AssemN` and `ConnectionN` entries with their references resolved: an RPI or size given as `ParamN` takes the param's default, an empty size takes the format's `AssemN` size, `[ParamN]` in a path becomes the default's little-endian bytes. The two mask words are `bilge` bitfields. |
-| 4 | `to_forward_open` | `to_forward_open(&Connection, OriginatorSettings)`: picks what this scanner asks for from what the device supports, and returns the `ForwardOpenRequest` with the O->T and T->O real-time formats: the arguments of `scanner::implicit::forward_open`. |
+| 4 | `to_forward_open` | `to_forward_open(&Connection, OriginatorSettings)`: picks what this scanner asks for from what the device supports, and returns the `ForwardOpenRequest` with the O->T and T->O real-time formats: the arguments of `scanner::implicit::connection::forward_open`. |
 
 `Eds::parse(&str)` runs steps 1 to 3.
 

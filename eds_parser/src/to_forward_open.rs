@@ -3,7 +3,7 @@
 //! The masks of a connection list what the device *supports*; the bridge picks one value for each
 //! field of the request, and refuses the connection when the device does not support what this
 //! scanner does (class 1, cyclic, exclusive owner, point-to-point). It returns exactly what
-//! `scanner::implicit::forward_open` takes: the request and the real-time format of each
+//! `scanner::implicit::connection::forward_open` takes: the request and the real-time format of each
 //! direction, which the EDS declares but the Forward_Open does not carry.
 
 use bilge::prelude::{u3, u9};
