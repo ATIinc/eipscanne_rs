@@ -97,14 +97,21 @@ pub enum NetworkConnectionParameters {
     Large(LargeNetworkConnectionParameters),
 }
 
+/// How an end point moves data over the connection. Classes 1, 2 and 3 put a 16-bit sequence
+/// count in front of every packet ([`connection_size`]).
 #[bitsize(4)]
 #[derive(FromBits, PartialEq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum TransportClass {
+    /// One way (the end point only produces or only consumes), over UDP
     #[default]
     Class0 = 0,
+    /// Class 0 plus the sequence count: cyclic I/O, the only class the scanner opens
     Class1 = 1,
+    /// Request/reply over TCP: each packet the server consumes makes it reply at once
     Class2 = 2,
+    /// Request/reply over TCP: the server's application object sends the reply (connected
+    /// explicit messaging)
     Class3 = 3,
 
     #[fallback]
@@ -135,7 +142,8 @@ pub enum Direction {
     Server = 1,
 }
 
-/// Transport Type/Trigger byte of a Forward_Open
+/// Transport Type/Trigger byte of a Forward_Open. A class 0/1 connection is two one-way flows,
+/// O->T and T->O, each with its own connection ID, sequence count and real-time format.
 #[bitsize(8, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u8::into)]
@@ -209,7 +217,7 @@ impl ConnectionTimeoutMultiplier {
 
 // ^^^^^^^^ End of ConnectionTimeoutMultiplier impl ^^^^^^^^
 
-/// How the packets of a class 0/1 connection signal run/idle
+/// How the packets of one direction of a class 0/1 connection signal run/idle
 #[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub enum RealTimeFormat {
     /// Application data only, no run/idle notification

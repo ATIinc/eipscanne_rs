@@ -16,8 +16,8 @@ use eipscanne_rs::eip::io_packet::IoPacket;
 use crate::error::{Error, Result};
 use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
 
-/// The O->T packet of `connection` carrying `outputs` (raw bytes or a `binrw` struct) with the
-/// run flag set to `run`.
+/// The O->T packet of `connection` carrying `outputs` (raw bytes or a `binrw` struct). `run` sets
+/// the run/idle flag when the O->T real-time format is `Header32Bit`; other formats ignore it.
 ///
 /// `encapsulation_sequence_number` advances every packet (start it at random, so a restarted
 /// scanner does not repeat old numbers); `cip_sequence_count` only when the outputs change.
