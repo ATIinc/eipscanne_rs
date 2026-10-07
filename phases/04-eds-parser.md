@@ -22,8 +22,8 @@ to bottom in the order the work happens: text → document → typed sections �
 Module docs listing the four steps above and the module that implements each. `Eds::parse(&str)`
 runs steps 1 to 3 into `Eds { document, params, assemblies, connections }`, and `to_forward_open`
 is step 4. `Eds::connection` finds a connection by its `ConnectionN` keyword or its name, and
-`Eds::first_exclusive_owner_connection` gives the default one. The public types are re-exported at
-the crate root (`eds_parser::{Eds, OriginatorSettings, to_forward_open}`).
+`Eds::first_exclusive_owner_connection` gives the default one. There are no re-exports: each type
+is imported from its module (`eds_parser::to_forward_open::to_forward_open`).
 
 ### Step 1 — syntax: `src/eds.pest`
 
