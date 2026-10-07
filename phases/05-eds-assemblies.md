@@ -99,7 +99,8 @@ The implicit counterpart of `io-hub-homing`, one linear file:
    so the CIP sequence count stays at 1). Each packet that `accept_t2o_packet` accepts is read with
    `InputAssemblyHub4E::read_le`, and a status line for the chosen motor (`--motor`) is printed
    when the printed values change (measured values such as torque move all the time); a packet it
-   discards (`Error::UnexpectedPacket`) is printed as `DISCARDED`. After `--cycles` packets, on the
+   discards (`Error::UnexpectedPacket`), and a datagram that does not parse as an I/O packet,
+   is printed as `DISCARDED`. After `--cycles` packets, on the
    input timeout or on Ctrl+C, close and unregister, as in the other examples.
 
 It includes the assemblies with `#[path = "../../scanner/assemblies"]` and reports errors through
