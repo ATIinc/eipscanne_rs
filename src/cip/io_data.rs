@@ -14,12 +14,15 @@ use crate::cip::types::CipUint;
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct RunIdleHeader {
-    /// Run/Idle: `true` while the sender is running, `false` while it is idle
+    /// Run/Idle: `true` while the sender is running, so the receiver applies the data; `false`
+    /// while it is idle, so the receiver ignores the data and puts its outputs in their configured
+    /// idle state. Idle packets keep the connection open; only missing packets time it out.
     pub run_idle: bool,
-    /// Claim Output Ownership (shown as COO by Wireshark), used by redundant-owner connections
+    /// Claim Output Ownership (shown as COO by Wireshark), used by redundant-owner connections;
+    /// the scanner sends 0
     pub claim_output_ownership: bool,
     /// Ready for Ownership of Outputs (shown as ROO by Wireshark), used by redundant-owner
-    /// connections
+    /// connections; the scanner sends 0
     pub ready_for_ownership_of_outputs: u2,
     reserved: u28,
 }
@@ -36,8 +39,8 @@ pub struct RunIdleHeader {
 #[derive(Debug, PartialEq)]
 #[br(import(byte_len: u16, transport_class: TransportClass, real_time_format: RealTimeFormat))]
 pub struct IoData {
-    /// CIP Sequence Count: numbers the packets sent on the connection; carried by transport
-    /// classes 1, 2 and 3
+    /// CIP Sequence Count: carried by transport classes 1, 2 and 3. It changes only with new data
+    /// (a resend keeps it), so a receiver can drop duplicates.
     #[br(if(matches!(
         transport_class,
         TransportClass::Class1 | TransportClass::Class2 | TransportClass::Class3
