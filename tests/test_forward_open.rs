@@ -140,8 +140,10 @@ fn sample_request(large: bool) -> ForwardOpenRequest {
 /// The request data of a packet read from the wire, parsed as a Forward_Open request of the
 /// given parameter width (what an adapter does with the packet)
 fn forward_open_request_of(packet: &RequestObjectAssembly, large: bool) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) =
-        packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    let Some(CipMessage::Request(message)) = packet
+        .command_specific_data
+        .as_send_rr_data()
+        .map(|rr_data| &rr_data.cip_message)
     else {
         panic!(
             "expected a Message Router request, got {:?}",
