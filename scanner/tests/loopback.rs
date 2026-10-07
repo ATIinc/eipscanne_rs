@@ -37,7 +37,7 @@ use eipscanne_rs::eip::constants::{
 };
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
-use eipscanne_rs::eip::sockaddr::{SockaddrInfo, SockaddrInfoItems};
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
 use scanner::implicit::connection::{forward_close, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
@@ -120,11 +120,11 @@ fn header(command: EnIpCommand) -> EncapsulationHeader {
     }
 }
 
-/// A successful Connection Manager reply carrying `data` and `sockaddr_info_items`
+/// A successful Connection Manager reply carrying `data` and `socket_addr_info_items`
 fn connection_manager_reply(
     service: ServiceCode,
     data: impl eipscanne_rs::cip::message::data::CipData + 'static,
-    sockaddr_info_items: SockaddrInfoItems,
+    socket_addr_info_items: SocketAddrInfoItems,
 ) -> EnIpPacket {
     let mut rr_data = RRPacketData::new_unconnected(
         CIP_INTERFACE_HANDLE,
@@ -139,7 +139,7 @@ fn connection_manager_reply(
             },
         },
     );
-    rr_data.sockaddr_info_items = sockaddr_info_items;
+    rr_data.socket_addr_info_items = socket_addr_info_items;
     EnIpPacket {
         header: header(EnIpCommand::SendRrData),
         command_specific_data: CommandSpecificData::SendRrData(rr_data),
@@ -148,8 +148,10 @@ fn connection_manager_reply(
 
 /// The Forward_Open request inside a packet, as the adapter parses it
 fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) = packet.cip_message() else {
-        panic!("expected a request, got {:?}", packet.cip_message());
+    let Some(CipMessage::Request(message)) =
+        packet.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    else {
+        panic!("expected a request, got {:?}", packet.command_specific_data);
     };
     assert_eq!(
         message.service_container.service(),
@@ -206,8 +208,8 @@ async fn fake_adapter(
                 application_reply_size: 0,
                 application_reply: vec![],
             },
-            SockaddrInfoItems {
-                o2t: Some(SockaddrInfo::from(SocketAddrV4::new(
+            SocketAddrInfoItems {
+                o2t: Some(SocketAddrInfo::from(SocketAddrV4::new(
                     Ipv4Addr::UNSPECIFIED,
                     io_port,
                 ))),
@@ -240,7 +242,9 @@ async fn fake_adapter(
 
     // 4. Forward_Close
     let request = read_request(&mut stream).await;
-    let Some(CipMessage::Request(message)) = request.cip_message() else {
+    let Some(CipMessage::Request(message)) =
+        request.send_rr_data().map(|rr_data| &rr_data.cip_message)
+    else {
         panic!("expected a Forward_Close request");
     };
     assert_eq!(
@@ -256,7 +260,7 @@ async fn fake_adapter(
                 application_reply_size: 0,
                 application_reply: vec![],
             },
-            SockaddrInfoItems::empty(),
+            SocketAddrInfoItems::empty(),
         ),
     )
     .await;
@@ -303,7 +307,7 @@ async fn one_connection_against_a_fake_adapter() {
     assert_ne!(
         connection.o2t_endpoint.port(),
         2222,
-        "the Sockaddr Info port is used"
+        "the Socket Address Info port is used"
     );
 
     // 3. One cycle each way

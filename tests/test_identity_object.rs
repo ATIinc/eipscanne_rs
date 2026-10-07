@@ -20,7 +20,7 @@ use eipscanne_rs::eip::constants::{
 };
 use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -365,7 +365,7 @@ fn test_deserialize_full_identity_response() {
     let byte_cursor = std::io::Cursor::new(identity_response_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let identity_response = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let identity_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_identity_response = ResponseObjectAssembly {
         header: EncapsulationHeader {
@@ -408,7 +408,7 @@ fn test_deserialize_full_identity_response() {
                 },
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 
