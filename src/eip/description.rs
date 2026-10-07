@@ -16,9 +16,6 @@ use crate::cip::types::{CipUint, CipUsint};
 use super::io_packet::{SEQUENCED_ADDRESS_LENGTH, SequencedAddress};
 use super::sockaddr::{SOCKADDR_INFO_LENGTH, SockaddrInfo};
 
-/// Length of the data of a Sequenced Address Item: the connection ID and the encapsulation
-/// sequence number
-
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]

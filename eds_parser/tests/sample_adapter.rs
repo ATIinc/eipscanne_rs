@@ -166,7 +166,7 @@ fn the_fixtures_assemblies_check_against_byte_arrays_of_their_size() {
     );
 }
 
-/// A device's own EDS: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -p eds_parser -- --ignored`
+/// A device's own EDS: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`
 #[test]
 #[ignore = "needs a local EDS file named by the EDS_FILE environment variable"]
 fn a_local_eds_file_yields_the_expected_connection() {

@@ -38,8 +38,8 @@ whether to use a Large_Forward_Open. The client/server bit
 of the trigger mask is ignored (vendors disagree on it; a Forward_Open's originator is always the
 client), and configuration data the EDS declares is kept but never sent.
 
-Not parsed: `{ }` nested fields, `L"..."` strings, `0b` numbers, string escapes. Such a file
-fails with pest's line and column.
+Not parsed: `{ }` nested fields, `L"..."` strings and escaped quotes inside strings. Such a file
+fails with pest's line and column. A `0b` number reads as a word.
 
 ## Running `eds-implicit-io`
 

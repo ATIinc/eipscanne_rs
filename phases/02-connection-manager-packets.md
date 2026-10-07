@@ -3,22 +3,24 @@
 ## Goal
 
 Typed `binrw` + `bilge` packets for the Connection Manager services used to open and close a class 1
-connection, sent through the existing explicit-messaging path (`SendRRData` to class 6, instance 1,
-addressed with 8-bit segments `20 06 24 01`).
+connection, sent through the explicit-messaging path of phase 1 (`SendRRData` to class 6,
+instance 1, addressed with 8-bit segments `20 06 24 01`), and the class 1 I/O packets exchanged
+once the connection is open.
 
 ## Scope
 
-New module `src/cip/connection_manager.rs` with its files in `src/cip/connection_manager/`:
+Module `src/cip/connection_manager.rs` with its files in `src/cip/connection_manager/`:
 
 * `parameters.rs` — everything the open services share:
-  * `StandardNetworkConnectionParameters` (16-bit: connection size, fixed/variable, priority,
-    connection type, redundant owner) and `LargeNetworkConnectionParameters` (32-bit: 16-bit size,
-    9 reserved bits, then the same upper fields), with a named enum for every field
-    (`ConnectionSizeType`, `ConnectionPriority`, `ConnectionType`, `RedundantOwner`); a caller
-    assembles the word field by field with the builder;
+  * `StandardNetworkConnectionParameters` (16-bit: 9-bit connection size, fixed/variable,
+    priority, a reserved bit, connection type, redundant owner) and
+    `LargeNetworkConnectionParameters` (32-bit: 16-bit size, 9 reserved bits, then the same upper
+    fields), with a named enum for every field (`ConnectionSizeType`, `ConnectionPriority`,
+    `ConnectionType`, `RedundantOwner`); a caller assembles the word field by field with the
+    builder;
   * `NetworkConnectionParameters`, a two-case `binrw` enum (`Standard` / `Large`) read with a
-    `large: bool` argument, like `PathData::FormatAsU8/FormatAsU16`; one request struct serves both
-    services instead of a generic parameter;
+    `large: bool` argument, like `PathData::FormatAsU8/FormatAsU16`, so one request struct serves
+    both services;
   * the free function `connection_size()` adds the 16-bit sequence count (transport classes 1, 2
     and 3) and the real-time header length to the application data size, the one piece of
     arithmetic Wireshark does not show; whether the result fits the nine bits of a Forward_Open is
@@ -28,13 +30,9 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
     `Unknown` for reserved values, `multiplier()`);
   * `RealTimeFormat` (modeless, zero length, heartbeat, 32-bit header) with `header_len()`. The
     run/idle header itself belongs to the I/O packets below.
-* `shared.rs` — the blocks every service carries in the same layout: `ConnectionTriad`
+* `shared.rs` — the block every service carries in the same layout: `ConnectionTriad`
   (connection serial number, originator vendor ID, originator serial number; in every request and
-  reply, and what a Forward_Close is matched against) and `UnsuccessfulResponse`, the reply data
-  of any rejected request: the triad plus the remaining path size and reserved byte that only a
-  routing error carries. All three are optional, read when the bytes are there: a request the
-  Message Router refuses before the Connection Manager sees it (a path segment error, for one)
-  comes back with no data at all.
+  reply, and what a Forward_Close is matched against).
 * `forward_open.rs` — `ForwardOpenRequest` (one struct for 0x54 and 0x5B, built field by field
   like every other packet; `service_code()` picks the service from the width of the O->T
   parameters, so both directions use the same case; the Connection Path Size byte is derived from
@@ -42,42 +40,35 @@ New module `src/cip/connection_manager.rs` with its files in `src/cip/connection
   application reply size, reserved byte and application reply data, flat as Wireshark shows them).
   For point-to-point the originator chooses the T->O connection ID; the O->T ID comes back in the
   reply.
-* `forward_close.rs` — `ForwardCloseRequest` (size byte, then a reserved byte, then the path) and
+* `forward_close.rs` — `ForwardCloseRequest` (priority/time tick, timeout ticks and triad, then the
+  Connection Path Size byte derived from the path on write, a reserved byte and the path) and
   `ForwardCloseResponse` (triad, application reply size, reserved byte, application reply data).
-* `response.rs` — the reply side: `ConnectionManagerResponse`, a `binrw` enum read with the service
-  and general status of the enclosing Message Router response (`ForwardOpen` / `ForwardClose` on
-  success, `Unsuccessful` otherwise), the way `CommandSpecificData` branches on the header command;
-  `ConnectionManagerExtendedStatus` (a `binrw` magic enum of every Connection Manager extended
-  status code + `Unknown`, like `ResponseStatusCode`) with `from_additional_status`, which reads
-  the first Additional Status word of a Message Router response through `binrw`; and
-  `ConnectionManagerResponse::from_message_router_response` (`binrw::BinResult`), which writes the
-  reply data of the Message Router response (raw or typed) through the `BinWrite` impl of
-  `CipDataOpt`, then reads the typed reply from those bytes; the reply to any other service is a
-  `binrw` assertion error. A rejected request is not an error: it parses as `Ok(Unsuccessful(..))`,
-  and its general status and Additional Status words stay on the Message Router response.
+* `response.rs` — why a request was refused: `ConnectionManagerExtendedStatus` (a `binrw` magic
+  enum of every Connection Manager extended status code + `Unknown`, like `ResponseStatusCode`;
+  plain data whose `Debug` names the status, no `Display`) and
+  `Rejection::extended_status() -> Option<ConnectionManagerExtendedStatus>`, which reads the first
+  Additional Status word of a phase 1 `Rejection` through `binrw`. It is `Some` only for a
+  Forward_Open, Large_Forward_Open or Forward_Close rejection that carries Additional Status; the
+  words of any other service mean something else. The reply data of an accepted Forward_Open or
+  Forward_Close is read directly as a `ForwardOpenResponse` / `ForwardCloseResponse`, like any
+  other typed reply. The reply data of a rejected request is not modelled and stays raw on the
+  Message Router response: the triad plus the remaining path size and reserved byte, or no data
+  at all when the Message Router refuses the request before the Connection Manager sees it (a
+  path segment error, for one).
 * `src/object_assembly.rs` — `RequestObjectAssembly::new_forward_open` (sends Forward_Open or
   Large_Forward_Open depending on the request) and `new_forward_close`, both addressed to the
   Connection Manager through the `CONNECTION_MANAGER_CLASS_ID` / `CONNECTION_MANAGER_INSTANCE_ID`
-  constants of `src/cip/object_ids.rs`, as 8-bit segments (`CipPath::new_u8`: `20 06 24 01`).
-  Both segment widths are valid for these values, but the Teknic IO-HUB-4-E refuses a 16-bit
-  request path (`21 00 06 00 25 00 01 00`) with a path segment error.
-* `ResponseStatusCode` and `ConnectionManagerExtendedStatus` display as words with their code
-  (`path segment error (0x04)`, `connection in use or duplicate forward open (0x0100)`), for error
-  messages.
-* The `CipData` blanket impl (`src/cip/message/data.rs`) no longer requires `BinRead` with empty
-  arguments: `write_to` only writes, and `ForwardOpenRequest` reads with a `large` argument. Every
-  type that satisfied the bound before still does.
-* The `async` feature is gone: `CipData` always requires `Send + Sync` (what `async` used to
-  add), so packets carrying typed data can be held across `.await` points without opting in.
-  `adapter` is the only feature left.
+  constants of `src/cip/object_ids.rs` (`u8`), as 8-bit segments (`CipPath::new_u8`:
+  `20 06 24 01`). Both segment widths are valid for these values, but the Teknic IO-HUB-4-E
+  refuses a 16-bit request path (`21 00 06 00 25 00 01 00`) with a path segment error.
 
 ## Class 1 I/O packets
 
 The UDP payload exchanged on port 2222 once a connection is open; delivered in the same pull
 request as the Connection Manager packets.
-* `CommonPacketItem` (`src/eip/description.rs`) gains two variants, read, written and falling
-  back to `Unknown` like the existing ones; SendRRData packets are untouched:
-  * `SequencedAddressItem(SequencedAddress { connection_id, encapsulation_sequence_number })` (0x8002, length 8);
+* `CommonPacketItem` (`src/eip/description.rs`) has two variants for I/O packets:
+  * `SequencedAddressItem(SequencedAddress { connection_id, encapsulation_sequence_number })`
+    (0x8002, length 8); an item of that type with any other length is read as `Unknown`;
   * `ConnectedDataItem(CipDataOpt)` (0x00B1). A Connected Data Item is always read as
     `CipDataOpt::Raw` of the item's length, because the Common Packet Format layer cannot know
     the transport class and real-time format of the connection the data belongs to; on write the
@@ -93,13 +84,14 @@ request as the Connection Manager packets.
   `Header32Bit`) and `data: CipDataOpt`, the application data declared by the caller. Read with
   `(byte_len, TransportClass, RealTimeFormat)` arguments: the optional fields are read when the
   arguments say so and the data gets what is left of the item (`byte_len` minus the connection
-  size of zero data bytes, the same `connection_size()` arithmetic the Forward_Open used). Written
+  size of zero data bytes, the same `connection_size()` arithmetic the Forward_Open uses). Written
   with no arguments, so an `IoData` is a `CipData` and goes into
   `ConnectedDataItem(CipDataOpt::Typed(..))`. On the wire the order is sequence count, header,
   data.
-* `RunIdleHeader` (`io_data.rs`): a 32-bit `bilge` bitfield (`run_idle`, `claim_output_ownership`, `ready_for_ownership_of_outputs`, 28
-  reserved bits), built with its builder like every other bitfield (`new = pub`).
-* `RealTimeFormat` and `TransportClass` stay in `parameters.rs`; `IoData` only uses them.
+* `RunIdleHeader` (`io_data.rs`): a 32-bit `bilge` bitfield (`run_idle`, `claim_output_ownership`,
+  the 2-bit `ready_for_ownership_of_outputs`, 28 reserved bits), built with its builder like every
+  other bitfield (`new = pub`).
+* `RealTimeFormat` and `TransportClass` are defined in `parameters.rs`; `IoData` imports them.
 
 ## Design notes
 
@@ -120,16 +112,25 @@ request as the Connection Manager packets.
 ## Tests
 
 `tests/test_forward_open.rs`, `tests/test_forward_close.rs`: one test per packet, each a full
-encapsulated packet for the connection the OpENer sample application accepts (path `20 04 24 97 2C 96 2C 64`, 32-byte
-assemblies, a 1 s requested packet interval, class 1, point-to-point, scheduled priority): the
-Forward_Open, Large_Forward_Open and Forward_Close requests (written, read back and parsed into the
-typed request), the Forward_Open and Forward_Close success replies (read, parsed into the typed
-reply and written back), the rejected Forward_Open reply (read and parsed into `Unsuccessful`,
-its general and extended status read from the Message Router response), and the path segment
-error a Teknic IO-HUB-4-E returned for a 16-bit request path (captured; no reply data). The dissection comment of
-every packet is generated with
-`scripts/dissect.sh` (tshark), a reply behind its request (`--request`) because Wireshark only names
-the service of a reply once it has seen the request.
+encapsulated packet for one connection (path `20 04 24 97 2C 96 2C 64`: Assembly, configuration
+instance 0x97, connection points 0x96 and 0x64; 32-byte assemblies, a 1 s requested packet
+interval, class 1, point-to-point, scheduled priority): the Forward_Open, Large_Forward_Open and
+Forward_Close requests (written field by field and through `new_forward_open` /
+`new_forward_close`, read back and parsed into the typed request), the Forward_Open and
+Forward_Close success replies (read, parsed into the typed reply and written back), the rejected
+Forward_Open reply (read, then checked as a `Rejection`: its service, general status and
+Additional Status words, and `extended_status()`), and the path segment error a Teknic IO-HUB-4-E
+returned for a 16-bit request path (captured; no reply data, a `Rejection` whose
+`extended_status()` is `None`). `tests/common.rs` holds the values of that connection. The
+dissection comments of these packets are generated with `scripts/dissect.sh`, which prints
+Wireshark's (tshark's) dissection of a packet given as hex; a reply is dissected behind its request
+(`--request`) because Wireshark only names the service of a reply once it has seen the request.
+The devcontainer installs tshark.
+
+`tests/test_general_status.rs` holds rejected Forward_Open replies with one and two Additional
+Status words, read and written back unchanged. `tests/test_common_packet.rs` holds a Forward_Open
+reply followed by a Sockaddr Info item (read and written back, and built, written and read back),
+and, with the `adapter` feature, `read_request` accepting a request and rejecting a response.
 
 ### Class 1 I/O packets
 

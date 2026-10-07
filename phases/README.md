@@ -20,9 +20,12 @@ the only edit a later phase makes here is filling in its pull request number bel
 * One branch per phase (`feat/SW-4573-<n>-<name>`), each based on the previous phase's branch, each
   opened as its own pull request so reviews stay small.
 * A change to a file goes into the phase that introduced the file and is merged up the stack, so
-  each pull request stays on its own component. The exception is a fix that only that later
-  phase's work could surface: the IO-HUB assembly types, found by checking them against the EDS,
-  are corrected in phase 5.
+  each pull request stays on its own component. A change to code that already exists on `main`
+  goes into the lowest phase it is relevant to (a general Message Router addition goes into phase
+  1 even when phase 2 needed it), and a later phase does not edit an earlier phase's new code: when
+  it needs more from an earlier type, it adds a new item in its own files. The exception is a fix
+  that only that later phase's work could surface: the IO-HUB assembly types, found by checking
+  them against the EDS, are corrected in phase 5.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
   `cargo test --all --features adapter` and `cargo test --examples` green (from phase 3 on, the
   workspace equivalents listed in that phase).
@@ -45,8 +48,8 @@ the only edit a later phase makes here is filling in its pull request number bel
 * **Bitfields are built with their builders.** Every `bilge` bitfield derives `BuilderBits` and is
   assembled with `Type::builder().field(value)....build()`, each field set exactly once, reserved
   bits zero, in the library and in the tests alike; a bitfield is never assembled with
-  `Type::default()` and the `set_*` setters, and the positional `new(...)` constructor is never
-  called. bilge 0.5 gives the builder the visibility of that `new`, so a bitfield built outside its
+  `Type::default()` and the `set_*` setters (`Type::default()` alone stands for the all-zero
+  value), and the positional `new(...)` constructor is never called. bilge 0.5 gives the builder the visibility of that `new`, so a bitfield built outside its
   module carries `new = pub` for the sole purpose of exposing its builder. A bitfield only built
   inside its module, through a wrapper such as `ServiceContainer::new_request`, keeps `new` private.
 * **Written for a human reader.** Behaviour follows the specification; the code is structured so

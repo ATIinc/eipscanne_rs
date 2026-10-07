@@ -2,7 +2,7 @@
 
 use std::fmt;
 
-/// An EDS file that cannot be read. Every message names the entry it is about.
+/// An EDS file that cannot be read
 #[derive(Debug, Clone, PartialEq)]
 pub enum EdsError {
     /// The text does not follow the EDS syntax; `line` and `column` are 1-based
@@ -13,8 +13,6 @@ pub enum EdsError {
     },
     /// A section the typed views need is not in the file
     MissingSection(String),
-    /// An entry the typed views need is not in its section
-    MissingEntry { section: String, keyword: String },
     /// A field of an entry has the wrong form; `index` is the field's 0-based position
     BadField {
         entry: String,
@@ -59,9 +57,6 @@ impl fmt::Display for EdsError {
                 message,
             } => write!(f, "line {line}, column {column}: {message}"),
             EdsError::MissingSection(section) => write!(f, "no [{section}] section"),
-            EdsError::MissingEntry { section, keyword } => {
-                write!(f, "no {keyword} entry in [{section}]")
-            }
             EdsError::BadField {
                 entry,
                 index,

@@ -1,7 +1,5 @@
-//! The encapsulation session over TCP port 44818, shared by explicit and implicit messaging.
-//!
-//! Every explicit request travels inside the session, and so do the Forward_Open and
-//! Forward_Close that bracket an I/O connection, so it is opened first and closed last.
+//! The encapsulation session over TCP port 44818, shared by explicit and implicit messaging. It
+//! carries the Forward_Open and Forward_Close too, so it is opened first and closed last.
 
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr};
@@ -19,15 +17,12 @@ use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::error::{Error, Result};
 
-/// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet the session sends or reads
-/// is printed to stderr as hex (`REQUEST 6f 00 ...`, `REPLY 6f 00 ...`), ready for
-/// `scripts/dissect.sh`. This is how Claude sees a session's traffic where it cannot capture
-/// packets (the devcontainer has no capture permission):
+/// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet is printed to stderr as hex
+/// for `scripts/dissect.sh`, since the devcontainer cannot capture packets:
 /// `EIP_DUMP=1 cargo run --example implicit-io -- ...`
 const DUMP_VARIABLE: &str = "EIP_DUMP";
 
-/// Size of the encapsulation header on the wire: command, length, session handle, status, sender
-/// context and options
+/// Size of the encapsulation header on the wire
 const ENCAPSULATION_HEADER_LEN: usize = 24;
 
 /// A registered encapsulation session with one adapter
@@ -63,12 +58,12 @@ impl Session {
         Ok(session)
     }
 
-    /// The handle the adapter gave this session; every packet sent over it carries this handle
+    /// The handle the adapter gave this session, carried by every packet
     pub fn session_handle(&self) -> CipUdint {
         self.session_handle
     }
 
-    /// The adapter's IP address, which is also where its I/O packets come from
+    /// The adapter's IP address, where its I/O packets come from
     pub fn peer_ip(&self) -> Ipv4Addr {
         self.peer_ip
     }
@@ -77,13 +72,13 @@ impl Session {
     pub async fn send(&mut self, packet: &EnIpPacket) -> Result<()> {
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes)?;
-        dump_if_requested("REQUEST", bytes.get_ref());
+        print_packet_hex("REQUEST", bytes.get_ref());
         self.stream.write_all(bytes.get_ref()).await?;
         Ok(())
     }
 
-    /// Reads one encapsulation packet from the adapter: the 24-byte header, then exactly as many
-    /// bytes as its Length field says. Fails when the encapsulation status is not success.
+    /// Reads one encapsulation packet: the header, then its Length in bytes. Fails on a
+    /// non-success encapsulation status.
     pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
         let mut bytes = vec![0u8; ENCAPSULATION_HEADER_LEN];
         self.stream.read_exact(&mut bytes).await?;
@@ -95,7 +90,7 @@ impl Session {
             .read_exact(&mut bytes[ENCAPSULATION_HEADER_LEN..])
             .await?;
 
-        dump_if_requested("REPLY", &bytes);
+        print_packet_hex("REPLY", &bytes);
 
         if header.status_code != EncapsStatusCode::Success {
             return Err(Error::EncapsulationStatus(header.status_code));
@@ -104,8 +99,7 @@ impl Session {
         Ok(EnIpPacket::read_response(&mut Cursor::new(&bytes))?)
     }
 
-    /// Sends a Message Router request and reads its reply: the reply to the same service, once
-    /// the adapter accepted the request
+    /// Sends a Message Router request and returns the accepted reply to the same service
     pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket> {
         self.send(packet).await?;
         let reply = self.read_reply().await?;
@@ -140,7 +134,7 @@ impl Session {
 // ^^^^^^^^ End of Session impl ^^^^^^^^
 
 /// Prints `bytes` as hex after `direction` when `EIP_DUMP` is set (see `DUMP_VARIABLE`)
-fn dump_if_requested(direction: &str, bytes: &[u8]) {
+fn print_packet_hex(direction: &str, bytes: &[u8]) {
     if std::env::var_os(DUMP_VARIABLE).is_none() {
         return;
     }
