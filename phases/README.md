@@ -45,6 +45,10 @@ the only edit a later phase makes here is filling in its pull request number bel
   (`enip.*` and `cip.cm.*` fields), in `snake_case`.
 * **Path-based module layout.** Modules are declared in `src/<name>.rs` with their submodules in
   `src/<name>/`; no `mod.rs` files.
+* **Visibility.** Whatever a scanner or adapter built on these crates could need is `pub`; only
+  internal helpers (size arithmetic, parse guards) are `pub(crate)`. Items are imported from the
+  module that defines them, with no re-exports. Fields are read directly; a getter only guards a
+  field the crate alone sets (`Session::session_handle`).
 * **Bitfields are built with their builders.** Every `bilge` bitfield derives `BuilderBits` and is
   assembled with `Type::builder().field(value)....build()`, each field set exactly once, reserved
   bits zero, in the library and in the tests alike; a bitfield is never assembled with
