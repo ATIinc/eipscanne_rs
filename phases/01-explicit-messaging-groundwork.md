@@ -92,8 +92,8 @@ packet and no other protocol feature.
     header's `length` is written from the size of the command specific data when it is `None`.
     `src/eip/packet.rs` starts with a map from the Wireshark tree to the Rust fields. Constructors:
     `new_registration`, `new_unregistration`, `new_send_rr_data`. `read` accepts a request or a
-    response. `send_rr_data()` gives the `RRPacketData` of a SendRRData packet and `response()`
-    the Message Router response it carries;
+    response; `response()` gives the Message Router response it carries.
+    `CommandSpecificData::as_send_rr_data()` gives the `RRPacketData` of a SendRRData packet;
   * `RequestObjectAssembly` / `ResponseObjectAssembly` are both aliases of `EnIpPacket` that only
     document the direction; `RequestObjectAssembly::new_identity` and `new_service_request` build
     a request to an object.
