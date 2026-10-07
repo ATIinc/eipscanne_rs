@@ -10,7 +10,8 @@ use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
 
-use eipscanne_rs::cip::message::response::MessageRouterResponse;
+use eipscanne_rs::cip::message::CipMessage;
+use eipscanne_rs::cip::message::response::Rejection;
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::EncapsStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
@@ -103,6 +104,29 @@ impl Session {
         Ok(EnIpPacket::read_response(&mut Cursor::new(&bytes))?)
     }
 
+    /// Sends a Message Router request and reads its reply: the reply to the same service, once
+    /// the adapter accepted the request
+    pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket, Error> {
+        self.send(packet).await?;
+        let reply = self.read_reply().await?;
+
+        let response = reply.response().ok_or(Error::NoResponse)?;
+        if let Some(CipMessage::Request(request)) = packet.cip_message() {
+            let requested = request.service_container.service();
+            let answered = response.service_container.service();
+            if answered != requested {
+                return Err(Error::UnexpectedReply(format!(
+                    "a {answered:?} reply answered {requested:?}"
+                )));
+            }
+        }
+        if let Some(rejection) = Rejection::from_response(response) {
+            return Err(rejection.into());
+        }
+
+        Ok(reply)
+    }
+
     /// Stage 5: tells the adapter the session is over and closes the connection
     pub async fn unregister(mut self) -> Result<(), Error> {
         self.send(&RequestObjectAssembly::new_unregistration(
@@ -114,13 +138,6 @@ impl Session {
 }
 
 // ^^^^^^^^ End of Session impl ^^^^^^^^
-
-/// The Message Router response a reply carries; every reply to a request over the session has one
-pub(crate) fn router_response(reply: &EnIpPacket) -> Result<&MessageRouterResponse, Error> {
-    reply.response().ok_or_else(|| {
-        Error::UnexpectedReply("the reply carries no Message Router response".to_string())
-    })
-}
 
 /// Prints `bytes` as hex after `direction` when `EIP_DUMP` is set (see `DUMP_VARIABLE`)
 fn dump_if_requested(direction: &str, bytes: &[u8]) {
