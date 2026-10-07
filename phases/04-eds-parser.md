@@ -190,7 +190,7 @@ Flags: `--eds <file>`, `--connection`, `--host` (default `172.28.0.10`), `--cycl
 ## Verification
 
 ```
-cargo fmt --all --check && cargo clippy --all-targets && cargo test && cargo test --features adapter
+cargo fmt --all --check && cargo clippy --all-targets && cargo test
 ```
 
 Against the OpENer container from `tests/integration`:

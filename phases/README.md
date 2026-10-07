@@ -26,9 +26,8 @@ the only edit a later phase makes here is filling in its pull request number bel
   it needs more from an earlier type, it adds a new item in its own files. The exception is a fix
   that only that later phase's work could surface: the IO-HUB assembly types, found by checking
   them against the EDS, are corrected in phase 5.
-* Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all`,
-  `cargo test --all --features adapter` and `cargo test --examples` green (from phase 3 on, the
-  workspace equivalents listed in that phase).
+* Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all` and
+  `cargo test --examples` green (from phase 3 on, the workspace equivalents listed in that phase).
 
 ## Ground rules
 

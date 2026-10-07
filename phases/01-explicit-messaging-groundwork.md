@@ -123,7 +123,7 @@ packet and no other protocol feature.
 ## Verification
 
 ```
-cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --all --features adapter && cargo test --examples
+cargo fmt --check && cargo clippy --all-targets && cargo test --all && cargo test --examples
 ```
 
 `cargo clippy --all-targets` reports style warnings (`Into` impls, an elidable lifetime, a `-1 *`

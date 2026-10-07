@@ -13,7 +13,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 * [`eds_parser`](./eds_parser/README.md): turns a connection from a device's EDS file into the scanner's Forward_Open (`eds-implicit-io` example).
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 
-`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`; `--features adapter` adds the adapter-side tests.
+`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.
 
 ## Reading PDF references
 
