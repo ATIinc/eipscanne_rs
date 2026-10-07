@@ -9,7 +9,8 @@ use crate::cip::types::{CipUdint, CipUint};
 use crate::cip::message::CipMessage;
 
 use super::constants as eip_constants;
-use super::description::CommonPacketItem;
+use super::description::{CommonPacketItemId, read_item, write_item};
+use super::sockaddr::SockaddrInfoItems;
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -58,48 +59,39 @@ pub struct RRPacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
 
-    // Read from the wire; written from the number of items actually serialized
-    #[br(temp)]
-    #[bw(calc = items.len() as CipUint)]
+    // The Null Address Item, the Unconnected Data Item, then the Sockaddr Info items
+    #[br(temp, assert(
+        item_count >= eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT,
+        "a Send RR Data packet has at least 2 items"
+    ))]
+    #[bw(calc = eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT + sockaddr_info_items.count())]
     item_count: CipUint,
 
-    #[br(count = item_count)]
-    pub items: Vec<CommonPacketItem>,
+    // Preceded by the Null Address Item: Type ID 0x0000, Length 0
+    #[brw(magic = 0u32)]
+    #[br(parse_with = read_item, args(CommonPacketItemId::UnconnectedMessage))]
+    #[bw(write_with = write_item, args(CommonPacketItemId::UnconnectedMessage))]
+    pub unconnected_data: CipMessage,
+
+    #[br(args(item_count - eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT))]
+    pub sockaddr_info_items: SockaddrInfoItems,
 }
 
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    fn new(interface_handle: CipUdint, timeout: CipUint, items: Vec<CommonPacketItem>) -> Self {
-        RRPacketData {
-            interface_handle,
-            timeout,
-            items,
-        }
-    }
-
     /// An unconnected message: the Null Address Item followed by the Unconnected Data Item
     pub fn new_unconnected(
         interface_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
     ) -> Self {
-        Self::new(
+        RRPacketData {
             interface_handle,
             timeout,
-            vec![
-                CommonPacketItem::NullAddressItem,
-                CommonPacketItem::UnconnectedDataItem(message.into()),
-            ],
-        )
-    }
-
-    /// The CIP message carried by the Unconnected Data Item, if any
-    pub(crate) fn cip_message(&self) -> Option<&CipMessage> {
-        self.items.iter().find_map(|item| match item {
-            CommonPacketItem::UnconnectedDataItem(message) => Some(message),
-            _ => None,
-        })
+            unconnected_data: message.into(),
+            sockaddr_info_items: SockaddrInfoItems::default(),
+        }
     }
 }
 
@@ -150,14 +142,6 @@ impl CommandSpecificData {
             timeout,
             message,
         ))
-    }
-
-    /// The Common Packet Format items (empty for commands without them)
-    pub(crate) fn items(&self) -> &[CommonPacketItem] {
-        match self {
-            CommandSpecificData::SendRrData(rr_data) => &rr_data.items,
-            _ => &[],
-        }
     }
 }
 
