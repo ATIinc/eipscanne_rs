@@ -16,33 +16,38 @@ use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
 
 use super::description::{CommonPacketDescriptor, CommonPacketItemId};
 
-/// Length of the data carried by a Sockaddr Info item
-const SOCKADDR_INFO_LENGTH: CipUint = 16;
+/// Length of the data carried by a Socket Address Info item
+const SOCKET_ADDR_INFO_LENGTH: CipUint = 16;
 /// Only IPv4 socket addresses are allowed
-const SOCKADDR_FAMILY_INET: CipInt = 2;
+const SOCKET_ADDR_FAMILY_INET: CipInt = 2;
 
-/// Socket address information (Sockaddr Info in Wireshark).
+/// Socket address information (Socket Address Info in Wireshark).
 ///
 /// Unlike the rest of the protocol, the family, port and address are sent in big endian order.
+/// The field names are those of a BSD `sockaddr_in` ("socket address, internet").
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]
-pub struct SockaddrInfo {
+pub struct SocketAddrInfo {
+    /// Address family: 2 (AF_INET, IPv4)
     #[brw(big)]
     pub sin_family: CipInt,
+    /// Port number
     #[brw(big)]
     pub sin_port: CipUint,
+    /// IPv4 address
     #[brw(big)]
     pub sin_addr: CipUdint,
+    /// Zero padding
     pub sin_zero: [CipUsint; 8],
 }
 
-// ======= Start of SockaddrInfo impl ========
+// ======= Start of SocketAddrInfo impl ========
 
-impl SockaddrInfo {
+impl SocketAddrInfo {
     fn new(address: SocketAddrV4) -> Self {
-        SockaddrInfo {
-            sin_family: SOCKADDR_FAMILY_INET,
+        SocketAddrInfo {
+            sin_family: SOCKET_ADDR_FAMILY_INET,
             sin_port: address.port(),
             sin_addr: u32::from(*address.ip()),
             sin_zero: [0; 8],
@@ -54,37 +59,37 @@ impl SockaddrInfo {
     }
 }
 
-impl From<SocketAddrV4> for SockaddrInfo {
+impl From<SocketAddrV4> for SocketAddrInfo {
     fn from(address: SocketAddrV4) -> Self {
-        SockaddrInfo::new(address)
+        SocketAddrInfo::new(address)
     }
 }
 
-impl From<SockaddrInfo> for SocketAddrV4 {
-    fn from(info: SockaddrInfo) -> Self {
+impl From<SocketAddrInfo> for SocketAddrV4 {
+    fn from(info: SocketAddrInfo) -> Self {
         info.socket_address()
     }
 }
 
-// ^^^^^^^^ End of SockaddrInfo impl ^^^^^^^^
+// ^^^^^^^^ End of SocketAddrInfo impl ^^^^^^^^
 
 /// The Socket Address Info items of a Forward_Open request or reply, after its Unconnected Data
 /// Item. Each one is optional, and they may come in either order: the Type ID of an item says
 /// which one it is. They are written O->T first.
 #[derive(Debug, PartialEq)]
-pub struct SockaddrInfoItems {
+pub struct SocketAddrInfoItems {
     /// Socket Address Info O->T (0x8000): where the scanner sends its I/O data
-    pub o2t: Option<SockaddrInfo>,
+    pub o2t: Option<SocketAddrInfo>,
     /// Socket Address Info T->O (0x8001): where the adapter sends its I/O data
-    pub t2o: Option<SockaddrInfo>,
+    pub t2o: Option<SocketAddrInfo>,
 }
 
-// ======= Start of SockaddrInfoItems impl ========
+// ======= Start of SocketAddrInfoItems impl ========
 
-impl SockaddrInfoItems {
+impl SocketAddrInfoItems {
     /// No Socket Address Info items
     pub const fn empty() -> Self {
-        SockaddrInfoItems {
+        SocketAddrInfoItems {
             o2t: None,
             t2o: None,
         }
@@ -96,15 +101,15 @@ impl SockaddrInfoItems {
     }
 }
 
-impl ReadEndian for SockaddrInfoItems {
+impl ReadEndian for SocketAddrInfoItems {
     const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
 }
 
-impl WriteEndian for SockaddrInfoItems {
+impl WriteEndian for SocketAddrInfoItems {
     const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
 }
 
-impl BinRead for SockaddrInfoItems {
+impl BinRead for SocketAddrInfoItems {
     // The number of items to read
     type Args<'a> = (CipUint,);
 
@@ -113,7 +118,7 @@ impl BinRead for SockaddrInfoItems {
         endian: Endian,
         (count,): Self::Args<'_>,
     ) -> BinResult<Self> {
-        let mut items = SockaddrInfoItems::empty();
+        let mut items = SocketAddrInfoItems::empty();
 
         for _ in 0..count {
             let pos = reader.stream_position()?;
@@ -126,25 +131,27 @@ impl BinRead for SockaddrInfoItems {
                 _ => {
                     return Err(binrw::Error::AssertFail {
                         pos,
-                        message: format!("expected a Sockaddr Info item, found a {type_id:?}"),
+                        message: format!(
+                            "expected a Socket Address Info item, found a {type_id:?}"
+                        ),
                     });
                 }
             };
-            if item.is_some() || descriptor.packet_length != Some(SOCKADDR_INFO_LENGTH) {
+            if item.is_some() || descriptor.packet_length != Some(SOCKET_ADDR_INFO_LENGTH) {
                 return Err(binrw::Error::AssertFail {
                     pos,
                     message: format!("a second or malformed {type_id:?}"),
                 });
             }
 
-            *item = Some(SockaddrInfo::read_options(reader, endian, ())?);
+            *item = Some(SocketAddrInfo::read_options(reader, endian, ())?);
         }
 
         Ok(items)
     }
 }
 
-impl BinWrite for SockaddrInfoItems {
+impl BinWrite for SocketAddrInfoItems {
     type Args<'a> = ();
 
     fn write_options<W: Write + Seek>(
@@ -161,7 +168,7 @@ impl BinWrite for SockaddrInfoItems {
             if let Some(info) = info {
                 let descriptor = CommonPacketDescriptor {
                     type_id,
-                    packet_length: Some(SOCKADDR_INFO_LENGTH),
+                    packet_length: Some(SOCKET_ADDR_INFO_LENGTH),
                 };
                 descriptor.write_options(writer, endian, Default::default())?;
                 info.write_options(writer, endian, ())?;
@@ -172,4 +179,4 @@ impl BinWrite for SockaddrInfoItems {
     }
 }
 
-// ^^^^^^^^ End of SockaddrInfoItems impl ^^^^^^^^
+// ^^^^^^^^ End of SocketAddrInfoItems impl ^^^^^^^^

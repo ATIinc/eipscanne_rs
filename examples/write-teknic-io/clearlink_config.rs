@@ -463,7 +463,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
         assert_eq!(expected_set_config_assembly_response, response_object);
     }

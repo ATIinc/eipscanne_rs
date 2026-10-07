@@ -16,7 +16,7 @@
 //!     Command Specific Data                        .command_specific_data: CommandSpecificData::SendRrData
 //!         Interface Handle                           .interface_handle
 //!         Timeout                                    .timeout
-//!         Item Count                                 (not stored: 2 + the Sockaddr Info items)
+//!         Item Count                                 (not stored: 2 + the Socket Address Info items)
 //!             Type ID: Null Address Item (0x0000)    .null_address_item.type_id
 //!                 Length                               .null_address_item.packet_length
 //!             Type ID: Unconnected Data Item (0x00b2)
@@ -24,9 +24,9 @@
 //!                 Length                               .unconnected_data_item.packet_length
 //!                                                      (computed on write when None)
 //!             Type ID: Socket Address Info O->T (0x8000)
-//!                                                    .sockaddr_info_items.o2t: Some(SockaddrInfo)
+//!                                                    .socket_addr_info_items.o2t: Some(SocketAddrInfo)
 //!             Type ID: Socket Address Info T->O (0x8001)
-//!                                                    .sockaddr_info_items.t2o: Some(SockaddrInfo)
+//!                                                    .socket_addr_info_items.t2o: Some(SocketAddrInfo)
 //! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
 //! ```
 //!
@@ -37,22 +37,17 @@
 
 use binrw::meta::WriteEndian;
 use binrw::{
-    BinRead, // trait for reading
-    BinResult,
     BinWrite, // trait for writing
     binread,
     binwrite,
 };
 
-use std::io::{Read, Seek};
-
 use crate::cip::message::CipMessage;
 use crate::cip::message::response::MessageRouterResponse;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
+use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData};
 use super::constants as eip_constants;
-use super::sockaddr::SockaddrInfoItems;
 
 #[binwrite]
 #[binread]
@@ -147,65 +142,18 @@ impl EnIpPacket {
         )
     }
 
-    /// The CIP message carried by the Unconnected Data Item, if any
-    pub fn cip_message(&self) -> Option<&CipMessage> {
+    /// The command specific data of a Send RR Data packet
+    pub fn send_rr_data(&self) -> Option<&RRPacketData> {
         match &self.command_specific_data {
-            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.cip_message),
+            CommandSpecificData::SendRrData(rr_data) => Some(rr_data),
             _ => None,
         }
     }
 
     /// The Message Router response carried by the packet, if it carries one
     pub fn response(&self) -> Option<&MessageRouterResponse> {
-        match self.cip_message() {
+        match self.send_rr_data().map(|rr_data| &rr_data.cip_message) {
             Some(CipMessage::Response(response)) => Some(response),
-            _ => None,
-        }
-    }
-
-    /// Reads a packet sent by a scanner: a SendRRData packet must carry a Message Router request.
-    /// Only available with the `adapter` feature.
-    ///
-    /// Unlike `read`, which accepts either, this fails when the message is a response.
-    #[cfg(feature = "adapter")]
-    pub fn read_request<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
-        Self::read_expecting(reader, "a Message Router request", |packet| {
-            matches!(packet.cip_message(), Some(CipMessage::Request(_)))
-        })
-    }
-
-    pub fn read_response<R: Read + Seek>(reader: &mut R) -> BinResult<Self> {
-        Self::read_expecting(reader, "a Message Router response", |packet| {
-            packet.response().is_some()
-        })
-    }
-
-    fn read_expecting<R: Read + Seek>(
-        reader: &mut R,
-        expected: &str,
-        has_expected_message: impl Fn(&Self) -> bool,
-    ) -> BinResult<Self> {
-        let pos = reader.stream_position()?;
-        let packet = Self::read(reader)?;
-
-        let is_send_rr_data = matches!(
-            packet.command_specific_data,
-            CommandSpecificData::SendRrData(_)
-        );
-        if is_send_rr_data && !has_expected_message(&packet) {
-            return Err(binrw::Error::AssertFail {
-                pos,
-                message: format!("SendRRData packet does not carry {expected}"),
-            });
-        }
-
-        Ok(packet)
-    }
-
-    /// The Sockaddr Info items carried by a Send RR Data packet
-    pub fn sockaddr_info_items(&self) -> Option<&SockaddrInfoItems> {
-        match &self.command_specific_data {
-            CommandSpecificData::SendRrData(rr_data) => Some(&rr_data.sockaddr_info_items),
             _ => None,
         }
     }

@@ -547,7 +547,7 @@ mod tests {
         let byte_cursor = std::io::Cursor::new(raw_bytes);
         let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-        let response_object = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+        let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
         assert_eq!(expected_output_assembly_response, response_object);
     }
@@ -635,8 +635,12 @@ mod tests {
         // Assert equality
         assert_eq!(request_object, expected_output_assembly_request);
         assert_eq!(
-            request_object.cip_message(),
-            expected_output_assembly_request.cip_message()
+            request_object
+                .send_rr_data()
+                .map(|rr_data| &rr_data.cip_message),
+            expected_output_assembly_request
+                .send_rr_data()
+                .map(|rr_data| &rr_data.cip_message)
         );
     }
 }

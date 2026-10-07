@@ -78,25 +78,22 @@ packet and no other protocol feature.
   * `CipMessage` (`src/cip/message.rs`): `Request(MessageRouterRequest)` or
     `Response(MessageRouterResponse)`, chosen on read by the Request/Response bit of the service
     code byte, so no type is generic over the message;
-  * `src/eip/sockaddr.rs`, used when opening an I/O connection: `SockaddrInfo` (family, port and
-    address in big endian; zero padding) with conversions from and to `SocketAddrV4`, and
-    `SockaddrInfoItems { o2t, t2o }`, the optional Socket Address Info items after a
+  * `src/eip/socket_addr.rs`, used when opening an I/O connection: `SocketAddrInfo` (family, port
+    and address in big endian; zero padding) with conversions from and to `SocketAddrV4`, and
+    `SocketAddrInfoItems { o2t, t2o }`, the optional Socket Address Info items after a
     Forward_Open request or reply. They are read in either order, each at most once and with a
     Length of 16, and written O->T first;
   * `RRPacketData`: the interface handle, the timeout, `null_address_item` and
-    `unconnected_data_item` (descriptors), `cip_message` and `sockaddr_info_items`. The item count
-    is not stored: it is read and checked to be at least `SEND_RR_DATA_REQUIRED_ITEM_COUNT` (2),
-    and written as 2 plus the Sockaddr Info items. `RRPacketData::new_unconnected` leaves the
-    message's Length `None`;
+    `unconnected_data_item` (descriptors), `cip_message` and `socket_addr_info_items`. The item
+    count is not stored: it is read and checked to be at least `SEND_RR_DATA_REQUIRED_ITEM_COUNT`
+    (2), and written as 2 plus the Socket Address Info items. `RRPacketData::new_unconnected`
+    leaves the message's Length `None`;
   * `EnIpPacket` is the whole packet: `EncapsulationHeader` plus `CommandSpecificData`. The
     header's `length` is written from the size of the command specific data when it is `None`.
     `src/eip/packet.rs` starts with a map from the Wireshark tree to the Rust fields. Constructors:
-    `new_registration`, `new_unregistration`, `new_send_rr_data`. `read_request` / `read_response`
-    fail when a SendRRData packet does not carry a Message Router request / response, while plain
-    `read` accepts either. `read_request`
-    is only compiled with the `adapter` feature (adapter-side helpers). `cip_message()`,
-    `response()` and `sockaddr_info_items()` give the carried message, the Message Router
-    response and the Sockaddr Info items;
+    `new_registration`, `new_unregistration`, `new_send_rr_data`. `read` accepts a request or a
+    response. `send_rr_data()` gives the `RRPacketData` of a SendRRData packet and `response()`
+    the Message Router response it carries;
   * `RequestObjectAssembly` / `ResponseObjectAssembly` are both aliases of `EnIpPacket` that only
     document the direction; `RequestObjectAssembly::new_identity` and `new_service_request` build
     a request to an object.
@@ -111,9 +108,8 @@ packet and no other protocol feature.
   the command specific data, CIP message included. A packet that is read is expected as an
   `RRPacketData` struct literal with the item lengths from the wire; a packet that is written is
   built with `RRPacketData::new_unconnected` or `RequestObjectAssembly::new_send_rr_data`.
-* `tests/test_common_packet.rs` — Sockaddr Info byte order and
-  `read_response` rejecting a request that plain `read` keeps. Replies carrying Sockaddr Info items
-  are tested in phase 2 with Forward_Open reply bodies.
+* `tests/test_common_packet.rs` — Socket Address Info byte order. Replies carrying Socket Address
+  Info items are tested in phase 2 with Forward_Open reply bodies.
 * `tests/test_cip_path.rs` — the assembly connection path written and read, and the rejection of a
   non-logical segment and of a segment overrunning the declared length.
   `tests/test_path_segment.rs` covers 16-bit segments, class/instance and class/instance/attribute

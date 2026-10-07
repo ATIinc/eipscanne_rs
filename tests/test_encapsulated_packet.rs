@@ -1,6 +1,6 @@
 mod common;
 
-use binrw::BinWrite;
+use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
 
@@ -22,7 +22,7 @@ use eipscanne_rs::eip::constants::{
 };
 use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
 use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::sockaddr::SockaddrInfoItems;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -206,7 +206,7 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let packet_description = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_packet_description = ResponseObjectAssembly {
         header: EncapsulationHeader {
@@ -229,7 +229,7 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
                 packet_length: Some(28),
             },
             cip_message: identity_response_message().into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 
@@ -281,7 +281,7 @@ fn test_deserialize_identity_object_response() {
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
-    let packet_description = ResponseObjectAssembly::read_response(&mut buf_reader).unwrap();
+    let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     let expected_packaet_description = ResponseObjectAssembly {
         header: EncapsulationHeader {
@@ -304,7 +304,7 @@ fn test_deserialize_identity_object_response() {
                 packet_length: Some(28),
             },
             cip_message: identity_response_message().into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }),
     };
 

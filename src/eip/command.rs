@@ -10,7 +10,7 @@ use crate::cip::message::CipMessage;
 
 use super::constants as eip_constants;
 use super::description::{CommonPacketDescriptor, CommonPacketItemId, serialized_length};
-use super::sockaddr::SockaddrInfoItems;
+use super::socket_addr::SocketAddrInfoItems;
 
 #[derive(BinRead, BinWrite)]
 #[br(little, repr = CipUint)]
@@ -59,12 +59,12 @@ pub struct RRPacketData {
     pub interface_handle: CipUdint,
     pub timeout: CipUint,
 
-    // The Null Address Item, the Unconnected Data Item, then the Sockaddr Info items
+    // The Null Address Item, the Unconnected Data Item, then the Socket Address Info items
     #[br(temp, assert(
         item_count >= eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT,
         "a Send RR Data packet has at least 2 items"
     ))]
-    #[bw(calc = eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT + sockaddr_info_items.count())]
+    #[bw(calc = eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT + socket_addr_info_items.count())]
     item_count: CipUint,
 
     #[br(assert(
@@ -84,7 +84,7 @@ pub struct RRPacketData {
     pub cip_message: CipMessage,
 
     #[br(args(item_count - eip_constants::SEND_RR_DATA_REQUIRED_ITEM_COUNT))]
-    pub sockaddr_info_items: SockaddrInfoItems,
+    pub socket_addr_info_items: SocketAddrInfoItems,
 }
 
 // ======= Start of RRPacketData impl ========
@@ -108,7 +108,7 @@ impl RRPacketData {
                 packet_length: None,
             },
             cip_message: message.into(),
-            sockaddr_info_items: SockaddrInfoItems::empty(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
         }
     }
 }
