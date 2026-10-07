@@ -408,7 +408,7 @@ fn test_deserialize_full_identity_response() {
                 },
             }
             .into(),
-            sockaddr_info_items: SockaddrInfoItems::default(),
+            sockaddr_info_items: SockaddrInfoItems::empty(),
         }),
     };
 
