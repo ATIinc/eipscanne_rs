@@ -9,7 +9,9 @@ use std::time::Duration;
 use binrw::BinRead;
 use tokio::net::UdpSocket;
 
-use eipscanne_rs::cip::connection_manager::parameters::connection_size;
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionSizeType, RealTimeFormat, TransportClass, connection_size,
+};
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipUdint;
@@ -22,8 +24,9 @@ use crate::implicit::connection::{OpenConnection, data_len_matches_connection, d
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
 
-/// Binds the I/O socket on every interface, before the Forward_Open: adapters send as soon as
-/// they reply.
+/// Binds the I/O socket to UDP 2222 on every interface, before the Forward_Open: adapters send as
+/// soon as they reply. One socket carries both directions: the Forward_Open names no T->O address,
+/// so the adapter sends the inputs to this host on 2222, and the outputs leave from it.
 pub async fn bind_io_socket() -> Result<UdpSocket> {
     Ok(UdpSocket::bind(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
@@ -35,7 +38,7 @@ pub async fn bind_io_socket() -> Result<UdpSocket> {
 /// Receives one I/O packet and its sender. Cancel safe.
 pub async fn recv_io_packet(socket: &UdpSocket) -> Result<(EnIpIoPacket, SocketAddr)> {
     let mut bytes = vec![0u8; MAX_UDP_PAYLOAD];
-    let (len, from) = socket.recv_from(&mut bytes).await?;
+    let (len, from): (usize, SocketAddr) = socket.recv_from(&mut bytes).await?;
     bytes.truncate(len);
 
     let packet = EnIpIoPacket::read(&mut Cursor::new(&bytes))?;
@@ -58,7 +61,7 @@ pub fn accept_t2o_packet(
     from: SocketAddr,
 ) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is for this connection
-    let address = packet.sequenced_address;
+    let address: SequencedAddress = packet.sequenced_address;
     if address.connection_id != connection.response.t2o_network_connection_id {
         return Err(Error::UnexpectedPacket(format!(
             "packet for another connection ({:#010x})",
@@ -76,18 +79,19 @@ pub fn accept_t2o_packet(
     // 3. It is newer than the last accepted one (distance modulo 2^32 in 1..2^31), by at most
     //    the timeout multiplier plus one (never under 16). Any first number is accepted
     if let Some(last) = last_sequence_number {
-        let received = address.encapsulation_sequence_number;
-        let distance = received.wrapping_sub(last);
+        let received: CipUdint = address.encapsulation_sequence_number;
+        let distance: u32 = received.wrapping_sub(last);
         if distance == 0 || distance >= 1 << 31 {
             return Err(Error::UnexpectedPacket(format!(
                 "stale sequence number {received} (last accepted {last})"
             )));
         }
-        let multiplier = connection
+        // The timeout multiplier as a factor: 4, 8, ... 512
+        let multiplier: u32 = connection
             .request
             .connection_timeout_multiplier
             .multiplier();
-        let allowed = MIN_ALLOWED_SEQUENCE_GAP.max(multiplier.saturating_add(1));
+        let allowed: u32 = MIN_ALLOWED_SEQUENCE_GAP.max(multiplier.saturating_add(1));
         if distance > allowed {
             return Err(Error::UnexpectedPacket(format!(
                 "sequence number {received} is more than {allowed} ahead of the last accepted {last}"
@@ -101,9 +105,10 @@ pub fn accept_t2o_packet(
             "packet whose Connected Data Item is not raw".to_string(),
         ));
     };
-    let transport_class = connection.request.transport_type_trigger.transport_class();
-    let real_time_format = connection.t2o_real_time_format;
-    let (expected, size_type) = data_size(
+    let transport_class: TransportClass =
+        connection.request.transport_type_trigger.transport_class();
+    let real_time_format: RealTimeFormat = connection.t2o_real_time_format;
+    let (expected, size_type): (u16, ConnectionSizeType) = data_size(
         &connection.request.t2o_network_connection_parameters,
         transport_class,
         real_time_format,
@@ -128,7 +133,8 @@ pub fn accept_t2o_packet(
 /// How long the inputs may stop before the connection times out: the timeout multiplier times
 /// the T->O actual packet interval
 pub fn input_timeout(connection: &OpenConnection) -> Duration {
-    let multiplier = connection
+    // The timeout multiplier as a factor: 4, 8, ... 512
+    let multiplier: u32 = connection
         .request
         .connection_timeout_multiplier
         .multiplier();

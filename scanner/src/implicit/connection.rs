@@ -12,6 +12,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, NetworkConnectionParameters, RealTimeFormat, TransportClass,
     connection_size,
 };
+use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
@@ -46,7 +47,7 @@ pub async fn forward_open(
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
 ) -> Result<OpenConnection> {
-    let reply = session
+    let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
             request.clone(),
@@ -54,7 +55,7 @@ pub async fn forward_open(
         .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;
 
-    let target_ip = session.peer_ip();
+    let target_ip: Ipv4Addr = session.peer_ip();
     Ok(OpenConnection {
         o2t_endpoint: o2t_endpoint(&reply, target_ip),
         request,
@@ -79,7 +80,7 @@ pub async fn forward_close(
         connection_path: connection.request.connection_path.clone(),
     };
 
-    let reply = session
+    let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_close(
             session.session_handle(),
             request,
@@ -91,13 +92,13 @@ pub async fn forward_close(
 /// Where the outputs go: the reply's O->T Socket Address Info address (`0.0.0.0` meaning the
 /// adapter), or the adapter on the I/O port
 fn o2t_endpoint(reply: &EnIpPacket, target_ip: Ipv4Addr) -> SocketAddrV4 {
-    let o2t_socket_addr_info = reply
-        .command_specific_data
-        .as_send_rr_data()
+    let rr_data: Option<&RRPacketData> = reply.command_specific_data.as_send_rr_data();
+    // The adapter adds an O->T Socket Address Info item only to redirect the outputs
+    let o2t_address: Option<SocketAddrV4> = rr_data
         .and_then(|rr_data| rr_data.socket_addr_info_items.o2t)
         .map(|info| info.socket_address());
 
-    match o2t_socket_addr_info {
+    match o2t_address {
         Some(address) if address.ip().is_unspecified() => {
             SocketAddrV4::new(target_ip, address.port())
         }
@@ -113,7 +114,7 @@ pub(crate) fn data_size(
     transport_class: TransportClass,
     real_time_format: RealTimeFormat,
 ) -> (u16, ConnectionSizeType) {
-    let (size, size_type) = match parameters {
+    let (size, size_type): (u16, ConnectionSizeType) = match parameters {
         NetworkConnectionParameters::Standard(parameters) => (
             parameters.connection_size().value(),
             parameters.connection_size_type(),
@@ -123,7 +124,7 @@ pub(crate) fn data_size(
             parameters.connection_size_type(),
         ),
     };
-    let overhead = connection_size(0, transport_class, real_time_format);
+    let overhead: u16 = connection_size(0, transport_class, real_time_format);
     (size.saturating_sub(overhead), size_type)
 }
 

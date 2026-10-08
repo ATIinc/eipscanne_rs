@@ -183,14 +183,14 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 ### Stage 3, outputs — `src/implicit/o2t.rs`
 
 * `build_o2t_packet(&OpenConnection, encapsulation_sequence_number: CipUdint,
-  cip_sequence_count: CipUint, outputs: CipDataOpt, run: bool) -> Result<EnIpIoPacket>`:
-  * encodes the outputs first (`CipDataOpt::Raw` bytes or a caller's `binrw` struct as
-    `CipDataOpt::Typed`, so a typed value is an explicit choice), then checks their length against
-    the O->T data size (`Error::OutputSize`);
+  cip_sequence_count: CipUint, assembly_data: CipDataOpt, run: bool) -> Result<EnIpIoPacket>`:
+  * writes the assembly data to bytes once (`CipDataOpt::Raw` bytes or a caller's `binrw` struct
+    as `CipDataOpt::Typed`, whose size is only known once written), then checks their length
+    against the O->T data size (`Error::OutputSize`);
   * adds the CIP sequence count for classes 1 to 3, and the run/idle header (run flag `run`) when
     the O->T real-time format is the 32-bit header;
   * addresses the packet with the O->T connection ID from the reply; its Connected Data Item is
-    always `CipDataOpt::Raw`.
+    the `CipIoData` as `CipDataOpt::Typed`.
 * `send_io_packet(&UdpSocket, &EnIpIoPacket, to: SocketAddrV4) -> Result<()>`.
 * The numbering is the caller's: the encapsulation sequence number starts at a random number and
   moves on every packet; the CIP sequence count moves when the outputs change, so a resend of
@@ -200,7 +200,8 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 ### Stage 3, inputs — `src/implicit/t2o.rs`
 
 * `bind_io_socket() -> Result<UdpSocket>`: `0.0.0.0:2222`, bound before the Forward_Open
-  (adapters start sending as soon as they reply).
+  (adapters start sending as soon as they reply). It carries both directions: the Forward_Open
+  names no T->O address, so the adapter sends the inputs to the scanner's host on 2222.
 * `recv_io_packet(&UdpSocket) -> Result<(EnIpIoPacket, SocketAddr)>`: one datagram parsed as an I/O
   packet, with its sender; cancel safe.
 * `accept_t2o_packet(&OpenConnection, last_sequence_number: Option<CipUdint>, &EnIpIoPacket,
