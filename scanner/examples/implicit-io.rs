@@ -4,10 +4,12 @@
 //!
 //! `cargo run --example implicit-io -- --host 172.28.0.10`
 
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use bilge::prelude::{u4, u9};
 use clap::Parser;
+use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -20,8 +22,9 @@ use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use scanner::error::Error;
-use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::connection::{OpenConnection, forward_close, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
@@ -85,12 +88,12 @@ impl Args {
     fn forward_open_request(&self) -> Result<ForwardOpenRequest, Box<dyn std::error::Error>> {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
-        let o2t_size = connection_size(
+        let o2t_size: u16 = connection_size(
             self.output_size,
             TransportClass::Class1,
             O2T_REAL_TIME_FORMAT,
         );
-        let t2o_size = connection_size(
+        let t2o_size: u16 = connection_size(
             self.input_size,
             TransportClass::Class1,
             T2O_REAL_TIME_FORMAT,
@@ -170,9 +173,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let connection = forward_open(
+    let connection: OpenConnection = forward_open(
         &mut session,
         args.forward_open_request()?,
         O2T_REAL_TIME_FORMAT,
@@ -204,9 +207,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut outputs = vec![0u8; usize::from(args.output_size)];
 
     // The inputs: the last accepted numbers, and the deadline every accepted packet moves
-    let timeout = input_timeout(&connection);
-    let mut last_sequence_number = None;
-    let mut last_cip_sequence_count = None;
+    let timeout: Duration = input_timeout(&connection);
+    let mut last_sequence_number: Option<u32> = None;
+    let mut last_cip_sequence_count: Option<u16> = None;
     let mut deadline = established_at + FIRST_PACKET_GRACE.max(timeout);
 
     // One loop drives both directions; production code may send outputs from their own task
@@ -226,7 +229,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
-                let packet = build_o2t_packet(
+                let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
@@ -240,7 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             received = recv_io_packet(&socket) => {
                 // A datagram that is not an I/O packet is logged and skipped, like a discarded one
-                let (packet, from) = match received {
+                let (packet, from): (EnIpIoPacket, SocketAddr) = match received {
                     Ok(received) => received,
                     Err(Error::Parse(error)) => {
                         eprintln!("[{cycle:>3}] DISCARDED a datagram that does not parse: {error}");
