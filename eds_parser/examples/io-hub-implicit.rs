@@ -9,21 +9,26 @@
 //! `cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host 172.31.19.18 --motor 0`
 
 use std::io::Cursor;
+use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, bail};
 use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
+use tokio::net::UdpSocket;
 
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionTimeoutMultiplier, PriorityTimeTick,
+    ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 use scanner::error::Error;
-use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::connection::{OpenConnection, forward_close, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
@@ -31,7 +36,9 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
+use eds_parser::assembly::Assembly;
 use eds_parser::check::check_assembly;
+use eds_parser::connection::Connection;
 use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
@@ -83,10 +90,14 @@ async fn main() -> anyhow::Result<()> {
     let text = std::fs::read_to_string(&args.eds)
         .with_context(|| format!("reading {}", args.eds.display()))?;
     let eds = Eds::parse(&text)?;
-    let connection = eds
+    let connection: &Connection = eds
         .first_exclusive_owner_connection()
         .context("the EDS offers no exclusive-owner connection")?;
-    let (request, o2t_real_time_format, t2o_real_time_format) = to_forward_open(
+    let (request, o2t_real_time_format, t2o_real_time_format): (
+        ForwardOpenRequest,
+        RealTimeFormat,
+        RealTimeFormat,
+    ) = to_forward_open(
         connection,
         OriginatorSettings {
             // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself
@@ -132,10 +143,10 @@ async fn main() -> anyhow::Result<()> {
     else {
         bail!("{} names no assembly for its data", connection.keyword);
     };
-    let input_layout = eds
+    let input_layout: &Assembly = eds
         .assembly(input_format)
         .with_context(|| format!("the EDS has no {input_format}"))?;
-    let output_layout = eds
+    let output_layout: &Assembly = eds
         .assembly(output_format)
         .with_context(|| format!("the EDS has no {output_format}"))?;
     println!("CHECKING the structs against {input_format} and {output_format}");
@@ -152,9 +163,9 @@ async fn main() -> anyhow::Result<()> {
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let connection = forward_open(
+    let connection: OpenConnection = forward_open(
         &mut session,
         request,
         o2t_real_time_format,
@@ -178,8 +189,8 @@ async fn main() -> anyhow::Result<()> {
     let mut encapsulation_sequence_number: u32 = rand::random();
     let cip_sequence_count: u16 = 1;
 
-    let timeout = input_timeout(&connection);
-    let mut last_sequence_number = None;
+    let timeout: Duration = input_timeout(&connection);
+    let mut last_sequence_number: Option<u32> = None;
     let mut deadline = established_at + FIRST_PACKET_GRACE.max(timeout);
 
     let mut last_line: Option<String> = None;
@@ -195,7 +206,7 @@ async fn main() -> anyhow::Result<()> {
                     break;
                 }
                 cycle += 1;
-                let packet = build_o2t_packet(
+                let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
@@ -208,7 +219,7 @@ async fn main() -> anyhow::Result<()> {
 
             received = recv_io_packet(&socket) => {
                 // A datagram that is not an I/O packet is logged and skipped, like a discarded one
-                let (packet, from) = match received {
+                let (packet, from): (EnIpIoPacket, SocketAddr) = match received {
                     Ok(received) => received,
                     Err(Error::Parse(error)) => {
                         eprintln!("[{cycle:>4}] DISCARDED a datagram that does not parse: {error}");
@@ -216,7 +227,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                let (address, inputs) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
                     Ok(accepted) => accepted,
                     Err(discarded) => {
                         eprintln!("[{cycle:>4}] DISCARDED {discarded}");
@@ -230,7 +241,7 @@ async fn main() -> anyhow::Result<()> {
                 let CipDataOpt::Raw(data) = &inputs.data else {
                     continue;
                 };
-                let inputs = match InputAssemblyHub4E::read_le(&mut Cursor::new(data)) {
+                let inputs: InputAssemblyHub4E = match InputAssemblyHub4E::read_le(&mut Cursor::new(data)) {
                     Ok(inputs) => inputs,
                     Err(error) => {
                         eprintln!("[{cycle:>4}] UNDECODED {error}");
