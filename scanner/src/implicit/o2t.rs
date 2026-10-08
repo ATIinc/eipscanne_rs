@@ -7,7 +7,9 @@ use std::net::SocketAddrV4;
 use binrw::BinWrite;
 use tokio::net::UdpSocket;
 
-use eipscanne_rs::cip::connection_manager::parameters::{RealTimeFormat, TransportClass};
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionSizeType, RealTimeFormat, TransportClass,
+};
 use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
@@ -16,44 +18,42 @@ use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use crate::error::{Error, Result};
 use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
 
-/// The O->T packet of `connection` carrying `outputs` (raw bytes or a `binrw` struct). `run` sets
-/// the run/idle flag when the O->T real-time format is `Header32Bit`; other formats ignore it.
+/// The O->T packet of `connection` carrying `assembly_data` (raw bytes or a `binrw` struct). `run`
+/// sets the run/idle flag when the O->T real-time format is `Header32Bit`; other formats ignore it.
 ///
 /// `encapsulation_sequence_number` advances every packet (start it at random, so a restarted
-/// scanner does not repeat old numbers); `cip_sequence_count` only when the outputs change.
+/// scanner does not repeat old numbers); `cip_sequence_count` only when the assembly data changes.
 pub fn build_o2t_packet(
     connection: &OpenConnection,
     encapsulation_sequence_number: CipUdint,
     cip_sequence_count: CipUint,
-    outputs: CipDataOpt,
+    assembly_data: CipDataOpt,
     run: bool,
 ) -> Result<EnIpIoPacket> {
-    // A typed assembly's size is only known once it is written
-    let mut outputs_bytes = Cursor::new(Vec::new());
-    outputs.write_le_args(&mut outputs_bytes, (0,))?;
-    let outputs = outputs_bytes.into_inner();
+    let assembly_data_bytes: Vec<u8> = to_bytes(&assembly_data)?;
 
-    let transport_class = connection.request.transport_type_trigger.transport_class();
-    let (data_size, connection_size_type) = data_size(
+    let transport_class: TransportClass =
+        connection.request.transport_type_trigger.transport_class();
+    let (data_size, connection_size_type): (u16, ConnectionSizeType) = data_size(
         &connection.request.o2t_network_connection_parameters,
         transport_class,
         connection.o2t_real_time_format,
     );
-    if !data_len_matches_connection(outputs.len(), data_size, connection_size_type) {
+    if !data_len_matches_connection(assembly_data_bytes.len(), data_size, connection_size_type) {
         return Err(Error::OutputSize {
             connection_size_type,
             data_size,
-            actual: outputs.len(),
+            actual: assembly_data_bytes.len(),
         });
     }
 
-    let cip_sequence_count = match transport_class {
+    let cip_sequence_count: Option<CipUint> = match transport_class {
         TransportClass::Class1 | TransportClass::Class2 | TransportClass::Class3 => {
             Some(cip_sequence_count)
         }
         TransportClass::Class0 | TransportClass::Unknown(_) => None,
     };
-    let run_idle_header = match connection.o2t_real_time_format {
+    let run_idle_header: Option<RunIdleHeader> = match connection.o2t_real_time_format {
         RealTimeFormat::Header32Bit => Some(
             RunIdleHeader::builder()
                 .run_idle(run)
@@ -64,19 +64,24 @@ pub fn build_o2t_packet(
         RealTimeFormat::Modeless | RealTimeFormat::ZeroLength | RealTimeFormat::Heartbeat => None,
     };
 
-    let mut bytes = Cursor::new(Vec::new());
-    CipIoData {
+    let cip_io_data = CipIoData {
         cip_sequence_count,
         run_idle_header,
-        data: CipDataOpt::Raw(outputs),
-    }
-    .write_le(&mut bytes)?;
-
+        data: CipDataOpt::Raw(assembly_data_bytes),
+    };
     Ok(EnIpIoPacket::new(
         connection.response.o2t_network_connection_id,
         encapsulation_sequence_number,
-        CipDataOpt::Raw(bytes.into_inner()),
+        CipDataOpt::Typed(Box::new(cip_io_data)),
     ))
+}
+
+/// The bytes of `assembly_data`, written once: the size check needs them, and a typed assembly's
+/// size is only known once written
+fn to_bytes(assembly_data: &CipDataOpt) -> Result<Vec<u8>> {
+    let mut bytes = Cursor::new(Vec::new());
+    assembly_data.write_le_args(&mut bytes, (0,))?;
+    Ok(bytes.into_inner())
 }
 
 /// Sends one I/O packet to `to`
