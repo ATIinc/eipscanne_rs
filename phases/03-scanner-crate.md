@@ -253,7 +253,9 @@ input instances, sizes, RPI, cycle count, `--large`. Defaults match the OpENer s
 `scanner/examples/README.md` lists every example with its device, kind of messaging and the
 hardware it moves, how the examples include the assemblies, and a walkthrough of each, the
 implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer steps for
-`implicit-io`.
+`implicit-io`, and `tests/integration/start-opener.sh` runs them on the host: it creates the
+`eip-network` network when missing, builds the `eip-adapter` image and runs the adapter at
+`172.28.0.10` in the foreground.
 
 ## Limits
 
@@ -293,4 +295,4 @@ Against the OpENer container from `tests/integration`: `implicit-io` opens the c
 exchanges data for the requested number of cycles (OpENer echoes output assembly 150 into input
 assembly 100), closes cleanly, and Wireshark dissects the traffic as Forward Open / Connected Data
 Item / Forward Close. The devcontainer has no Docker client, so the container is started from the
-host (steps in `tests/integration/README.md`).
+host with `tests/integration/start-opener.sh`.
