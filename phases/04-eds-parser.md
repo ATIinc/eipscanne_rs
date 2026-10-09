@@ -164,8 +164,8 @@ commands that start the adapter and what the run prints.
 
 ### Example — `eds_parser/examples/io-hub-implicit.rs`
 
-The implicit counterpart of `io-hub-homing`, one linear file, with the IO-HUB assemblies included
-through `#[path = "../../scanner/assemblies"]` and errors reported through `anyhow`:
+The implicit counterpart of `io-hub-explicit-homing`, one linear file, with the IO-HUB assemblies
+included through `#[path = "../../scanner/assemblies"]` and errors reported through `anyhow`:
 
 1. Parse `--eds` (the local IO-HUB file), pick the first exclusive-owner connection, write its
    `ForwardOpenRequest` from the `Connection` methods and the originator constants of
