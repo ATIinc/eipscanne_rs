@@ -15,8 +15,3 @@ hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
-
-[features]
-default = []            # Comment to enable async support
-# default = ["async"]   # UN-Comment to enable async support for testing
-async = []
