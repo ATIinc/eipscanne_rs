@@ -1,6 +1,6 @@
 [workspace]
 members = ["hex_test_macros", "scanner", "eds_parser"]
-# `cargo run --example`, `cargo test` and friends cover the library and the scanner without `-p`
+# `cargo run --example`, `cargo test` and friends cover the library, the scanner and the EDS parser without `-p`
 default-members = [".", "scanner", "eds_parser"]
 
 [package]

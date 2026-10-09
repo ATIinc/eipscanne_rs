@@ -14,7 +14,7 @@ pest = "2"
 pest_derive = "2"
 
 [dev-dependencies]
-# Used by the examples only
+# Used by the examples, except hex-test-macros (tests)
 anyhow = "1"
 scanner = { path = "../scanner" }
 clap = { version = "4.6.7", features = ["derive"] }

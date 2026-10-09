@@ -24,13 +24,13 @@ Reference PDFs (e.g. protocol specifications) can be kept in the git-ignored [do
 
 ## Implicit messaging
 
-Class 1 implicit messaging (cyclic I/O) is being added in stages; the plan, the ground rules and the status of each stage live in [phases/](./phases/).
+The library also covers class 1 implicit messaging (cyclic I/O): Forward_Open and Forward_Close, and the I/O packets on UDP port 2222. Its plan and ground rules live in [phases/](./phases/).
 
 ## Related projects
 
 Other implementations that were reviewed while planning the implicit messaging work. None of their code is used here, but they are useful references and possible interoperability test targets:
 
-* [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) (C++, [ATI fork](https://github.com/ATIinc/EIPScanner)) — the scanner this library was originally modelled on; its `ImplicitMessagingExample` is the behavioural reference for class 1 connections.
+* [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) (C++, [ATI fork](https://github.com/ATIinc/EIPScanner)) — used to capture the Wireshark traffic the packet types follow.
 * [OpENer](https://github.com/EIPStackGroup/OpENer) (C) — open source adapter used for the integration tests in [tests/integration](./tests/integration/).
 * [EthernetIpRust](https://github.com/CristianMori/EthernetIpRust) (Rust, Apache-2.0) — async scanner/adapter crates (`ethernetip-core`, `ethernetip-connections`) with class 1 I/O. Its `echo-adapter` sample could serve as a future loopback interoperability target.
 * [rseip](https://github.com/Joylei/eip-rs) (Rust, MIT) — explicit messaging client with class 3 connected messaging.
