@@ -39,7 +39,8 @@ use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::connection_manager::forward_close;
+use scanner::implicit::connection::forward_open;
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
 use scanner::session::Session;
@@ -330,7 +331,9 @@ async fn one_connection_against_a_fake_adapter() {
     assert_eq!(inputs.data, CipDataOpt::Raw(outputs.to_vec()));
 
     // 4. Close, 5. End session
-    forward_close(&mut session, &connection).await.unwrap();
+    forward_close(&mut session, &connection.request)
+        .await
+        .unwrap();
     session.unregister().await.unwrap();
 
     assert_eq!(adapter.await.unwrap(), outputs);

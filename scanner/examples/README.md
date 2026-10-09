@@ -1,10 +1,12 @@
 # Examples
 
 The examples live in the `scanner` crate, which also holds what they are built on: the
-encapsulation `session` (shared), `explicit` messaging (one request, one reply) and `implicit`
-messaging (a class 1 I/O connection: `connection` plus one submodule per direction).
-`read-identity` and `clearlink-explicit-outputs` use `session` and `explicit`; `implicit-io` uses
-`session` and `implicit`.
+encapsulation `session` (shared), `explicit` messaging (one request, one reply; `connected` for
+a class 3 connection), `implicit` messaging (a class 1 I/O connection: `connection` plus one
+submodule per direction) and the `connection_manager` both kinds of connection open and close
+through. `read-identity` and `clearlink-explicit-outputs` use `session` and `explicit`;
+`read-identity-connected` uses `connection_manager` and `explicit::connected`; `implicit-io` uses `session` and
+`implicit`.
 
 ## Run Examples
 
@@ -16,6 +18,7 @@ lists the scanner among the workspace's default members, so no `-p scanner` is n
 | Example | Device | Messaging | Moves hardware |
 |---|---|---|---|
 | `read-identity` | any adapter | explicit | no |
+| `read-identity-connected` | OpENer or any class 3 adapter | explicit (connected) | no |
 | `clearlink-explicit-outputs` | Teknic ClearLink | explicit | digital outputs |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
@@ -39,6 +42,26 @@ i.e. `cargo run --example read-identity` (the OpENer adapter of `tests/integrati
 1. Reads the Identity object (`explicit::read_identity`: Get_Attributes_All, reply decoded as
    `IdentityResponse`)
 1. Unregisters the session
+
+### read-identity-connected
+
+Reads the Identity object over a class 3 (connected explicit messaging) connection a number of
+times, then closes the connection.
+
+i.e. `cargo run --example read-identity-connected` (OpENer at `172.28.0.10` by default)
+* `cargo run --example read-identity-connected -- --reads 10 --interval 500`
+
+Flags: `--host`, `--reads`, `--interval` (milliseconds between reads, also the requested packet
+interval, so the adapter drops the connection after four missed reads).
+
+1. Registers a session
+1. Opens the connection: a Forward_Open to the Message Router with transport class 3, application
+   trigger, 504 bytes each way (`connection_manager::forward_open`)
+1. Every `--interval`: advances the CIP sequence count and sends Get_Attributes_All on the
+   Identity object over the connection (`connected::send_request`, Send Unit Data on the O->T
+   connection ID); the reply must come back on the T->O connection ID with the same sequence
+   count, and is decoded as `IdentityResponse` (`explicit::decode_reply`). Ctrl+C ends early
+1. Closes the connection (`connection_manager::forward_close`) and unregisters the session
 
 ### clearlink-explicit-outputs
 
@@ -111,7 +134,8 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
     * the deadline passes: no input packet arrived within timeout multiplier × packet interval
       (`t2o::input_timeout`), the connection is considered timed out and the loop ends
     * Ctrl+C: the loop ends early; the connection is still closed and the session unregistered
-1. **Close**: sends the Forward_Close matching the Forward_Open (`connection::forward_close`)
+1. **Close**: sends the Forward_Close matching the Forward_Open
+   (`connection_manager::forward_close`)
 1. **End session**: unregisters the session
 
 Production code may send the outputs on a task of its own so a slow input handler can never

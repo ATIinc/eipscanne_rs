@@ -9,7 +9,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 ## Workspace
 
 * `eipscanne_rs` (this directory): the packet library.
-* [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
+* [`scanner`](./scanner/): sessions, explicit (unconnected and class 3 connected) and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
 * [`eds_parser`](./eds_parser/README.md): reads a device's EDS file into the fields of the scanner's Forward_Open and the assembly layouts hand-written structs follow (`eds-implicit-io`, `eds-assemblies`, `io-hub-implicit` examples).
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 

@@ -1,10 +1,7 @@
-//! Opening (stage 2) and closing (stage 4) the connection, and what both directions read from it.
+//! Opening the connection (stage 2) and what both directions read from it.
 
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-use eipscanne_rs::cip::connection_manager::forward_close::{
-    ForwardCloseRequest, ForwardCloseResponse,
-};
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
@@ -15,10 +12,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
+use crate::connection_manager;
 use crate::error::Result;
-use crate::explicit::decode_reply;
 use crate::session::Session;
 
 /// An open connection: the Forward_Open sent, the adapter's reply, and each direction's
@@ -47,13 +43,8 @@ pub async fn forward_open(
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
 ) -> Result<OpenConnection> {
-    let reply: EnIpPacket = session
-        .request(&RequestObjectAssembly::new_forward_open(
-            session.session_handle(),
-            request.clone(),
-        ))
-        .await?;
-    let response: ForwardOpenResponse = decode_reply(&reply)?;
+    let (response, reply): (ForwardOpenResponse, EnIpPacket) =
+        connection_manager::forward_open(session, &request).await?;
 
     let target_ip: Ipv4Addr = session.peer_ip();
     Ok(OpenConnection {
@@ -64,29 +55,6 @@ pub async fn forward_open(
         t2o_real_time_format,
         target_ip,
     })
-}
-
-/// Closes `connection` and returns the adapter's reply. A failed close is not fatal: the adapter
-/// drops the connection once it times out.
-pub async fn forward_close(
-    session: &mut Session,
-    connection: &OpenConnection,
-) -> Result<ForwardCloseResponse> {
-    // The connection is named by its Forward_Open's triad and path
-    let request = ForwardCloseRequest {
-        priority_time_tick: connection.request.priority_time_tick,
-        timeout_ticks: connection.request.timeout_ticks,
-        connection_triad: connection.request.connection_triad,
-        connection_path: connection.request.connection_path.clone(),
-    };
-
-    let reply: EnIpPacket = session
-        .request(&RequestObjectAssembly::new_forward_close(
-            session.session_handle(),
-            request,
-        ))
-        .await?;
-    decode_reply(&reply)
 }
 
 /// Where the outputs go: the reply's O->T Socket Address Info address (`0.0.0.0` meaning the
