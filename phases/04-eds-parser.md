@@ -233,8 +233,7 @@ followed and the doc comment says the documentation may be wrong:
   `Connection2` is refused.
 * Ignored, with a local EDS (`EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`):
   for the IO-HUB, configuration 1, O->T 101 with 148 bytes and a 32-bit header, T->O 100 with
-  228 bytes modeless, RPI 10 ms, scheduled priority; `scanner/assemblies/io_hub` input (100) and
-  output (101) have the instances of the connection's assemblies.
+  228 bytes modeless, RPI 10 ms, scheduled priority.
 
 ## Verification
 
