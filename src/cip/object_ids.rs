@@ -10,5 +10,5 @@ pub const ASSEMBLY_CLASS_ID: u8 = 0x04;
 pub const ASSEMBLY_DATA_ATTRIBUTE_ID: u8 = 0x03;
 
 /// Connection Manager object, addressed by Forward_Open and Forward_Close
-pub const CONNECTION_MANAGER_CLASS_ID: u16 = 0x06;
-pub const CONNECTION_MANAGER_INSTANCE_ID: u16 = 0x01;
+pub const CONNECTION_MANAGER_CLASS_ID: u8 = 0x06;
+pub const CONNECTION_MANAGER_INSTANCE_ID: u8 = 0x01;
