@@ -79,13 +79,13 @@ bracket an I/O connection, so they sit under `implicit`.
   dependencies are `eipscanne_rs`, `tokio`, `binrw` and `bilge`, with no error-handling crate; its
   dev-dependencies are `clap` and `rand` (for the examples), `hex-test-macros` and
   `pretty_assertions`.
-* Every example is in `scanner/examples/`: `read-identity`, `write-clearlink-io`,
-  `write-nitra-io`, `clearlink-homing`, `io-hub-homing` and `implicit-io`. The library has no
-  examples and no dev-dependency on the scanner, `tokio` or `clap`.
+* Every example is in `scanner/examples/`: `read-identity`, `clearlink-explicit-outputs`,
+  `io-hub-explicit-homing` and `implicit-io`. The library has no examples and no dev-dependency
+  on the scanner, `tokio` or `clap`.
 * Every example is a single file that reads top to bottom and parses its arguments with `clap`;
-  the ones that wait or keep hardware moving (`implicit-io`, `write-nitra-io --pulse` and the two
-  homing examples) handle Ctrl+C. The device assemblies live outside the library in
-  `scanner/assemblies/` (`clearlink`, `io_hub`, `nitra`), which an example includes with
+  the ones that wait or keep hardware moving (`implicit-io`, `io-hub-explicit-homing`) handle
+  Ctrl+C. The device assemblies live outside the library in `scanner/assemblies/` (`clearlink`,
+  `io_hub`), which an example includes with
   `#[path = "../assemblies"]`.
 * The ClearLink configuration and output assembly tests are in `scanner/tests/clearlink/`
   (`config.rs`, `output.rs`, with `main.rs` including the assemblies).
