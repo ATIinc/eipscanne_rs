@@ -23,8 +23,9 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
+use scanner::connection_manager::forward_close;
 use scanner::error::Error;
-use scanner::implicit::connection::{OpenConnection, forward_close, forward_open};
+use scanner::implicit::connection::{OpenConnection, forward_open};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
@@ -286,7 +287,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 4. Close the connection ============
     println!("CLOSING the connection");
-    forward_close(&mut session, &connection).await?;
+    forward_close(&mut session, &connection.request).await?;
 
     // ========= 5. End the session ============
     println!("UNREGISTERING the session");

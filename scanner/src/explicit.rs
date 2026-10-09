@@ -1,5 +1,8 @@
 //! Explicit (unconnected) messaging: one Message Router request, one reply, over the session.
-//! The caller declares the reply data as a `binrw` type.
+//! The caller declares the reply data as a `binrw` type. Connected (class 3) explicit messaging
+//! lives in [`connected`].
+
+pub mod connected;
 
 use std::io::Cursor;
 

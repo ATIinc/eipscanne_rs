@@ -26,6 +26,9 @@ In the devcontainer; every example that can talk to OpENer defaults to `172.28.0
 
 * `cargo run --example read-identity`: registers a session, prints the adapter's identity
   (`Product Name: "OpENer PC"`) and unregisters
+* `cargo run --example read-identity-connected`: opens a class 3 connection to the Message
+  Router, reads the identity over it five times (Send Unit Data, sequence counts 1 to 5) and
+  closes it
 * `cargo run --example implicit-io`: opens a class 1 connection (configuration assembly 151,
   output 150, input 100, 32 bytes each, a 1 s packet interval), prints a `SENT` line per cycle and
   a `RECEIVED` line per input packet carrying the same bytes, then closes the connection and
