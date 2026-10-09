@@ -3,10 +3,12 @@
 
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::time::timeout;
 
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::response::Rejection;
@@ -25,6 +27,13 @@ const DUMP_VARIABLE: &str = "EIP_DUMP";
 /// Size of the encapsulation header on the wire
 const ENCAPSULATION_HEADER_LEN: usize = 24;
 
+/// How long connecting to the adapter may take: a wrong or unreachable address fails after this
+/// instead of after the operating system gives up (minutes on Linux)
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How long the adapter may take to answer one request
+pub const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// A registered encapsulation session with one adapter
 #[derive(Debug)]
 pub struct Session {
@@ -36,9 +45,16 @@ pub struct Session {
 // ======= Start of Session impl ========
 
 impl Session {
-    /// Stage 1: connects to the adapter and registers a session with it
+    /// Stage 1: connects to the adapter and registers a session with it. Fails with
+    /// [`Error::Timeout`] when the adapter does not accept the connection within
+    /// [`CONNECT_TIMEOUT`] or does not answer within [`REPLY_TIMEOUT`].
     pub async fn register(address: impl ToSocketAddrs) -> Result<Session> {
-        let stream = TcpStream::connect(address).await?;
+        let stream = timeout(CONNECT_TIMEOUT, TcpStream::connect(address))
+            .await
+            .map_err(|_| Error::Timeout {
+                waiting_for: "the TCP connection",
+                after: CONNECT_TIMEOUT,
+            })??;
         let peer_ip = match stream.peer_addr()?.ip() {
             IpAddr::V4(ip) => ip,
             other => return Err(Error::NotIpv4(other)),
@@ -78,8 +94,20 @@ impl Session {
     }
 
     /// Reads one encapsulation packet: the header, then its Length in bytes. Fails on a
-    /// non-success encapsulation status.
+    /// non-success encapsulation status, and with [`Error::Timeout`] when the whole packet has
+    /// not arrived within [`REPLY_TIMEOUT`]; the session is unusable after a timeout, since part
+    /// of the packet may have been read.
     pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
+        timeout(REPLY_TIMEOUT, self.read_packet())
+            .await
+            .map_err(|_| Error::Timeout {
+                waiting_for: "a reply",
+                after: REPLY_TIMEOUT,
+            })?
+    }
+
+    /// [`Session::read_reply`] without the timeout
+    async fn read_packet(&mut self) -> Result<EnIpPacket> {
         let mut bytes = vec![0u8; ENCAPSULATION_HEADER_LEN];
         self.stream.read_exact(&mut bytes).await?;
 
