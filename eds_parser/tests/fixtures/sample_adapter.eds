@@ -1,0 +1,153 @@
+$ Sample EDS written for the eds_parser tests. It describes an adapter offering the connection the
+$ OpENer sample application accepts (configuration assembly 151, 32 output bytes to assembly 150
+$ with a 32-bit run/idle header, 32 input bytes from assembly 100 without one, 1 s packet interval)
+$ and an input-only connection. Not a real device's file.
+
+[File]
+        DescText = "Sample adapter EDS for eds_parser";
+        CreateDate = 10-06-2026;
+        CreateTime = 12:00:00;
+        ModDate = 10-06-2026;
+        ModTime = 12:00:00;
+        Revision = 1.0;
+
+[Device]
+        VendCode = 1;
+        VendName = "Sample Vendor";
+        ProdType = 12;
+        ProdTypeStr = "Communications Adapter";
+        ProdCode = 1;
+        MajRev = 1;
+        MinRev = 0;
+        ProdName = "Sample Adapter";
+        Icon = "sample.ico";
+        IconContents =
+                "AAABAAEAEBAAAAEAIABoBAAAFgAAACgAAAAQAAAAIAAAAAEAIAAAAAAAAAQAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+[Device Classification]
+        Class1 = EtherNetIP;
+
+[Params]
+        Param1 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0004,                 $ Descriptor
+                0xC8,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "RPI Range",            $ name
+                "",                     $ units
+                "Requested packet interval of both directions",    $ help string
+                1000,1000000,1000000,   $ min, max, default data values
+                1,1000,1,0,             $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                1;                      $ decimal places
+        Param2 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Configuration Instance",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0x97,                 $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param3 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Output Size",          $ name
+                "bytes",                $ units
+                "",                     $ help string
+                ,,32,                   $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum2 =
+                0x97,"Default configuration";
+
+[Assembly]
+        Object_Name = "Assembly Object";
+        Object_Class_Code = 0x04;
+        Assem100 =
+                "Input Assembly",
+                "20 04 24 64 30 03",
+                32,
+                0x0000,
+                ,,
+                256,;
+        Assem150 =
+                "Output Assembly",
+                "20 04 24 96 30 03",
+                32,
+                0x0000,
+                ,,
+                256,;
+        Assem151 =
+                "Configuration Assembly",
+                "20 04 24 97 30 03",
+                0,
+                0x0000,
+                ,,
+                ;
+
+[Connection Manager]
+        Object_Name = "Connection Manager Object";
+        Object_Class_Code = 0x06;
+        Connection1 =
+                0x04010002,             $ 0-15    = supported transport classes: 1
+                                        $ 16      = trigger: cyclic
+                                        $ 26      = application type: exclusive-owner
+                0x44440405,             $ 0       = O->T fixed size supported
+                                        $ 2       = T->O fixed size supported
+                                        $ 8-10    = O->T real time transfer format: 32-bit header
+                                        $ 12-14   = T->O real time transfer format: modeless
+                                        $ 18      = O->T connection type: POINT2POINT
+                                        $ 22      = T->O connection type: POINT2POINT
+                                        $ 26      = O->T priority: SCHEDULED
+                                        $ 30      = T->O priority: SCHEDULED
+                Param1,Param3,Assem150, $ O->T RPI, size, format
+                Param1,,Assem100,       $ T->O RPI, size (from Assem100), format
+                ,,                      $ proxy config size, format
+                0,Assem151,             $ target config size, format
+                "Exclusive Owner",      $ Connection Name
+                "",                     $ help string
+                "20 04 24 [Param2] 2C 96 2C 64";    $ Path
+        Connection2 =
+                0x02010002,             $ class 1, cyclic, application type: input-only
+                0x44440305,             $ fixed sizes, O->T heartbeat, T->O modeless, point-to-point, scheduled
+                100000,0,,              $ O->T RPI, size, format
+                100000,,Assem100,       $ T->O RPI, size, format
+                ,,                      $ proxy config size, format
+                ,,                      $ target config size, format
+                "Input Only",           $ Connection Name
+                "",                     $ help string
+                "20 04 24 97 2C FE 2C 64";    $ Path
+
+[TCP/IP Interface Class]
+        Revision = 4;
+        Object_Name = "TCP/IP Interface Object";
+        Object_Class_Code = 0xF5;
+        MaxInst = 1;
+
+[Port]
+        Object_Name = "Port Object";
+        Object_Class_Code = 0xF4;
+        Port1 =
+                TCP,
+                "EtherNet/IP Port",
+                "20 F5 24 01",
+                1,
+                0x00,
+                ;
+
+[Capacity]
+        MaxIOConnections = 1;
+        MaxMsgConnections = 4;
+        TSpec1 = Rx, 32, 1000;
+        TSpec2 = Tx, 32, 1000;

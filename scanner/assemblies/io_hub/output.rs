@@ -68,9 +68,9 @@ pub struct MotorOutputData {
     pub move_param_4: CipDint,
     /// A `MoveType`; the hub acts on it when `move_number` changes
     pub move_type: CipUsint,
-    pub move_number: CipUint,
-    pub read_parameter_id: CipUint,
-    pub write_parameter_id: CipUint,
+    pub move_number: CipInt,
+    pub read_parameter_id: CipInt,
+    pub write_parameter_id: CipInt,
     #[brw(pad_after = 1)]
     pub write_parameter_value: CipDint,
 }
@@ -79,7 +79,7 @@ pub struct MotorOutputData {
 
 impl MotorOutputData {
     /// Asks for `move_type` as move number `move_number` (a new number per command)
-    pub fn command_move(&mut self, move_type: MoveType, move_number: CipUint) {
+    pub fn command_move(&mut self, move_type: MoveType, move_number: CipInt) {
         self.move_type = move_type as CipUsint;
         self.move_number = move_number;
     }
@@ -116,8 +116,11 @@ pub struct DigitalOutputs {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct IoOutputData {
     pub digital_outputs: DigitalOutputs,
-    /// Analog output on I/O-12 in microamps (0-20000)
-    pub analog_output_io12_ua: CipInt,
+    /// Analog output on I/O-12 in microamps (0-20000). UINT, as the hub's EDS declares it
+    /// (Param102). The Software Reference lists the matching `AnalogOut_IO12_uA` tag as INT
+    /// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=57); the
+    /// EDS is followed here, and the documentation may be wrong.
+    pub analog_output_io12_ua: CipUint,
     /// PWM duty cycles of I/O-0 through I/O-11 (0 = 0 %, 255 = 100 %)
     pub pwm_duty_cycles: [CipUsint; 12],
 }
