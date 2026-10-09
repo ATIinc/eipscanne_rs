@@ -1,6 +1,7 @@
 //! Registers a session with an adapter, reads its Identity object and unregisters again.
 //!
-//! `cargo run --example read-identity -- --host <adapter IP>`
+//! `cargo run --example read-identity` reads the OpENer adapter at 172.28.0.10 (see
+//! tests/integration/README.md); `-- --host <adapter IP>` reads another adapter
 
 use clap::Parser;
 
@@ -13,7 +14,7 @@ use scanner::session::Session;
 #[command(version)]
 struct Args {
     /// IP address of the adapter
-    #[arg(long, default_value = "172.31.19.10")]
+    #[arg(long, default_value = "172.28.0.10")]
     host: String,
 }
 

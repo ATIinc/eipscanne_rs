@@ -32,7 +32,8 @@ paths are built once at the top of `main` and passed to `send_request`.
 
 Requests the Identity object from the connected device.
 
-i.e. `cargo run --example read-identity -- --host 172.28.0.10`
+i.e. `cargo run --example read-identity` (the OpENer adapter of `tests/integration` at
+`172.28.0.10` by default; `-- --host <ip>` reads another adapter)
 
 1. Registers a session (`Session::register`)
 1. Reads the Identity object (`explicit::read_identity`: Get_Attributes_All, reply decoded as

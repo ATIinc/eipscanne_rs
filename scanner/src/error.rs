@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use eipscanne_rs::cip::connection_manager::parameters::ConnectionSizeType;
 use eipscanne_rs::cip::message::response::Rejection;
@@ -14,6 +15,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[derive(Debug)]
 pub enum Error {
     Io(std::io::Error),
+    /// The adapter did not connect or answer in time
+    Timeout {
+        waiting_for: &'static str,
+        after: Duration,
+    },
     /// A packet or a caller's assembly did not encode or decode
     Parse(binrw::Error),
     /// The adapter answered with an encapsulation status other than success
@@ -48,6 +54,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Io(error) => write!(f, "I/O error: {error}"),
+            Error::Timeout { waiting_for, after } => {
+                write!(f, "timed out after {after:?} waiting for {waiting_for}")
+            }
             Error::Parse(error) => write!(f, "a packet did not encode or decode: {error}"),
             Error::EncapsulationStatus(status) => {
                 write!(
