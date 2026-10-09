@@ -48,8 +48,8 @@ packet and no other protocol feature.
 * **Typed data** — `CipData` (`src/cip/message/data.rs`) requires `Send + Sync`, so packets
   carrying typed data can be held across `.await` points. Its blanket impl only requires
   `BinWrite` with empty arguments, since `write_to` only writes, so a type that reads with
-  arguments can be typed data as well as one that reads without. `adapter` (below) is the crate's
-  only feature.
+  arguments can be typed data as well as one that reads without. The `async` feature, which made
+  `Send + Sync` optional, is removed; the crate has no features.
 * **EPATH** — `src/cip/path.rs`:
   * `SegmentType` names every segment type (`PortSegment`, `LogicalSegment`, `NetworkSegment`,
     `SymbolicSegment`, `DataSegment`) and `LogicalSegmentType` every logical segment type
