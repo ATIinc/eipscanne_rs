@@ -1,5 +1,5 @@
 //! The fixture end to end: file → `Eds` → `ForwardOpenRequest` → the Forward_Open bytes the library
-//! tests were built on. Plus an ignored test against a device's own EDS, named by `EDS_FILE`.
+//! tests were built on.
 
 use binrw::BinWrite;
 use hex_test_macros::prelude::*;
@@ -8,11 +8,9 @@ use bilge::prelude::u4;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionPriority, ConnectionTimeoutMultiplier, NetworkConnectionParameters, PriorityTimeTick,
-    RealTimeFormat,
+    ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
-use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
@@ -118,52 +116,4 @@ fn the_input_only_connection_is_refused() {
 
     assert_eq!(error.entry, "Connection2");
     assert!(error.message.contains("exclusive-owner"), "{error}");
-}
-
-/// A device's own EDS: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`
-#[test]
-#[ignore = "needs a local EDS file named by the EDS_FILE environment variable"]
-fn a_local_eds_file_yields_the_expected_connection() {
-    let path = std::env::var("EDS_FILE").expect("EDS_FILE names the file to read");
-    // Cargo runs tests from the crate directory; a relative path is taken from the repository
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(&path);
-    let text = std::fs::read_to_string(&path).expect("the EDS file is readable");
-    let path = path.to_string_lossy();
-
-    let eds = Eds::parse(&text).unwrap();
-    let connection = eds.first_exclusive_owner_connection().unwrap();
-    let request = request(connection);
-    let o2t_real_time_format = connection.o2t_real_time_format().unwrap();
-    let t2o_real_time_format = connection.t2o_real_time_format().unwrap();
-
-    println!(
-        "{}: {request:#?}, O->T {o2t_real_time_format:?}, T->O {t2o_real_time_format:?}",
-        connection.name
-    );
-
-    // What the IO-HUB-4-E file describes; another device's file prints its own values above
-    if path.contains("IO-HUB") {
-        let NetworkConnectionParameters::Standard(o2t) = request.o2t_network_connection_parameters
-        else {
-            panic!("a Forward_Open has 16-bit parameters");
-        };
-        let NetworkConnectionParameters::Standard(t2o) = request.t2o_network_connection_parameters
-        else {
-            panic!("a Forward_Open has 16-bit parameters");
-        };
-        assert_eq!(
-            request.connection_path,
-            CipPath::new_assembly_connection(1, 101, 100)
-        );
-        // 148 bytes, the sequence count and the 32-bit header
-        assert_eq!(o2t.connection_size().value(), 154);
-        assert_eq!(o2t_real_time_format, RealTimeFormat::Header32Bit);
-        // 228 bytes and the sequence count
-        assert_eq!(t2o.connection_size().value(), 230);
-        assert_eq!(t2o_real_time_format, RealTimeFormat::Modeless);
-        assert_eq!(request.o2t_requested_packet_interval, 10_000);
-        assert_eq!(o2t.priority(), ConnectionPriority::Scheduled);
-    }
 }

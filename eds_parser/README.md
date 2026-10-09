@@ -100,4 +100,3 @@ cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host
   the path and configuration data to be ignored.
 * `tests/sample_adapter.rs`: the fixture end to end, down to the Forward_Open bytes of the
   library's captured request.
-* Against a device's own file: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`.
