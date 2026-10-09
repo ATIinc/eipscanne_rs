@@ -1,7 +1,6 @@
 //! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection, with the same assembly structs the
-//! explicit examples read and write. The connection comes from the hub's EDS file, the structs
-//! are checked against that file before the connection is opened, and every input packet is
-//! decoded as an `InputAssemblyHub4E`. One motor's status is printed whenever it changes.
+//! explicit examples read and write. The connection comes from the hub's EDS file, and every input
+//! packet is decoded as an `InputAssemblyHub4E`. One motor's status is printed whenever it changes.
 //!
 //! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
 //! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
@@ -36,10 +35,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::assembly::Assembly;
-use eds_parser::check::check_assembly;
 use eds_parser::connection::Connection;
-use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -93,30 +89,31 @@ async fn main() -> anyhow::Result<()> {
     let connection: &Connection = eds
         .first_exclusive_owner_connection()
         .context("the EDS offers no exclusive-owner connection")?;
-    let (request, o2t_real_time_format, t2o_real_time_format): (
-        ForwardOpenRequest,
-        RealTimeFormat,
-        RealTimeFormat,
-    ) = to_forward_open(
-        connection,
-        OriginatorSettings {
-            // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself
-            // times out
-            priority_time_tick: PriorityTimeTick::builder()
-                .tick_time(u4::new(10))
-                .priority(false)
-                .build(),
-            timeout_ticks: 5,
-            connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-            t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
-            connection_triad: ConnectionTriad {
-                connection_serial_number: CONNECTION_SERIAL_NUMBER,
-                originator_vendor_id: ORIGINATOR_VENDOR_ID,
-                originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
-            },
-            large_forward_open: false,
+    let request = ForwardOpenRequest {
+        // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
+        priority_time_tick: PriorityTimeTick::builder()
+            .tick_time(u4::new(10))
+            .priority(false)
+            .build(),
+        timeout_ticks: 5,
+        // Point-to-point: the adapter chooses the O->T connection ID and returns it
+        o2t_network_connection_id: 0,
+        t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
+        connection_triad: ConnectionTriad {
+            connection_serial_number: CONNECTION_SERIAL_NUMBER,
+            originator_vendor_id: ORIGINATOR_VENDOR_ID,
+            originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
-    )?;
+        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_requested_packet_interval: connection.o2t_requested_packet_interval()?,
+        o2t_network_connection_parameters: connection.o2t_network_connection_parameters(false)?,
+        t2o_requested_packet_interval: connection.t2o_requested_packet_interval()?,
+        t2o_network_connection_parameters: connection.t2o_network_connection_parameters(false)?,
+        transport_type_trigger: connection.transport_type_trigger()?,
+        connection_path: connection.connection_path()?,
+    };
+    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
+    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
     println!(
         "{} ({}): path {}",
         connection.name,
@@ -124,9 +121,8 @@ async fn main() -> anyhow::Result<()> {
         hex(&connection.path)
     );
 
-    // ========= Check the structs against the EDS ============
-    // The connection must carry the assemblies the structs are written for, with their layout.
-    // The path ends with the two connection points: 2C <O->T> 2C <T->O>
+    // The connection must carry the assemblies the structs are written for. The path ends with
+    // the two connection points: 2C <O->T> 2C <T->O>
     if !connection.path.ends_with(&[
         0x2C,
         OUTPUT_ASSEMBLY_INSTANCE,
@@ -137,24 +133,6 @@ async fn main() -> anyhow::Result<()> {
             "the connection path {} does not end with the assemblies the structs are for ({OUTPUT_ASSEMBLY_INSTANCE} and {INPUT_ASSEMBLY_INSTANCE})",
             hex(&connection.path)
         );
-    }
-    let (Some(input_format), Some(output_format)) =
-        (&connection.t2o.format, &connection.o2t.format)
-    else {
-        bail!("{} names no assembly for its data", connection.keyword);
-    };
-    let input_layout: &Assembly = eds
-        .assembly(input_format)
-        .with_context(|| format!("the EDS has no {input_format}"))?;
-    let output_layout: &Assembly = eds
-        .assembly(output_format)
-        .with_context(|| format!("the EDS has no {output_format}"))?;
-    println!("CHECKING the structs against {input_format} and {output_format}");
-    for finding in check_assembly::<InputAssemblyHub4E>(input_layout)? {
-        println!("  {finding}");
-    }
-    for finding in check_assembly::<OutputAssemblyHub4E>(output_layout)? {
-        println!("  {finding}");
     }
 
     // ========= 1. Register the session ============

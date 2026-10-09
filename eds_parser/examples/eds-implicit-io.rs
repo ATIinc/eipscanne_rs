@@ -1,17 +1,30 @@
 //! Opens the class 1 connection an EDS file describes, exchanges cyclic I/O for a number of
-//! cycles and closes it again. The stages are those of the scanner's `implicit-io` example; only
-//! the connection settings come from the EDS instead of flags.
+//! cycles and closes it again: the stages of the scanner's `implicit-io` example, with the
+//! connection settings read from the EDS.
 //!
-//! The outputs sent are zeros, and the scanner stays idle (run flag cleared) unless `--run` is
-//! given: an output assembly may drive real outputs.
+//! The defaults describe the OpENer adapter of `tests/integration`: `--eds` is this crate's
+//! `sample_adapter.eds` fixture and `--host` is `172.28.0.10`. Start the adapter on the host, then
+//! run the example in the devcontainer:
 //!
-//! `cargo run --example eds-implicit-io -- --eds eds_parser/tests/fixtures/sample_adapter.eds --host 172.28.0.10 --run`
+//! ```text
+//! tests/integration/start-opener.sh
+//! cargo run --example eds-implicit-io
+//! ```
+//!
+//! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
+//! I/O travels over UDP 2222 in both directions, so the scanner must reach the adapter's Docker
+//! network; the devcontainer's host networking does (`tests/integration/README.md`).
+//!
+//! Another device: `--eds <its EDS file> --host <ip>`, plus `--connection <ConnectionN or name>`
+//! for a connection other than the first exclusive-owner one. The outputs are zeros, sent idle
+//! (run flag cleared) unless `--run` is given, since an output assembly may drive real outputs.
 
 use std::time::{Duration, Instant};
 
 use bilge::prelude::u4;
 use clap::Parser;
 
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
@@ -27,7 +40,6 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -35,12 +47,18 @@ const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
 const CONNECTION_SERIAL_NUMBER: u16 = 1;
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
 
+/// The fixture describing the OpENer sample application
+const SAMPLE_ADAPTER_EDS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/sample_adapter.eds"
+);
+
 /// Exchanges cyclic I/O with an adapter over the connection its EDS file describes
 #[derive(Parser)]
 #[command(version)]
 struct Args {
     /// The device's EDS file
-    #[arg(long)]
+    #[arg(long, default_value = SAMPLE_ADAPTER_EDS)]
     eds: std::path::PathBuf,
 
     /// The connection to open: its `ConnectionN` keyword or its name. Default: the first
@@ -81,26 +99,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .ok_or("the EDS offers no exclusive-owner connection")?,
     };
 
-    let (request, o2t_real_time_format, t2o_real_time_format) = to_forward_open(
-        connection,
-        OriginatorSettings {
-            // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself
-            // times out
-            priority_time_tick: PriorityTimeTick::builder()
-                .tick_time(u4::new(10))
-                .priority(false)
-                .build(),
-            timeout_ticks: 5,
-            connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-            t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
-            connection_triad: ConnectionTriad {
-                connection_serial_number: CONNECTION_SERIAL_NUMBER,
-                originator_vendor_id: ORIGINATOR_VENDOR_ID,
-                originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
-            },
-            large_forward_open: args.large,
+    let request = ForwardOpenRequest {
+        // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
+        priority_time_tick: PriorityTimeTick::builder()
+            .tick_time(u4::new(10))
+            .priority(false)
+            .build(),
+        timeout_ticks: 5,
+        // Point-to-point: the adapter chooses the O->T connection ID and returns it
+        o2t_network_connection_id: 0,
+        t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
+        connection_triad: ConnectionTriad {
+            connection_serial_number: CONNECTION_SERIAL_NUMBER,
+            originator_vendor_id: ORIGINATOR_VENDOR_ID,
+            originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
-    )?;
+        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_requested_packet_interval: connection.o2t_requested_packet_interval()?,
+        o2t_network_connection_parameters: connection
+            .o2t_network_connection_parameters(args.large)?,
+        t2o_requested_packet_interval: connection.t2o_requested_packet_interval()?,
+        t2o_network_connection_parameters: connection
+            .t2o_network_connection_parameters(args.large)?,
+        transport_type_trigger: connection.transport_type_trigger()?,
+        connection_path: connection.connection_path()?,
+    };
+    let o2t_real_time_format = connection.o2t_real_time_format()?;
+    let t2o_real_time_format = connection.t2o_real_time_format()?;
 
     println!(
         "{} ({}) from {}",

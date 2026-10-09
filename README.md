@@ -10,8 +10,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 
 * `eipscanne_rs` (this directory): the packet library.
 * [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
-* [`eds_parser`](./eds_parser/README.md): turns a connection from a device's EDS file into the scanner's Forward_Open (`eds-implicit-io` example).
-  It also checks hand-written assembly structs against the EDS layouts (`eds-assemblies`, `io-hub-implicit` examples).
+* [`eds_parser`](./eds_parser/README.md): reads a device's EDS file into the fields of the scanner's Forward_Open and the assembly layouts hand-written structs follow (`eds-implicit-io`, `eds-assemblies`, `io-hub-implicit` examples).
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 
 `cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.

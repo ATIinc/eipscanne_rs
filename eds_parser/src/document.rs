@@ -1,11 +1,11 @@
 //! Step 2: the shape of an EDS file, with no EDS meaning attached. This is the only module that
-//! touches pest's parse tree.
+//! touches pest's parse tree, and the one that words errors about a field.
 
 use pest::Parser;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::error::EdsError;
+use crate::error::{Error, Result};
 
 #[derive(Parser)]
 #[grammar = "eds.pest"]
@@ -13,20 +13,20 @@ pub(crate) struct EdsParser;
 
 /// A whole file: its sections in file order
 #[derive(Debug, Clone, PartialEq)]
-pub struct Document {
+pub(crate) struct Document {
     pub sections: Vec<Section>,
 }
 
 /// `[name]` followed by its entries
 #[derive(Debug, Clone, PartialEq)]
-pub struct Section {
+pub(crate) struct Section {
     pub name: String,
     pub entries: Vec<Entry>,
 }
 
 /// `keyword = field, field, ...;`
 #[derive(Debug, Clone, PartialEq)]
-pub struct Entry {
+pub(crate) struct Entry {
     pub keyword: String,
     pub fields: Vec<Field>,
     /// The 1-based line the keyword is on
@@ -35,7 +35,7 @@ pub struct Entry {
 
 /// One comma-separated value of an entry
 #[derive(Debug, Clone, PartialEq)]
-pub enum Field {
+pub(crate) enum Field {
     /// Nothing between two commas (or before the `;`)
     Empty,
     /// A decimal or `0x` hexadecimal number
@@ -50,7 +50,7 @@ pub enum Field {
 
 impl Document {
     /// Parses the text of an EDS file. A syntax error carries pest's line and column.
-    pub fn parse(text: &str) -> Result<Document, EdsError> {
+    pub fn parse(text: &str) -> Result<Document> {
         let file = EdsParser::parse(Rule::file, text)
             .map_err(syntax_error)?
             .next()
@@ -77,23 +77,12 @@ impl Document {
 // ======= Start of Section impl ========
 
 impl Section {
-    /// The entry with `keyword`, whatever its case
-    pub fn entry(&self, keyword: &str) -> Option<&Entry> {
-        self.entries
-            .iter()
-            .find(|entry| entry.keyword.eq_ignore_ascii_case(keyword))
-    }
-
     /// The entries whose keyword is `prefix` followed by a number (`Param1`, `Param999`), in
     /// file order
     pub fn numbered_entries<'a>(&'a self, prefix: &'a str) -> impl Iterator<Item = &'a Entry> {
-        self.entries.iter().filter(move |entry| {
-            entry.keyword.len() > prefix.len()
-                && entry.keyword[..prefix.len()].eq_ignore_ascii_case(prefix)
-                && entry.keyword[prefix.len()..]
-                    .bytes()
-                    .all(|byte| byte.is_ascii_digit())
-        })
+        self.entries
+            .iter()
+            .filter(move |entry| is_numbered(&entry.keyword, prefix))
     }
 }
 
@@ -105,6 +94,49 @@ impl Entry {
     /// The field at `index`, `Empty` when the entry is shorter than that
     pub fn field(&self, index: usize) -> &Field {
         self.fields.get(index).unwrap_or(&Field::Empty)
+    }
+
+    /// A field that must be an integer that fits `T`
+    pub fn integer<T: TryFrom<i64>>(&self, index: usize, expected: &str) -> Result<T> {
+        self.optional_integer(index, expected)?
+            .ok_or_else(|| self.bad_field(index, expected))
+    }
+
+    /// A field that is an integer that fits `T`, or empty
+    pub fn optional_integer<T: TryFrom<i64>>(
+        &self,
+        index: usize,
+        expected: &str,
+    ) -> Result<Option<T>> {
+        match self.field(index) {
+            Field::Empty => Ok(None),
+            Field::Integer(value) => T::try_from(*value)
+                .map(Some)
+                .map_err(|_| self.bad_field(index, expected)),
+            _ => Err(self.bad_field(index, expected)),
+        }
+    }
+
+    /// A text field, or an empty string when the field is empty or not text
+    pub fn text(&self, index: usize) -> String {
+        self.field(index).as_text().unwrap_or("").to_string()
+    }
+
+    /// An error about the entry: `Assem100 (line 212): message`
+    pub fn error(&self, message: impl Into<String>) -> Error {
+        Error {
+            entry: format!("{} (line {})", self.keyword, self.line),
+            message: message.into(),
+        }
+    }
+
+    /// An error about the field at `index`, saying what it should be and what it is
+    pub fn bad_field(&self, index: usize, expected: &str) -> Error {
+        self.error(format!(
+            "field {} should be {expected}, found {}",
+            index + 1,
+            self.field(index).describe()
+        ))
     }
 }
 
@@ -151,15 +183,23 @@ impl Field {
 
 // ^^^^^^^^ End of Field impl ^^^^^^^^
 
-/// The pest error as an `EdsError::Syntax`
-pub(crate) fn syntax_error(error: pest::error::Error<Rule>) -> EdsError {
+/// Whether `keyword` is `prefix` followed by a number (`Param12` for `Param`), whatever its case
+pub(crate) fn is_numbered(keyword: &str, prefix: &str) -> bool {
+    keyword.len() > prefix.len()
+        && keyword[..prefix.len()].eq_ignore_ascii_case(prefix)
+        && keyword[prefix.len()..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit())
+}
+
+/// The pest error, placed at its line and column
+pub(crate) fn syntax_error(error: pest::error::Error<Rule>) -> Error {
     let (line, column) = match error.line_col {
         pest::error::LineColLocation::Pos((line, column)) => (line, column),
         pest::error::LineColLocation::Span((line, column), _) => (line, column),
     };
-    EdsError::Syntax {
-        line,
-        column,
+    Error {
+        entry: format!("line {line}, column {column}"),
         message: error.variant.message().into_owned(),
     }
 }
@@ -252,14 +292,10 @@ mod tests {
     }
 
     #[test]
-    fn section_and_entry_lookups_ignore_case() {
+    fn section_lookups_ignore_case() {
         let document = parse("[Connection Manager]\nConnection1 = 1;\n");
 
-        let section = document.section("connection manager").unwrap();
-        assert_eq!(
-            section.entry("CONNECTION1").unwrap().fields,
-            vec![Field::Integer(1)]
-        );
+        assert!(document.section("connection manager").is_some());
         assert!(document.section("Params").is_none());
     }
 
@@ -362,41 +398,18 @@ mod tests {
     fn a_missing_semicolon_reports_line_and_column() {
         // pest points at the entry it could not finish
         let error = Document::parse("[S]\nK = 1\n[T]\n").unwrap_err();
-        assert!(
-            matches!(
-                error,
-                EdsError::Syntax {
-                    line: 2,
-                    column: 5,
-                    ..
-                }
-            ),
-            "{error:?}"
-        );
+        assert_eq!(error.entry, "line 2, column 5");
     }
 
     #[test]
     fn an_entry_outside_a_section_is_a_syntax_error() {
         let error = Document::parse("K = 1;\n").unwrap_err();
-        assert!(
-            matches!(
-                error,
-                EdsError::Syntax {
-                    line: 1,
-                    column: 1,
-                    ..
-                }
-            ),
-            "{error:?}"
-        );
+        assert_eq!(error.entry, "line 1, column 1");
     }
 
     #[test]
     fn nested_fields_are_not_supported() {
         let error = Document::parse("[S]\nK = { 1, 2 };\n").unwrap_err();
-        assert!(
-            matches!(error, EdsError::Syntax { line: 2, .. }),
-            "{error:?}"
-        );
+        assert!(error.entry.starts_with("line 2,"), "{error}");
     }
 }

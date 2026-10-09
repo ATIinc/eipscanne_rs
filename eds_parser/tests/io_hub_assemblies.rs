@@ -1,9 +1,8 @@
-//! The hand-written IO-HUB-4-E assemblies of `scanner/assemblies/` checked against the hub's own
-//! EDS, which stays local:
+//! The hand-written IO-HUB-4-E assemblies of `scanner/assemblies/` against the hub's own EDS, which
+//! stays local:
 //! `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`
 
 use eds_parser::Eds;
-use eds_parser::check::check_assembly;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -12,8 +11,8 @@ mod assemblies {
     pub mod io_hub;
 }
 
-use assemblies::io_hub::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E};
-use assemblies::io_hub::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyHub4E};
+use assemblies::io_hub::input::INPUT_ASSEMBLY_INSTANCE;
+use assemblies::io_hub::output::OUTPUT_ASSEMBLY_INSTANCE;
 
 fn local_eds() -> Eds {
     let path = std::env::var("EDS_FILE").expect("EDS_FILE names the file to read");
@@ -26,34 +25,12 @@ fn local_eds() -> Eds {
 
 #[test]
 #[ignore = "needs the IO-HUB-4-E EDS file named by the EDS_FILE environment variable"]
-fn the_io_hub_assemblies_match_the_hubs_eds() {
+fn the_io_hub_assembly_instances_match_the_hubs_eds() {
     let eds = local_eds();
     let connection = eds.first_exclusive_owner_connection().unwrap();
-    let inputs = eds
-        .assembly(connection.t2o.format.as_deref().unwrap())
-        .unwrap();
-    let outputs = eds
-        .assembly(connection.o2t.format.as_deref().unwrap())
-        .unwrap();
+    let inputs = connection.t2o.assembly.as_ref().unwrap();
+    let outputs = connection.o2t.assembly.as_ref().unwrap();
 
     assert_eq!(inputs.instance(), Some(INPUT_ASSEMBLY_INSTANCE.into()));
     assert_eq!(outputs.instance(), Some(OUTPUT_ASSEMBLY_INSTANCE.into()));
-
-    // Members the structs cannot be probed on (the I/O mode nibbles are an enum) are listed
-    // when the test runs with --nocapture
-    let mut mismatches = Vec::new();
-    for (assembly, result) in [
-        (inputs, check_assembly::<InputAssemblyHub4E>(inputs)),
-        (outputs, check_assembly::<OutputAssemblyHub4E>(outputs)),
-    ] {
-        match result {
-            Ok(not_checked) => {
-                for finding in not_checked {
-                    println!("{}: {finding}", assembly.keyword);
-                }
-            }
-            Err(mismatch) => mismatches.push(mismatch.to_string()),
-        }
-    }
-    assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }

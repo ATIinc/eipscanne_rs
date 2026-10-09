@@ -1,13 +1,13 @@
 //! Prints the layout of the assemblies an EDS file describes: one line per member with its byte
 //! offset, size, type and param, and the bit or value names under it. A device's assembly
-//! structs (`scanner/assemblies/`) are written from this, by hand or by handing it to Claude, and
-//! then checked against the same file with `eds_parser::check_assembly`.
+//! structs (`scanner/assemblies/`) are written from this, by hand or by handing it to Claude.
 //!
 //! `cargo run --example eds-assemblies -- --eds docs/IO-HUB-4-E_EDS_File.eds --assembly Assem100`
 
 use clap::Parser;
 
 use eds_parser::Eds;
+use eds_parser::assembly::Assembly;
 
 /// Prints the layout of an EDS file's assemblies
 #[derive(Parser)]
@@ -37,13 +37,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Which assembly each connection carries, so the right ones get written
+    let keyword = |assembly: &Option<Assembly>| match assembly {
+        Some(assembly) => assembly.keyword.clone(),
+        None => "(no format)".to_string(),
+    };
     for connection in &eds.connections {
         println!(
             "{} \"{}\": O->T {}, T->O {}",
             connection.keyword,
             connection.name,
-            connection.o2t.format.as_deref().unwrap_or("(no format)"),
-            connection.t2o.format.as_deref().unwrap_or("(no format)")
+            keyword(&connection.o2t.assembly),
+            keyword(&connection.t2o.assembly)
         );
     }
     for assembly in &eds.assemblies {

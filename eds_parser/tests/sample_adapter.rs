@@ -6,6 +6,7 @@ use hex_test_macros::prelude::*;
 
 use bilge::prelude::u4;
 
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionTimeoutMultiplier, NetworkConnectionParameters, PriorityTimeTick,
     RealTimeFormat,
@@ -16,28 +17,36 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use eds_parser::Eds;
-use eds_parser::check::{Finding, check_assembly};
-use eds_parser::error::BridgeError;
-use eds_parser::to_forward_open::{OriginatorSettings, to_forward_open};
+use eds_parser::connection::Connection;
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
 
-/// The originator of the library's Forward_Open test
-fn originator() -> OriginatorSettings {
-    OriginatorSettings {
+/// The connection's Forward_Open, from the originator of the library's Forward_Open test
+fn request(connection: &Connection) -> ForwardOpenRequest {
+    ForwardOpenRequest {
         priority_time_tick: PriorityTimeTick::builder()
             .tick_time(u4::new(10))
             .priority(false)
             .build(),
         timeout_ticks: 5,
-        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_network_connection_id: 0,
         t2o_network_connection_id: 0x1234_5678,
         connection_triad: ConnectionTriad {
             connection_serial_number: 0x0001,
             originator_vendor_id: 342,
             originator_serial_number: 0x0001_2345,
         },
-        large_forward_open: false,
+        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_requested_packet_interval: connection.o2t_requested_packet_interval().unwrap(),
+        o2t_network_connection_parameters: connection
+            .o2t_network_connection_parameters(false)
+            .unwrap(),
+        t2o_requested_packet_interval: connection.t2o_requested_packet_interval().unwrap(),
+        t2o_network_connection_parameters: connection
+            .t2o_network_connection_parameters(false)
+            .unwrap(),
+        transport_type_trigger: connection.transport_type_trigger().unwrap(),
+        connection_path: connection.connection_path().unwrap(),
     }
 }
 
@@ -58,11 +67,6 @@ fn the_fixture_parses_with_its_references_resolved() {
     );
     assert_eq!(connection.o2t.size, 32, "from Param3");
     assert_eq!(connection.t2o.size, 32, "from Assem100");
-    assert_eq!(connection.configuration.target_size, Some(0));
-    assert_eq!(
-        connection.configuration.target_format.as_deref(),
-        Some("Assem151")
-    );
     assert_eq!(
         connection.path,
         vec![0x20, 0x04, 0x24, 0x97, 0x2C, 0x96, 0x2C, 0x64],
@@ -71,29 +75,6 @@ fn the_fixture_parses_with_its_references_resolved() {
 
     assert_eq!(eds.first_exclusive_owner_connection(), Some(connection));
     assert_eq!(eds.connection("connection2").unwrap().name, "Input Only");
-
-    // The document keeps everything, including what gets no typed view
-    assert_eq!(
-        eds.document
-            .section("TCP/IP Interface Class")
-            .unwrap()
-            .entry("MaxInst")
-            .unwrap()
-            .field(0)
-            .as_integer(),
-        Some(1)
-    );
-    assert!(
-        eds.document
-            .section("Device")
-            .unwrap()
-            .entry("IconContents")
-            .unwrap()
-            .field(0)
-            .as_text()
-            .unwrap()
-            .ends_with("AAA=")
-    );
 }
 
 #[test]
@@ -101,11 +82,14 @@ fn the_exclusive_owner_connection_builds_the_captured_forward_open() {
     let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
     let connection = eds.first_exclusive_owner_connection().unwrap();
 
-    let (request, o2t_real_time_format, t2o_real_time_format) =
-        to_forward_open(connection, originator()).unwrap();
-
-    assert_eq!(o2t_real_time_format, RealTimeFormat::Header32Bit);
-    assert_eq!(t2o_real_time_format, RealTimeFormat::Modeless);
+    assert_eq!(
+        connection.o2t_real_time_format(),
+        Ok(RealTimeFormat::Header32Bit)
+    );
+    assert_eq!(
+        connection.t2o_real_time_format(),
+        Ok(RealTimeFormat::Modeless)
+    );
 
     // The same bytes as the library's Forward_Open request test, where Wireshark's dissection
     // of them is documented
@@ -117,7 +101,7 @@ fn the_exclusive_owner_connection_builds_the_captured_forward_open() {
         0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f, 0x00, 0x26, 0x48, 0x40,
         0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
     ];
-    let packet = RequestObjectAssembly::new_forward_open(0x03, request);
+    let packet = RequestObjectAssembly::new_forward_open(0x03, request(connection));
     let mut bytes = std::io::Cursor::new(Vec::new());
     packet.write(&mut bytes).unwrap();
     let bytes = bytes.into_inner();
@@ -130,43 +114,10 @@ fn the_input_only_connection_is_refused() {
     let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
     let connection = eds.connection("Connection2").unwrap();
 
-    let error = to_forward_open(connection, originator()).unwrap_err();
+    let error = connection.transport_type_trigger().unwrap_err();
 
-    assert!(
-        matches!(&error, BridgeError::Unsupported { connection, what }
-            if connection == "Connection2" && what.contains("exclusive-owner")),
-        "{error}"
-    );
-}
-
-#[test]
-fn the_fixtures_assemblies_check_against_byte_arrays_of_their_size() {
-    let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
-    let connection = eds.first_exclusive_owner_connection().unwrap();
-    let inputs = eds
-        .assembly(connection.t2o.format.as_deref().unwrap())
-        .unwrap();
-    let outputs = eds
-        .assembly(connection.o2t.format.as_deref().unwrap())
-        .unwrap();
-
-    // Both are one 256-bit member without a param: only the size and coverage steps apply
-    assert_eq!(
-        (inputs.instance(), outputs.instance()),
-        (Some(100), Some(150))
-    );
-    assert_eq!(check_assembly::<[u8; 32]>(inputs), Ok(vec![]));
-    assert_eq!(check_assembly::<[u8; 32]>(outputs), Ok(vec![]));
-    assert_eq!(
-        check_assembly::<[u8; 31]>(inputs).unwrap_err().findings,
-        vec![
-            Finding::ReadSize { read: 31, size: 32 },
-            Finding::WriteSize {
-                written: 31,
-                size: 32
-            }
-        ]
-    );
+    assert_eq!(error.entry, "Connection2");
+    assert!(error.message.contains("exclusive-owner"), "{error}");
 }
 
 /// A device's own EDS: `EDS_FILE=docs/IO-HUB-4-E_EDS_File.eds cargo test -- --ignored`
@@ -183,8 +134,9 @@ fn a_local_eds_file_yields_the_expected_connection() {
 
     let eds = Eds::parse(&text).unwrap();
     let connection = eds.first_exclusive_owner_connection().unwrap();
-    let (request, o2t_real_time_format, t2o_real_time_format) =
-        to_forward_open(connection, originator()).unwrap();
+    let request = request(connection);
+    let o2t_real_time_format = connection.o2t_real_time_format().unwrap();
+    let t2o_real_time_format = connection.t2o_real_time_format().unwrap();
 
     println!(
         "{}: {request:#?}, O->T {o2t_real_time_format:?}, T->O {t2o_real_time_format:?}",

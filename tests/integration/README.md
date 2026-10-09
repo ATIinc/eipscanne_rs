@@ -122,8 +122,8 @@ output packet.
    Forward Open), a Forward Close request and reply, then Unregister Session
 
 The same connection can be opened from an EDS file instead of flags. The `eds_parser` crate ships
-a fixture describing the OpENer connection:
+a fixture describing the OpENer connection, and the `eds-implicit-io` example uses it by default:
 
-* `cargo run --example eds-implicit-io -- --eds eds_parser/tests/fixtures/sample_adapter.eds --host 172.28.0.10 --run`
+* `cargo run --example eds-implicit-io`
 * Without `--run` the outputs are sent idle (run flag cleared); OpENer still echoes them. `--run`
   matches what `implicit-io` always does

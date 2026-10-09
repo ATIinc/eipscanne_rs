@@ -1,42 +1,40 @@
-//! Reads a device's EDS file and turns one of its connections into the Forward_Open the
-//! `scanner` crate sends. The code reads top to bottom in the order the work happens:
+//! Reads a device's EDS file and gives the fields of the Forward_Open that opens one of its
+//! connections from the `scanner` crate. The code reads top to bottom in the order the work
+//! happens:
 //!
 //! ```text
 //! Step  From                 To                                          Module
 //! ----  -------------------  ------------------------------------------  --------------------
 //! 1     the file's text      pest's parse tree                           eds.pest
-//! 2     the parse tree       Document: sections, entries, fields         document
-//! 3     the document         Param, Assembly, Connection (typed views    params, assembly,
+//! 2     the parse tree       sections, entries, fields                   document
+//! 3     the sections         Param, Assembly, Connection (typed views    params, assembly,
 //!                            with their references resolved)             connection
-//! 4     one Connection       ForwardOpenRequest + real-time formats      to_forward_open
+//! 4     one Connection       the Forward_Open fields and real-time       forward_open
+//!                            formats
 //! ```
 //!
-//! [`Eds::parse`] runs steps 1 to 3; [`to_forward_open`](to_forward_open::to_forward_open) is step 4. Nothing here touches
-//! the network: the `eds-implicit-io` example feeds the result to the scanner.
+//! [`Eds::parse`] runs steps 1 to 3. Nothing here touches the network: the `io-hub-implicit`
+//! example writes the `ForwardOpenRequest` from step 4 and hands it to the scanner.
 //!
-//! An [`Assembly`] also carries its members, the layout its `Display` prints. A caller's
-//! assembly struct is written from that layout and checked against it with
-//! [`check_assembly`](check::check_assembly), so the same struct decodes explicit replies and implicit inputs (the
-//! `io-hub-implicit` example).
+//! An [`Assembly`] also carries its members, the layout its `Display` prints: what a caller's
+//! assembly struct is written from (the `eds-assemblies` example).
 
 pub mod assembly;
-pub mod check;
 pub mod connection;
-pub mod document;
+pub(crate) mod document;
 pub mod error;
+pub mod forward_open;
 pub mod params;
-pub mod to_forward_open;
 
 use assembly::Assembly;
 use connection::Connection;
 use document::Document;
-use error::EdsError;
+use error::Result;
 use params::Param;
 
-/// An EDS file read into its document and typed sections
+/// An EDS file read into its typed sections
 #[derive(Debug, Clone, PartialEq)]
 pub struct Eds {
-    pub document: Document,
     pub params: Vec<Param>,
     pub assemblies: Vec<Assembly>,
     pub connections: Vec<Connection>,
@@ -46,13 +44,12 @@ pub struct Eds {
 
 impl Eds {
     /// Parses the text of an EDS file and resolves its params, assemblies and connections
-    pub fn parse(text: &str) -> Result<Eds, EdsError> {
+    pub fn parse(text: &str) -> Result<Eds> {
         let document = Document::parse(text)?;
         let params = Param::all(&document)?;
         let assemblies = Assembly::all(&document, &params)?;
         let connections = Connection::all(&document, &params, &assemblies)?;
         Ok(Eds {
-            document,
             params,
             assemblies,
             connections,
@@ -68,8 +65,7 @@ impl Eds {
         })
     }
 
-    /// The assembly with `keyword` (`Assem100`), case ignored: the layout of a connection
-    /// direction's `format`
+    /// The assembly with `keyword` (`Assem100`), case ignored
     pub fn assembly(&self, keyword: &str) -> Option<&Assembly> {
         self.assemblies
             .iter()
