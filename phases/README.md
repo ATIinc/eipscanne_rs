@@ -11,8 +11,7 @@ the only edit a later phase makes here is filling in its pull request number bel
 | 1 | [Explicit-messaging groundwork](01-explicit-messaging-groundwork.md) | #3 (`feat/SW-4573-1-explicit-groundwork`) |
 | 2 | [Connection Manager packets and class 1 I/O packets](02-connection-manager-packets.md) | #4 (`feat/SW-4573-2-connection-manager`) |
 | 3 | [`scanner` crate: open a connection and exchange I/O](03-scanner-crate.md) | #5 (`feat/SW-4573-4-utils-crate`) |
-| 4 | [EDS parser crate and `eds-implicit-io` example](04-eds-parser.md) | #7 (`feat/SW-4573-eds-parser`) |
-| 5 | [Device assemblies checked against the EDS](05-eds-assemblies.md) | #8 (`feat/SW-4573-eds-assemblies`) |
+| 4 | [EDS parser crate, `eds-implicit-io` and device assemblies](04-eds-parser.md) | #7 (`feat/SW-4573-eds-parser`) |
 
 ## How the stack works
 
@@ -24,8 +23,8 @@ the only edit a later phase makes here is filling in its pull request number bel
   goes into the lowest phase it is relevant to (a general Message Router addition goes into phase
   1 even when phase 2 needed it), and a later phase does not edit an earlier phase's new code: when
   it needs more from an earlier type, it adds a new item in its own files. The exception is a fix
-  that only that later phase's work could surface: the IO-HUB assembly types, found by checking
-  them against the EDS, are corrected in phase 5.
+  that only that later phase's work could surface: the IO-HUB assembly types, found by comparing
+  them with the EDS, are corrected in phase 4.
 * Every phase keeps `cargo fmt --check`, `cargo clippy --all-targets`, `cargo test --all` and
   `cargo test --examples` green (from phase 3 on, the workspace equivalents listed in that phase).
 
