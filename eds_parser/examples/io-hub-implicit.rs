@@ -214,8 +214,8 @@ async fn main() -> anyhow::Result<()> {
                 };
                 last_sequence_number = Some(address.encapsulation_sequence_number);
                 deadline = Instant::now() + timeout;
-                // Read from the wire, so the data is raw bytes; the same struct `io-hub-homing`
-                // reads with Get_Attribute_Single
+                // Read from the wire, so the data is raw bytes; the same struct
+                // `io-hub-explicit-homing` reads with Get_Attribute_Single
                 let CipDataOpt::Raw(data) = &inputs.data else {
                     continue;
                 };
