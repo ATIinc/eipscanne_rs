@@ -1,3 +1,11 @@
+//! Sets one digital output of a Teknic ClearLink over explicit messaging: write the configuration,
+//! read the output assembly, change the one output and write it back, then read the input
+//! assembly to check that the ClearLink drives the output as written and reports no overload.
+//!
+//! `cargo run --example clearlink-explicit-outputs -- --index 4 --on`
+
+use std::time::Duration;
+
 use clap::Parser;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -15,7 +23,11 @@ mod assemblies {
 }
 
 use assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+use assemblies::clearlink::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyObject};
 use assemblies::clearlink::output::{IOOutputData, OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject};
+
+/// How long the ClearLink gets to act on the written outputs before the inputs are read
+const SETTLE_TIME: Duration = Duration::from_millis(200);
 
 #[derive(Parser)]
 struct OutputValue {
@@ -59,8 +71,8 @@ struct CliArgs {
     #[arg(long, default_value = "172.31.19.10")]
     host: String,
 
-    /// The digital output to set
-    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..5))]
+    /// The digital output to set (0 = IO-0 ... 5 = IO-5)
+    #[arg(short, long, value_parser = clap::value_parser!(u8).range(0..6))]
     index: u8,
 
     #[command(flatten)]
@@ -71,7 +83,7 @@ struct CliArgs {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli_args = CliArgs::parse();
 
-    // The two assemblies this example talks to
+    // The three assemblies this example talks to
     let config_assembly = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         CONFIG_ASSEMBLY_INSTANCE,
@@ -80,6 +92,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output_assembly = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         OUTPUT_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
+    let input_assembly = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        INPUT_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
     );
 
@@ -127,6 +144,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cli_args.output_value,
     );
 
+    // The ClearLink drives the output when its value bit is set or its PWM duty cycle is not 0
+    let index = cli_args.index;
+    let io_output_data = &output_assembly_object.io_output_data;
+    let expected_driven = io_output_data.dop_pwm[usize::from(index)] != 0
+        || bit(u16::from(io_output_data.dop_value), index);
+
     println!("REQUESTING - SET digital output");
 
     let _set_digital_io_success_response = send_request(
@@ -139,6 +162,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
+    // ========= Check the output against the inputs ============
+    tokio::time::sleep(SETTLE_TIME).await;
+    println!("REQUESTING - GET inputs");
+
+    let input_assembly_reply = send_request(
+        &mut session,
+        input_assembly,
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
+
+    let inputs: InputAssemblyObject = decode_reply(&input_assembly_reply)?;
+
+    // DIP Status is set while IO-n is driven as an output, DOP Status while it is overloaded
+    let driven = bit(u16::from(inputs.io_input_data.dip_status), index);
+    let overloaded = bit(u16::from(inputs.io_input_data.dop_status), index);
+    println!("  IO-{index}: driven {driven} (expected {expected_driven}), overloaded {overloaded}");
+    // ^^^^^^^^^ Check the output against the inputs ^^^^^^^^^^^^
+
     // ========= UnRegister the session ============
     println!("REQUESTING - UN REGISTER session");
     session.unregister().await?;
@@ -146,7 +189,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("UN Registered the CIP session");
     // ^^^^^^^^^ UnRegister the session ^^^^^^^^^^^^
 
+    if driven != expected_driven || overloaded {
+        return Err(format!("IO-{index} does not read back as written").into());
+    }
+
     Ok(())
+}
+
+/// Bit `index` of a 16-bit field with one bit per connector
+fn bit(bits: u16, index: u8) -> bool {
+    (bits >> index) & 1 == 1
 }
 
 /// Turns the chosen output on or off, or sets its PWM duty cycle

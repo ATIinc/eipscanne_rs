@@ -3,14 +3,9 @@
 //! the inputs until the motor reports it has homed, then disable the motor again. The motor is
 //! disabled however the motion ends: homed, timed out, failed or stopped with Ctrl+C.
 //!
-//! `--repeat N` sends N homing commands back to back, each before the previous one has finished,
-//! which reproduces a firmware bug: depending on the version the motor cancels the active homing
-//! move, never asserts `has_homed`, or faults.
-//!
 //! This moves a real motor. `--host` has no default on purpose.
 //!
-//! `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0`
-//! `cargo run --example io-hub-homing -- --host 172.31.19.18 --motor 0 --repeat 4`
+//! `cargo run --example io-hub-explicit-homing -- --host 172.31.19.18 --motor 0`
 
 use std::time::{Duration, Instant};
 
@@ -50,15 +45,7 @@ struct Args {
     #[arg(long, default_value_t = 0, value_parser = clap::value_parser!(u8).range(0..4))]
     motor: u8,
 
-    /// Number of homing commands to send back to back; more than 1 reproduces the firmware bug
-    #[arg(long, default_value_t = 1, value_parser = clap::value_parser!(u32).range(1..))]
-    repeat: u32,
-
-    /// Pause between repeated homing commands, in milliseconds
-    #[arg(long, default_value_t = 10)]
-    delay_ms: u64,
-
-    /// How long to wait for the motor to home after the last command, in seconds
+    /// How long to wait for the motor to home after the command, in seconds
     #[arg(long, default_value_t = 10)]
     timeout_s: u64,
 }
@@ -141,8 +128,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
 
-        // ========= Send the homing command(s) ============
-        // The hub acts on a move when its move number changes, so each command takes the next one
+        // ========= Send the homing command ============
+        // The hub acts on a move when its move number changes, so the command takes the next one
         let reply = send_request(
             &mut session,
             input_assembly.clone(),
@@ -151,25 +138,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .await?;
         let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
-        let mut move_number = inputs.motor_input(args.motor).move_number_ack;
-        for i in 1..=args.repeat {
-            move_number = move_number.wrapping_add(1);
-            outputs
-                .motor_output_mut(args.motor)
-                .command_move(MoveType::HomingMove, move_number);
-            send_request(
-                &mut session,
-                output_assembly.clone(),
-                ServiceCode::SetAttributeSingle,
-                Some(Box::new(outputs.clone())),
-            )
-            .await?;
-            println!(
-                "REQUESTING - HOMING move {move_number} ({i}/{})",
-                args.repeat
-            );
-            tokio::time::sleep(Duration::from_millis(args.delay_ms)).await;
-        }
+        let move_number = inputs
+            .motor_input(args.motor)
+            .move_number_ack
+            .wrapping_add(1);
+        println!("REQUESTING - HOMING move {move_number}");
+        outputs
+            .motor_output_mut(args.motor)
+            .command_move(MoveType::HomingMove, move_number);
+        send_request(
+            &mut session,
+            output_assembly.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
 
         // ========= Wait for the motor to home ============
         let deadline = Instant::now() + Duration::from_secs(args.timeout_s);
@@ -190,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 break;
             }
             if Instant::now() >= deadline {
-                println!("NOT HOMED within {} s of the last command", args.timeout_s);
+                println!("NOT HOMED within {} s of the command", args.timeout_s);
                 break;
             }
             tokio::time::sleep(POLL_INTERVAL).await;
