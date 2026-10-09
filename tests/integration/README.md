@@ -8,6 +8,13 @@ The Dockerfile to built the OpENer Ethernet/IP Adapter has been updated to work 
 
 ## Running an Integration Test
 
+### Quick start
+
+On the host, `tests/integration/start-opener.sh` creates the network, builds the image and runs
+the adapter at `172.28.0.10` in the foreground (Ctrl+C stops it). The devcontainer's host
+networking reaches it through the network's bridge, so the examples run with their defaults, e.g.
+`cargo run --example implicit-io`. The steps below do the same by hand.
+
 ### Creating an Ethernet/IP Test Network
 
 1. Check that the network doesn't already exist
@@ -106,9 +113,9 @@ cyclic I/O with it and closes the connection again. OpENer copies the outputs it
 assembly 150 into the inputs it sends from assembly 100, so every input packet echoes the last
 output packet.
 
-1. Start the OpENer container as above. Class 1 I/O travels over UDP port 2222 in both directions,
-   so the scanner must be on the same Docker network as the adapter (or both on the host network);
-   publishing TCP 44818 alone is not enough
+1. Start the OpENer container (`start-opener.sh` or the steps above). Class 1 I/O travels over UDP
+   port 2222 in both directions, so the scanner must reach the adapter's network (the host network
+   does, through the bridge); publishing TCP 44818 alone is not enough
 1. Run the example with the adapter's address; the defaults (configuration assembly 151, output
    assembly 150, input assembly 100, 32 bytes each, a 1 s packet interval, 10 cycles) match the
    OpENer sample application
