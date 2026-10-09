@@ -1,19 +1,26 @@
+mod common;
+
 use std::vec;
 
 use binrw::{BinRead, BinWrite};
 
-use bilge::prelude::u3;
-
 use hex_test_macros::prelude::*;
 
+use eipscanne_rs::cip::object_ids::{
+    ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
+};
 use eipscanne_rs::cip::path::{
-    CipPath, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType, PathData, SegmentType,
+    CipPath, LogicalPathDefinition, LogicalPathSegment, LogicalSegmentFormat, LogicalSegmentType,
+    PathData, SegmentType,
 };
 use eipscanne_rs::cip::types::CipByte;
 
+use common::CLEARLINK_CONFIG_ASSEMBLY_INSTANCE;
+
 #[test]
 fn test_serialize_path_segment() {
-    let sample_path_segment_bits = LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, 0x01);
+    let sample_path_segment_bits =
+        LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, IDENTITY_CLASS_ID);
 
     let expected_bytes = vec![0x21, 0x0, 0x01, 0x0];
 
@@ -49,7 +56,10 @@ fn test_deserialize_path_segment() {
         deserialized_path.path_definition.logical_segment_format(),
         LogicalSegmentFormat::FormatAsU16
     );
-    assert_eq!(deserialized_path.data, PathData::FormatAsU16(0x04));
+    assert_eq!(
+        deserialized_path.data,
+        PathData::FormatAsU16(ASSEMBLY_CLASS_ID.into())
+    );
 }
 
 #[test]
@@ -75,7 +85,7 @@ fn test_serialize_cip_path() {
     */
     let expected_byte_array: Vec<CipByte> = vec![0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
-    let cip_path = CipPath::new(0x1, 0x1);
+    let cip_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
 
     let mut cip_path_bytes: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut cip_path_bytes);
@@ -114,7 +124,11 @@ fn test_serialize_cip_full_path() {
     */
     let expected_byte_array: Vec<CipByte> = vec![0x20, 0x04, 0x24, 0x96, 0x30, 0x03];
 
-    let cip_full_path = CipPath::new_full(0x4, 0x96, 0x3);
+    let cip_full_path = CipPath::new_full(
+        ASSEMBLY_CLASS_ID,
+        CLEARLINK_CONFIG_ASSEMBLY_INSTANCE,
+        ASSEMBLY_DATA_ATTRIBUTE_ID,
+    );
 
     let mut cip_full_path_bytes: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut cip_full_path_bytes);
@@ -152,26 +166,25 @@ fn test_deserialize_cip_path() {
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let cip_path = CipPath::read(&mut buf_reader).unwrap();
+    let cip_path = CipPath::read_args(&mut buf_reader, (4,)).unwrap();
 
     // Assert equality
-    assert_eq!(cip_path.class_id_segment.data, PathData::FormatAsU16(0x1));
+    assert_eq!(cip_path.segments.len(), 2);
+
+    let class_segment = &cip_path.segments[0];
+    assert_eq!(class_segment.data, PathData::FormatAsU16(IDENTITY_CLASS_ID));
     assert_eq!(
-        cip_path
-            .class_id_segment
-            .path_definition
-            .logical_segment_type(),
+        class_segment.path_definition.logical_segment_type(),
         LogicalSegmentType::ClassId
     );
+
+    let instance_segment = &cip_path.segments[1];
     assert_eq!(
-        cip_path.instance_id_segment.data,
-        PathData::FormatAsU16(0x1)
+        instance_segment.data,
+        PathData::FormatAsU16(IDENTITY_INSTANCE_ID)
     );
     assert_eq!(
-        cip_path
-            .instance_id_segment
-            .path_definition
-            .logical_segment_type(),
+        instance_segment.path_definition.logical_segment_type(),
         LogicalSegmentType::InstanceId
     );
 }
@@ -199,42 +212,28 @@ fn test_deserialize_unknown_cip_path() {
     */
     let raw_bytes: Vec<CipByte> = vec![0b10011001, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
+    // Assert equality
+    let path_definition = LogicalPathDefinition::from(raw_bytes[0]);
+    assert_eq!(path_definition.segment_type(), SegmentType::DataSegment);
+    assert_eq!(
+        path_definition.logical_segment_type(),
+        LogicalSegmentType::ServiceId
+    );
+    assert_eq!(
+        path_definition.logical_segment_format(),
+        LogicalSegmentFormat::FormatAsU16
+    );
+
     let byte_cursor = std::io::Cursor::new(raw_bytes);
     let mut buf_reader = std::io::BufReader::new(byte_cursor);
 
     // Read from buffered reader
-    let cip_path = CipPath::read(&mut buf_reader).unwrap();
-
-    // Assert equality
-    assert_eq!(
-        cip_path.class_id_segment.path_definition.segment_type(),
-        SegmentType::Unknown(u3::new(0x4))
-    );
-
-    assert_eq!(cip_path.class_id_segment.data, PathData::FormatAsU16(0x1));
-    assert_eq!(
-        cip_path
-            .class_id_segment
-            .path_definition
-            .logical_segment_type(),
-        LogicalSegmentType::Unknown(u3::new(0x6))
-    );
-    assert_eq!(
-        cip_path.instance_id_segment.data,
-        PathData::FormatAsU16(0x1)
-    );
-    assert_eq!(
-        cip_path
-            .instance_id_segment
-            .path_definition
-            .logical_segment_type(),
-        LogicalSegmentType::InstanceId
-    );
+    assert!(CipPath::read_args(&mut buf_reader, (4,)).is_err());
 }
 
 #[test]
 fn test_path_byte_size() {
-    let cip_path = CipPath::new(0x1, 0x1);
+    let cip_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
 
     let mut cip_path_buffer = Vec::new();
     let mut cip_path_writer = std::io::Cursor::new(&mut cip_path_buffer);

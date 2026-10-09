@@ -1,8 +1,10 @@
-use binrw::{binrw, BinRead, BinWrite};
+use binrw::{BinRead, BinWrite, binrw};
 
-use bilge::prelude::{bitsize, DebugBits, FromBits, Number};
-use bilge::Bitsized;
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u26};
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipDword, CipSint, CipUdint, CipUint, CipUsint};
+
+/// Assembly instance holding the ClearLink configuration
+pub const CONFIG_ASSEMBLY_INSTANCE: u8 = 0x96;
 
 #[binrw]
 #[brw(little)]
@@ -121,7 +123,7 @@ impl EncoderConfigData {
 // ^^^^^^^ End of EncoderConfigData impl ^^^^^^^^
 
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct ConfigRegisterData {
@@ -131,7 +133,7 @@ pub struct ConfigRegisterData {
     hlfb_inversion: bool,                // bit = 3, // NOTE: The default if HIGH
     position_capture_active_level: bool, // bit = 4,
     software_limit_enable: bool,         // bit = 5,
-    _padding: [bool; 26],                // bits 6-31
+    reserved: u26,                       // bits 6-31
 }
 #[binrw]
 #[brw(little)]
@@ -158,7 +160,14 @@ pub struct MotorConfigData {
 impl MotorConfigData {
     fn default() -> Self {
         Self {
-            config_register: ConfigRegisterData::new(false, false, false, true, false, false),
+            config_register: ConfigRegisterData::builder()
+                .homing_enable(false)
+                .home_sensor_active_level(false)
+                .enable_inversion(false)
+                .hlfb_inversion(true)
+                .position_capture_active_level(false)
+                .software_limit_enable(false)
+                .build(),
             follow_divisor: 1,
             follow_multiplier: 1,
             max_deceleration: 10000000,
@@ -243,7 +252,7 @@ impl ConfigAssemblyObject {
 mod tests {
     use std::vec;
 
-    use binrw::{BinRead, BinWrite};
+    use binrw::BinWrite;
 
     use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
     use hex_test_macros::prelude::*;
@@ -257,11 +266,20 @@ mod tests {
     use eipscanne_rs::eip::command::{
         CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
     };
-    use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
-    use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+    use eipscanne_rs::eip::packet::EncapsulationHeader;
     use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
-    use crate::clearlink_config::ConfigAssemblyObject;
+    use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
+    use eipscanne_rs::cip::types::CipUdint;
+    use eipscanne_rs::eip::constants::{
+        CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+        NO_ENCAPSULATION_TIMEOUT,
+    };
+
+    use crate::clearlink_config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
+
+    /// Session handle of the captures below
+    const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;
 
     #[test]
     fn test_write_clearlink_config_assembly_object() {
@@ -339,21 +357,24 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
         ];
 
-        let provided_session_handle = 0x3;
+        let provided_session_handle = CAPTURE_SESSION_HANDLE;
 
         let set_clearlink_config_message = MessageRouterRequest::new_data(
             ServiceCode::SetAttributeSingle,
-            CipPath::new_full(0x4, 0x96, 0x3),
+            CipPath::new_full(
+                ASSEMBLY_CLASS_ID,
+                CONFIG_ASSEMBLY_INSTANCE,
+                ASSEMBLY_DATA_ATTRIBUTE_ID,
+            ),
             Some(Box::new(ConfigAssemblyObject::default())),
         );
 
-        let set_clearlink_config_object = eipscanne_rs::object_assembly::RequestObjectAssembly {
-            packet_description: EnIpPacketDescription::new_cip_description(
+        let set_clearlink_config_object =
+            eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
                 provided_session_handle,
-                0,
-            ),
-            cip_message: Some(set_clearlink_config_message),
-        };
+                NO_ENCAPSULATION_TIMEOUT,
+                set_clearlink_config_message,
+            );
 
         // Write the object_assembly binary data to the buffer
         let mut byte_array_buffer: Vec<u8> = Vec::new();
@@ -414,36 +435,29 @@ mod tests {
         ];
 
         let expected_set_config_assembly_response = ResponseObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(20),
-                    session_handle: 0x3,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x0; 8],
-                    options: 0x0,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
-                    interface_handle: 0x0,
-                    timeout: 0,
-                    empty_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::NullAddr,
-                        packet_length: Some(0),
-                    },
-                    unconnected_data_packet: CommonPacketDescriptor {
-                        type_id: CommonPacketItemId::UnconnectedMessage,
-                        packet_length: Some(4),
-                    },
-                }),
+            header: EncapsulationHeader {
+                command: EnIpCommand::SendRrData,
+                length: Some(20),
+                session_handle: CAPTURE_SESSION_HANDLE,
+                status_code: EncapsStatusCode::Success,
+                sender_context: EMPTY_SENDER_CONTEXT,
+                options: DEFAULT_ENCAPSULATION_OPTIONS,
             },
-            cip_message: Some(MessageRouterResponse {
-                service_container: ServiceContainer::new(ServiceCode::SetAttributeSingle, true),
-                response_data: ResponseData {
-                    status: ResponseStatusCode::Success,
-                    additional_status_size: 0,
-                    data: CipDataOpt::Raw(vec![]),
+            command_specific_data: CommandSpecificData::SendRrData(RRPacketData::new_unconnected(
+                CIP_INTERFACE_HANDLE,
+                NO_ENCAPSULATION_TIMEOUT,
+                MessageRouterResponse {
+                    service_container: ServiceContainer::new_response(
+                        ServiceCode::SetAttributeSingle,
+                    ),
+                    response_data: ResponseData {
+                        status: ResponseStatusCode::Success,
+                        additional_status_size: 0,
+                        additional_status: vec![],
+                        data: CipDataOpt::Raw(vec![]),
+                    },
                 },
-            }),
+            )),
         };
 
         let byte_cursor = std::io::Cursor::new(raw_bytes);

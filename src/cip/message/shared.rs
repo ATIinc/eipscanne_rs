@@ -2,18 +2,19 @@ use std::mem;
 
 use binrw::{BinRead, BinWrite};
 
-use bilge::prelude::{bitsize, u7, Bitsized, DebugBits, FromBits, Number};
+use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u7};
 
 use crate::cip::types::CipUsint;
 
-pub const BYTES_IN_A_WORD: u16 = 2;
-pub const SIZE_OF_CIP_USINT: usize = mem::size_of::<CipUsint>();
-pub const SIZE_OF_SERVICE_CONTAINER: usize = mem::size_of::<ServiceContainer>();
+pub(crate) const BYTES_IN_A_WORD: u16 = 2;
+pub(crate) const SIZE_OF_CIP_USINT: usize = mem::size_of::<CipUsint>();
+pub(crate) const SIZE_OF_SERVICE_CONTAINER: usize = mem::size_of::<ServiceContainer>();
 
 #[bitsize(7)]
-#[derive(FromBits, PartialEq, Debug)]
+#[derive(FromBits, PartialEq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
 pub enum ServiceCode {
+    #[default]
     None = 0x00,
     /* Start CIP common services */
     GetAttributeAll = 0x01,
@@ -40,18 +41,51 @@ pub enum ServiceCode {
     RemoveMember = 0x1B,
     GroupSync = 0x1C, /* End CIP common services */
 
+    /* Start Connection Manager object specific services */
+    ForwardClose = 0x4E,
+    UnconnectedSend = 0x52,
+    ForwardOpen = 0x54,
+    GetConnectionData = 0x56,
+    SearchConnectionData = 0x57,
+    GetConnectionOwner = 0x5A,
+    LargeForwardOpen = 0x5B, /* End Connection Manager object specific services */
+
     #[fallback]
     Unknown(u7),
 }
 
 #[bitsize(8)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(
+    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
+)]
 #[br(map = u8::into)]
 #[bw(map = |&x| u8::from(x))]
 pub struct ServiceContainer {
     pub service: ServiceCode,
     pub response: bool,
 }
+
+// ======= Start of ServiceContainer impl ========
+
+impl ServiceContainer {
+    /// The service byte of a request
+    pub fn new_request(service: ServiceCode) -> Self {
+        ServiceContainer::builder()
+            .service(service)
+            .response(false)
+            .build()
+    }
+
+    /// The service byte of a response (request bit set)
+    pub fn new_response(service: ServiceCode) -> Self {
+        ServiceContainer::builder()
+            .service(service)
+            .response(true)
+            .build()
+    }
+}
+
+// ^^^^^^^^ End of ServiceContainer impl ^^^^^^^^
 
 // NOTE:
 //  - Keeping a generic MessageRouter struct here for future reference

@@ -1,20 +1,16 @@
 [package]
 name = "eipscanne_rs"
-version = "0.1.0"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
-bilge = "0.2.0"
+bilge = "0.5.0"
 binrw = "0.15.2"
 hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
 
 [dev-dependencies]
 # Not actually a dependency of the package, just used for testing the examples
-clap = { version = "4.5.27", features = ["derive"] }
-tokio = { version = "1.43.1", features = ["full"] }
+clap = { version = "4.6.7", features = ["derive"] }
+tokio = { version = "1.53.2", features = ["full"] }
 pretty_assertions = "1.4.1"
-
-[features]
-default = []            # Comment to enable async support
-# default = ["async"]   # UN-Comment to enable async support for testing
-async = []
