@@ -102,6 +102,8 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 * `Error`:
   * `Io(std::io::Error)`, `Parse(binrw::Error)` (a packet or a caller's assembly did not encode
     or decode);
+  * `Timeout { waiting_for, after }`: the adapter did not accept the connection or answer a
+    request in time;
   * `EncapsulationStatus(EncapsStatusCode)`: an encapsulation status other than success;
   * `NotIpv4(IpAddr)`: the adapter's address is not IPv4, which is all I/O connections support;
   * `Rejected(Rejection)`: the adapter refused the request;
@@ -123,10 +125,12 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
 * `Session { stream: TcpStream, session_handle: CipUdint, peer_ip: Ipv4Addr }`, fields private.
 * `Session::register(address: impl ToSocketAddrs) -> Result<Session>`: connect, send
   RegisterSession, keep the handle from the reply. `Error::NotIpv4` when the adapter's address is
-  not IPv4.
+  not IPv4, `Error::Timeout` when the connection is not accepted within `CONNECT_TIMEOUT` (5 s), so
+  a wrong or unreachable address fails instead of hanging until the operating system gives up.
 * `send(&EnIpPacket)`, `read_reply() -> Result<EnIpPacket>`: a reply is read as the 24-byte
   encapsulation header followed by exactly `length` bytes, and an encapsulation status other than
-  success is `Error::EncapsulationStatus`.
+  success is `Error::EncapsulationStatus`. A reply not complete within `REPLY_TIMEOUT` (5 s) is
+  `Error::Timeout`, after which the session is unusable (part of the packet may have been read).
 * `request(&EnIpPacket) -> Result<EnIpPacket>`: `send`, `read_reply`, then `Error::NoResponse`
   without a Message Router response, `Error::UnexpectedReply` when the reply answers another
   service than the request, and `Error::Rejected` when `Rejection::from_response` finds a
@@ -254,8 +258,11 @@ input instances, sizes, RPI, cycle count, `--large`. Defaults match the OpENer s
 hardware it moves, how the examples include the assemblies, and a walkthrough of each, the
 implicit I/O one stage by stage. `tests/integration/README.md` has the OpENer steps for
 `implicit-io`, and `tests/integration/start-opener.sh` runs them on the host: it creates the
-`eip-network` network when missing, builds the `eip-adapter` image and runs the adapter at
-`172.28.0.10` in the foreground.
+`eip-network` network when missing (a fixed address needs a user-defined network), builds the
+`eip-adapter` image and runs the adapter at `172.28.0.10` in the foreground, with no port
+published since the devcontainer's host networking reaches the network's bridge. Every example
+that can talk to OpENer (`read-identity`, `implicit-io`) defaults to `172.28.0.10`; the ClearLink
+and IO-HUB ones keep their own addresses.
 
 ## Limits
 
