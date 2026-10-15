@@ -5,8 +5,8 @@ encapsulation `session` (shared), `explicit` messaging (one request, one reply; 
 a class 3 connection), `implicit` messaging (a class 1 I/O connection: `connection` plus one
 submodule per direction) and the `connection_manager` both kinds of connection open and close
 through. `read-identity` and `clearlink-explicit-outputs` use `session` and `explicit`;
-`read-identity-connected` uses `connection_manager` and `explicit::connected`; `implicit-io` uses `session` and
-`implicit`.
+`read-identity-connected` uses `connection_manager` and `explicit::connected`; `implicit-io` and
+`flexi-net-implicit` use `session` and `implicit`.
 
 ## Run Examples
 
@@ -22,6 +22,7 @@ lists the scanner among the workspace's default members, so no `-p scanner` is n
 | `clearlink-explicit-outputs` | Teknic ClearLink | explicit | digital outputs |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
+| `flexi-net-implicit` | SICK flexi-net | implicit | inputs of the safety logic |
 
 Every example is a single file. The device assemblies they use live outside the library in
 `scanner/assemblies/`: `clearlink.rs` (config, input, output) and `io_hub.rs` (input, output),
@@ -143,3 +144,22 @@ delay an output packet; the example keeps one loop to stay readable.
 
 Limits: one connection per host (only one socket can bind UDP 2222) and point-to-point in both
 directions (no multicast).
+
+### flexi-net-implicit
+
+The stages of `implicit-io` against a SICK flexi-net, with the device's connection fixed in
+constants: configuration assembly 1278 (no configuration data, so a 16-bit instance segment),
+outputs to connection point 151 and inputs from connection point 152, 4 data bytes each way, a
+run/idle header on the outputs only. The connection path has no electronic key. The outputs
+count slowly, with the run flag set: one byte at a time, byte `i` goes from `10 * i` to
+`10 * i + 10` and holds it while the next byte counts, one step every `--count-delay`, while
+packets keep going out every RPI. Every packet sent or received prints a line numbered by the
+packet count, and every step of the count prints a `COUNT` line. After the last count has been
+held for one delay, or on Ctrl+C, one packet sets every byte back to 0 (a `ZERO` line) and the
+connection closes. A longer test is a longer `--count-delay`.
+
+* `cargo run --example flexi-net-implicit -- --host 172.31.19.210`
+* `cargo run --example flexi-net-implicit -- --count-delay 3000`
+
+Flags: `--host` (`172.31.19.210` by default), `--rpi` (milliseconds, both directions, 20 by
+default), `--count-delay` (milliseconds, rounded up to whole RPIs, 1000 by default).
