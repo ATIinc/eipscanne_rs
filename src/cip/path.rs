@@ -9,10 +9,10 @@ use binrw::{
 };
 
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
-use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3};
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3, u7};
 
 use crate::cip::object_ids::ASSEMBLY_CLASS_ID;
-use crate::cip::types::CipUsint;
+use crate::cip::types::{CipByte, CipUint, CipUsint};
 
 const BYTES_PER_PATH_WORD: usize = 2;
 
@@ -66,40 +66,59 @@ pub struct LogicalPathDefinition {
     pub segment_type: SegmentType,
 }
 
-// NOTE: Could also investigate doing something that explicitly converts from and to a u32
-// #[bitsize(32)]
-// #[derive(DebugBits, FromBits, BinRead, BinWrite, PartialEq, Clone, Copy)]
-// #[br(map = u32::into)]
-// #[bw(map = |&x| u32::from(x))]
+impl LogicalPathDefinition {
+    /// Electronic Key Segment (0x34): the special logical type's first format
+    pub fn electronic_key() -> Self {
+        LogicalPathDefinition::builder()
+            .logical_segment_format(LogicalSegmentFormat::FormatAsU8)
+            .logical_segment_type(LogicalSegmentType::Special)
+            .segment_type(SegmentType::LogicalSegment)
+            .build()
+    }
+}
+
+/// Major Revision (bits 0-6) and Compatibility (bit 7) of an electronic key. With Compatibility
+/// clear the device must match the key exactly; set, it may accept any key it can emulate.
+#[bitsize(8, new = pub)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]
+#[br(map = CipByte::into)]
+#[bw(map = |&x| CipByte::from(x))]
+pub struct MajorRevisionCompatibility {
+    pub major_revision: u7,
+    pub compatibility: bool,
+}
+
+/// The data of an Electronic Key Segment: the device a connection path is meant for, checked
+/// against its Identity object before the connection opens.
+#[binrw]
+#[brw(little)]
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct ElectronicKey {
+    // Key Format 4, the only one defined
+    #[br(temp, assert(key_format == 4))]
+    #[bw(calc = 4)]
+    key_format: CipUsint,
+
+    pub vendor_id: CipUint,
+    pub device_type: CipUint,
+    pub product_code: CipUint,
+    pub major_revision_compatibility: MajorRevisionCompatibility,
+    pub minor_revision: CipUsint,
+}
 
 #[binrw]
 #[derive(Debug, PartialEq, Clone, Copy)]
-#[br(import(segment_format: LogicalSegmentFormat))]
+#[br(import(path_definition: LogicalPathDefinition))]
 pub enum PathData {
-    #[br(pre_assert(segment_format == LogicalSegmentFormat::FormatAsU8))]
-    FormatAsU8(u8),
+    // Order matters: the electronic key's segment byte has the 8-bit format bits so this must come first
+    #[br(pre_assert(path_definition == LogicalPathDefinition::electronic_key()))]
+    ElectronicKey(ElectronicKey),
 
-    #[br(pre_assert(segment_format == LogicalSegmentFormat::FormatAsU16))]
-    FormatAsU16(u16),
-}
+    #[br(pre_assert(path_definition.logical_segment_format() == LogicalSegmentFormat::FormatAsU8))]
+    FormatAsU8(CipUsint),
 
-impl Into<u16> for PathData {
-    /// Converts the path data to a u16, regardless of its underlying format.
-    fn into(self) -> u16 {
-        match self {
-            PathData::FormatAsU8(data) => data as u16,
-            PathData::FormatAsU16(data) => data,
-        }
-    }
-}
-
-impl<'a> Into<u16> for &'a PathData {
-    fn into(self) -> u16 {
-        match self {
-            PathData::FormatAsU8(data) => *data as u16,
-            PathData::FormatAsU16(data) => *data,
-        }
-    }
+    #[br(pre_assert(path_definition.logical_segment_format() == LogicalSegmentFormat::FormatAsU16))]
+    FormatAsU16(CipUint),
 }
 
 #[binrw]
@@ -113,7 +132,7 @@ pub struct LogicalPathSegment {
     #[br(if (path_definition.logical_segment_format() == LogicalSegmentFormat::FormatAsU16))]
     pub u16_padding: Option<u8>,
 
-    #[br(args(path_definition.logical_segment_format(),))]
+    #[br(args(path_definition,))]
     pub data: PathData,
 }
 
@@ -144,11 +163,21 @@ impl LogicalPathSegment {
         }
     }
 
+    /// Electronic Key Segment (0x34)
+    pub fn new_electronic_key(electronic_key: ElectronicKey) -> Self {
+        LogicalPathSegment {
+            path_definition: LogicalPathDefinition::electronic_key(),
+            u16_padding: None,
+            data: PathData::ElectronicKey(electronic_key),
+        }
+    }
+
     /// Number of bytes this segment occupies on the wire
     fn byte_len(&self) -> usize {
         match self.data {
             PathData::FormatAsU8(_) => 2,
             PathData::FormatAsU16(_) => 4,
+            PathData::ElectronicKey(_) => 10,
         }
     }
 }
@@ -182,8 +211,9 @@ fn parse_segments_until(word_len: u8) -> BinResult<Vec<LogicalPathSegment>> {
 /// A padded path made of logical segments (Request Path / Connection Path in Wireshark).
 ///
 /// Only logical segments are modelled: every path this library builds or parses consists of
-/// class, instance, attribute and connection point segments. Reading takes the path size in
-/// 16-bit words, which is how every packet carries it (Request Path Size, Connection Path Size).
+/// class, instance, attribute, connection point and electronic key segments. Reading takes the
+/// path size in 16-bit words, which is how every packet carries it (Request Path Size,
+/// Connection Path Size).
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -277,34 +307,6 @@ mod tests {
     use crate::cip::object_ids::{
         ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
     };
-
-    #[test]
-    fn test_path_data_into_u16_u8_variant() {
-        let data = PathData::FormatAsU8(42);
-        let value: u16 = data.into();
-        assert_eq!(value, 42u16);
-    }
-
-    #[test]
-    fn test_path_data_into_u16_u16_variant() {
-        let data = PathData::FormatAsU16(4242);
-        let value: u16 = data.into();
-        assert_eq!(value, 4242u16);
-    }
-
-    #[test]
-    fn test_path_data_ref_into_u16_u8_variant() {
-        let data = PathData::FormatAsU8(42);
-        let value: u16 = (&data).into();
-        assert_eq!(value, 42u16);
-    }
-
-    #[test]
-    fn test_path_data_ref_into_u16_u16_variant() {
-        let data = PathData::FormatAsU16(4242);
-        let value: u16 = (&data).into();
-        assert_eq!(value, 4242u16);
-    }
 
     #[test]
     fn test_cip_path_accessors_and_sizes() {

@@ -1,7 +1,7 @@
 //! Exchanges cyclic I/O with a SICK flexi-net over a class 1 connection, in the five stages of
 //! `implicit-io`. The connection is the device's: configuration assembly 1278 with no
 //! configuration data, outputs to connection point 151 and inputs from connection point 152, 4
-//! data bytes each way. The connection path carries no electronic key.
+//! data bytes each way. The connection path starts with the device's electronic key.
 //!
 //! The outputs count slowly so each value can be watched on the device: one byte at a time,
 //! byte `i` counts from `10 * i` to `10 * i + 10` and then holds it while the next byte counts,
@@ -22,16 +22,15 @@
 //! 151 and 152 are of the last kind: they exist only once the Safety Designer configuration
 //! defining them is on the device, with the sizes it gives them.
 //!
-//! The electronic key (vendor 808, device type 100, product code 11584, revision 1.1, the
-//! device's Identity object) is optional; with it in the path, a different device would refuse
-//! the connection.
+//! The electronic key (vendor 808, device type 100, product code 11584, revision 1.1) is the
+//! device's Identity object; a different device refuses the connection.
 //!
 //! `cargo run --example flexi-net-implicit -- --host 172.31.19.210`
 
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
-use bilge::prelude::{u4, u9};
+use bilge::prelude::{u4, u7, u9};
 use clap::Parser;
 use tokio::net::UdpSocket;
 
@@ -45,7 +44,10 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
-use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType};
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, MajorRevisionCompatibility,
+};
+use eipscanne_rs::cip::types::{CipUint, CipUsint};
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use scanner::connection_manager::forward_close;
@@ -66,6 +68,13 @@ const CONNECTION_SERIAL_NUMBER: u16 = 1;
 /// The connection ID the adapter puts on every input packet. On a point-to-point T->O
 /// connection the scanner picks it; any value works, and this one is easy to spot in a capture.
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
+
+/// The flexi-net's Identity object, which the electronic key must match exactly
+const VENDOR_ID: CipUint = 808;
+const DEVICE_TYPE: CipUint = 100;
+const PRODUCT_CODE: CipUint = 11584;
+const MAJOR_REVISION: CipUsint = 1;
+const MINOR_REVISION: CipUsint = 1;
 
 /// The flexi-net's assembly instances and data sizes, fixed by the device's connection
 const CONFIGURATION_INSTANCE: u16 = 1278;
@@ -146,6 +155,16 @@ impl Args {
             // The configuration instance is above 255, so it needs a 16-bit segment; the
             // connection points fit in 8 bits
             connection_path: CipPath::from_segments(vec![
+                LogicalPathSegment::new_electronic_key(ElectronicKey {
+                    vendor_id: VENDOR_ID,
+                    device_type: DEVICE_TYPE,
+                    product_code: PRODUCT_CODE,
+                    major_revision_compatibility: MajorRevisionCompatibility::builder()
+                        .major_revision(u7::new(MAJOR_REVISION))
+                        .compatibility(false)
+                        .build(),
+                    minor_revision: MINOR_REVISION,
+                }),
                 LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
                 LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, CONFIGURATION_INSTANCE),
                 LogicalPathSegment::new_u8(

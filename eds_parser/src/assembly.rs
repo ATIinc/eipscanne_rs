@@ -4,7 +4,7 @@
 
 use std::fmt;
 
-use eipscanne_rs::cip::path::LogicalSegmentType;
+use eipscanne_rs::cip::path::{LogicalSegmentType, PathData};
 
 use crate::connection::{read_path, resolve_path};
 use crate::document::{Document, Entry, Field};
@@ -108,7 +108,11 @@ impl Assembly {
             .find(|segment| {
                 segment.path_definition.logical_segment_type() == LogicalSegmentType::InstanceId
             })
-            .map(|segment| (&segment.data).into())
+            .and_then(|segment| match segment.data {
+                PathData::FormatAsU8(instance) => Some(instance.into()),
+                PathData::FormatAsU16(instance) => Some(instance),
+                PathData::ElectronicKey(_) => None,
+            })
     }
 }
 

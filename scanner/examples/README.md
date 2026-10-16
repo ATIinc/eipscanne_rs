@@ -150,7 +150,7 @@ directions (no multicast).
 The stages of `implicit-io` against a SICK flexi-net, with the device's connection fixed in
 constants: configuration assembly 1278 (no configuration data, so a 16-bit instance segment),
 outputs to connection point 151 and inputs from connection point 152, 4 data bytes each way, a
-run/idle header on the outputs only. The connection path has no electronic key. The outputs
+run/idle header on the outputs only. The connection path starts with the electronic key. The outputs
 count slowly, with the run flag set: one byte at a time, byte `i` goes from `10 * i` to
 `10 * i + 10` and holds it while the next byte counts, one step every `--count-delay`, while
 packets keep going out every RPI. Every packet sent or received prints a line numbered by the
