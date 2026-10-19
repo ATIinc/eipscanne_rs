@@ -8,6 +8,17 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 
 See the [examples](./examples/) directory for ideas on how to implement an Ethernet/IP Explicit Messaging Scanner
 
+## Reading PDF references
+
+Reference PDFs (e.g. protocol specifications) can be kept in the git-ignored [docs](./docs/) directory. The devcontainer installs `poppler-utils` for working with them:
+
+* `scripts/pdf-to-text.sh <input.pdf> [output.txt]` extracts the text layer into a text file with a `=====PAGE n=====` marker per page, which is easier to search with `grep` than the PDF itself. PDFs whose text is drawn with embedded glyph fonts are decoded through the fonts' Unicode tables; scanned PDFs only give text if they have an OCR layer.
+* `pdftoppm` also lets Claude Code render PDF pages directly, which helps with tables and diagrams that don't survive text extraction.
+
+## Implicit messaging
+
+The library also covers class 1 implicit messaging (cyclic I/O): Forward_Open and Forward_Close, and the I/O packets on UDP port 2222. Its plan and ground rules live in [phases/](./phases/).
+
 ## Related projects
 
 Other implementations that were reviewed while planning the implicit messaging work. None of their code is used here, but they are useful references and possible interoperability test targets:
