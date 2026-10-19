@@ -1,16 +1,28 @@
+mod common;
+
 use binrw::BinRead;
 
 use pretty_assertions::assert_eq;
 
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
 };
-use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
+    UNREGISTERED_SESSION_HANDLE,
+};
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_deserialize_cip_identity_request() {
@@ -80,26 +92,38 @@ fn test_deserialize_cip_identity_request() {
 
     let cip_identity_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
-    let expected_identity_packet =
-        RequestObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(26),
-                    session_handle: 0x06,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x00; 8],
-                    options: 0x00,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(
-                    RRPacketData::test_with_size(0x0, 0x0, Some(10)),
-                ),
+    let expected_identity_packet = RequestObjectAssembly {
+        header: EncapsulationHeader {
+            command: EnIpCommand::SendRrData,
+            length: Some(26),
+            session_handle: IDENTITY_SESSION_HANDLE,
+            status_code: EncapsStatusCode::Success,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
+        },
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
             },
-            cip_message: Some(MessageRouterRequest {
-                service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, false),
-                request_data: RequestData::new(Some(0x4), CipPath::new(0x1, 0x1), None),
-            }),
-        };
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(10),
+            },
+            cip_message: MessageRouterRequest {
+                service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
+                request_data: RequestData::new(
+                    Some(0x4),
+                    CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+                    None,
+                ),
+            }
+            .into(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
+        }),
+    };
 
     // Assert equality
     assert_eq!(expected_identity_packet, cip_identity_request);
@@ -138,21 +162,18 @@ fn test_deserialize_registration_request() {
     let registration_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
     let expected_identity_packet = RequestObjectAssembly {
-        packet_description: EnIpPacketDescription {
-            header: EncapsulationHeader {
-                command: EnIpCommand::RegisterSession,
-                length: Some(4),
-                session_handle: 0x00,
-                status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; 8],
-                options: 0x00,
-            },
-            command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0x00,
-            }),
+        header: EncapsulationHeader {
+            command: EnIpCommand::RegisterSession,
+            length: Some(4),
+            session_handle: UNREGISTERED_SESSION_HANDLE,
+            status_code: EncapsStatusCode::Success,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
         },
-        cip_message: None,
+        command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
+            protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
+            option_flags: REGISTER_SESSION_OPTION_FLAGS,
+        }),
     };
 
     assert_eq!(expected_identity_packet, registration_request);

@@ -1,13 +1,52 @@
+//! EtherNet/IP encapsulated packets.
+//!
+//! How a SendRRData packet, as Wireshark shows it, maps onto the Rust types:
+//!
+//! ```text
+//! Wireshark                                      Rust
+//! ---------------------------------------------  --------------------------------------------------
+//! EtherNet/IP (Industrial Protocol)              EnIpPacket
+//!     Encapsulation Header                         .header: EncapsulationHeader
+//!         Command                                    .command: EnIpCommand::SendRrData
+//!         Length                                     .length (computed on write when None)
+//!         Session Handle                             .session_handle
+//!         Status                                     .status_code
+//!         Sender Context                             .sender_context
+//!         Options                                    .options
+//!     Command Specific Data                        .command_specific_data: CommandSpecificData::SendRrData
+//!         Interface Handle                           .interface_handle
+//!         Timeout                                    .timeout
+//!         Item Count                                 (not stored: 2 + the Socket Address Info items)
+//!             Type ID: Null Address Item (0x0000)    .null_address_item.type_id
+//!                 Length                               .null_address_item.packet_length
+//!             Type ID: Unconnected Data Item (0x00b2)
+//!                                                    .unconnected_data_item.type_id
+//!                 Length                               .unconnected_data_item.packet_length
+//!                                                      (computed on write when None)
+//!             Type ID: Socket Address Info O->T (0x8000)
+//!                                                    .socket_addr_info_items.o2t: Some(SocketAddrInfo)
+//!             Type ID: Socket Address Info T->O (0x8001)
+//!                                                    .socket_addr_info_items.t2o: Some(SocketAddrInfo)
+//! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
+//! ```
+//!
+//! The one structural difference: Wireshark shows the CIP message as its own top-level tree, while
+//! here it is the data of the Unconnected Data Item, which is where its bytes are on the wire.
+//! Register Session and Unregister Session packets have no items; their command specific data is
+//! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or nothing.
+
 use binrw::meta::WriteEndian;
 use binrw::{
+    BinWrite, // trait for writing
     binread,
     binwrite,
-    BinWrite, // trait for writing
 };
 
+use crate::cip::message::CipMessage;
+use crate::cip::message::response::MessageRouterResponse;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, RegisterData};
+use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
 use super::constants as eip_constants;
 
 #[binwrite]
@@ -39,10 +78,12 @@ fn header_length_writer(obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()
 
 // ^^^^^^^^ End of EncapsulationHeader impl ^^^^^^^^
 
+/// A complete encapsulated packet: the encapsulation header followed by the command specific data
+/// (which, for SendRRData, carries the Common Packet Format items and with them the CIP message).
 #[binread]
 #[brw(little)]
 #[derive(Debug, PartialEq)]
-pub struct EnIpPacketDescription {
+pub struct EnIpPacket {
     pub header: EncapsulationHeader,
 
     #[br(args(header.command))]
@@ -50,99 +91,97 @@ pub struct EnIpPacketDescription {
     /* Passes the command field of the header to the command_specific_data field for binary reading */
 }
 
-// ======= Start of EnIpPacketDescription impl ========
+// ======= Start of EnIpPacket impl ========
 
-impl EnIpPacketDescription {
-    pub fn new(
+impl EnIpPacket {
+    fn new(
         command: EnIpCommand,
         session_handle: CipUdint,
         command_specific_data: CommandSpecificData,
     ) -> Self {
-        EnIpPacketDescription {
+        EnIpPacket {
             header: EncapsulationHeader {
                 command,
                 // will be calculated when serialized
                 length: None,
                 session_handle,
                 status_code: EncapsStatusCode::Success,
-                sender_context: [0x00; eip_constants::SENDER_CONTEXT_SIZE],
-                options: 0x00,
+                sender_context: eip_constants::EMPTY_SENDER_CONTEXT,
+                options: eip_constants::DEFAULT_ENCAPSULATION_OPTIONS,
             },
             command_specific_data,
         }
     }
 
-    pub fn new_registration_description() -> Self {
-        EnIpPacketDescription::new(
+    pub fn new_registration() -> Self {
+        EnIpPacket::new(
             EnIpCommand::RegisterSession,
-            0,
-            CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: 1,
-                option_flags: 0,
-            }),
+            eip_constants::UNREGISTERED_SESSION_HANDLE,
+            CommandSpecificData::new_registration(),
         )
     }
 
-    pub fn new_unregistration_description(session_handle: CipUdint) -> Self {
-        EnIpPacketDescription::new(
+    pub fn new_unregistration(session_handle: CipUdint) -> Self {
+        EnIpPacket::new(
             EnIpCommand::UnRegisterSession,
             session_handle,
             CommandSpecificData::UnregisterSession,
         )
     }
 
-    pub fn new_cip_description(session_handle: CipUdint, timeout: CipUint) -> Self {
-        EnIpPacketDescription::new(
+    /// A SendRRData packet carrying `message` as an unconnected message
+    pub fn new_send_rr_data(
+        session_handle: CipUdint,
+        timeout: CipUint,
+        message: impl Into<CipMessage>,
+    ) -> Self {
+        EnIpPacket::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::new_request(0, timeout),
+            CommandSpecificData::new_request(eip_constants::CIP_INTERFACE_HANDLE, timeout, message),
         )
+    }
+
+    /// The Message Router response carried by the packet, if it carries one
+    pub fn response(&self) -> Option<&MessageRouterResponse> {
+        match &self.command_specific_data.as_send_rr_data()?.cip_message {
+            CipMessage::Response(response) => Some(response),
+            CipMessage::Request(_) => None,
+        }
     }
 }
 
-impl WriteEndian for EnIpPacketDescription {
+impl WriteEndian for EnIpPacket {
     const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
 }
 
-impl BinWrite for EnIpPacketDescription {
-    // The EnIpPacketDescription is passed the packet_length
-    type Args<'a> = (u16,);
+impl BinWrite for EnIpPacket {
+    type Args<'a> = ();
 
     fn write_options<W: std::io::Write + std::io::Seek>(
         &self,
         writer: &mut W,
         endian: binrw::Endian,
-        args: Self::Args<'_>,
+        _args: Self::Args<'_>,
     ) -> binrw::BinResult<()> {
-        // Step 1: Serialize the `command_specific_data` field
-        let mut temp_buffer = Vec::new();
-        let mut temp_writer = std::io::Cursor::new(&mut temp_buffer);
+        // Step 1: Serialize the `command_specific_data` field, its size is the Length of the header
+        let mut command_specific_data_buffer = Vec::new();
+        self.command_specific_data.write_options(
+            &mut std::io::Cursor::new(&mut command_specific_data_buffer),
+            endian,
+            (),
+        )?;
 
-        let data_write_result =
-            self.command_specific_data
-                .write_options(&mut temp_writer, endian, args);
-
-        if let Err(write_err) = data_write_result {
-            return Err(write_err);
-        };
-
-        // Step 2: Calculate the total data size after header
-        let full_proceeding_data_length = (temp_buffer.len() as u16) + args.0;
-
-        // Step 3: Write the full struct to the actual writer
-        if let Err(write_err) =
-            self.header
-                .write_options(writer, endian, (full_proceeding_data_length,))
-        {
-            return Err(write_err);
-        }
-
-        if let Err(write_err) = writer.write(&temp_buffer) {
-            return Err(binrw::Error::Io(write_err));
-        }
+        // Step 2: Write the header with the length, then the command specific data
+        self.header.write_options(
+            writer,
+            endian,
+            (command_specific_data_buffer.len() as CipUint,),
+        )?;
+        writer.write_all(&command_specific_data_buffer)?;
 
         Ok(())
     }
 }
 
-// ^^^^^^^^ End of EnIpPacketDescription impl ^^^^^^^^
+// ^^^^^^^^ End of EnIpPacket impl ^^^^^^^^

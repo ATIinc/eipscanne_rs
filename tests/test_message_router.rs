@@ -1,3 +1,5 @@
+mod common;
+
 use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
@@ -9,14 +11,19 @@ use eipscanne_rs::cip::message::response::{
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
+use eipscanne_rs::cip::object_ids::{
+    ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
+};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
+
+use common::CLEARLINK_OUTPUT_ASSEMBLY_INSTANCE;
 
 #[test]
 fn test_serialize_service_container() {
     let expected_byte_array: Vec<CipByte> = vec![0x01];
 
-    let service_container_bits = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
+    let service_container_bits = ServiceContainer::new_request(ServiceCode::GetAttributeAll);
     let service_container = ServiceContainer::from(service_container_bits);
 
     let mut service_container_bytes: Vec<u8> = Vec::new();
@@ -29,7 +36,7 @@ fn test_serialize_service_container() {
 
 #[test]
 fn test_deserialize_request_service_container() {
-    let expected_service_container = ServiceContainer::new(ServiceCode::GetAttributeAll, false);
+    let expected_service_container = ServiceContainer::new_request(ServiceCode::GetAttributeAll);
 
     let raw_byte_array: Vec<CipByte> = vec![0x1];
 
@@ -44,7 +51,7 @@ fn test_deserialize_request_service_container() {
 
 #[test]
 fn test_deserialize_response_service_container() {
-    let expected_service_container = ServiceContainer::new(ServiceCode::Reset, true);
+    let expected_service_container = ServiceContainer::new_response(ServiceCode::Reset);
 
     let raw_byte_array: Vec<CipByte> = vec![0b10000101];
 
@@ -88,8 +95,10 @@ fn test_serialize_get_attributes_all_request() {
     let expected_byte_array: Vec<CipByte> =
         vec![0x01, 0x04, 0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
-    let message_router_request =
-        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+    let message_router_request = MessageRouterRequest::new(
+        ServiceCode::GetAttributeAll,
+        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+    );
 
     let mut message_router_bytes: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut message_router_bytes);
@@ -114,13 +123,13 @@ fn test_deserialize_empty_response() {
             .unwrap();
 
     let expected_message_router_response = MessageRouterResponse {
-        service_container: ServiceContainer::from(ServiceContainer::new(
+        service_container: ServiceContainer::from(ServiceContainer::new_response(
             ServiceCode::GetAttributeAll,
-            true,
         )),
         response_data: ResponseData {
             status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
+            additional_status: vec![],
             data: CipDataOpt::Raw(vec![]),
         },
     };
@@ -132,11 +141,14 @@ fn test_deserialize_empty_response() {
 #[test]
 fn test_message_cip_path_byte_size() {
     let message_router_request = MessageRouterRequest {
-        service_container: ServiceContainer::from(ServiceContainer::new(
+        service_container: ServiceContainer::from(ServiceContainer::new_request(
             ServiceCode::GetAttributeAll,
-            false,
         )),
-        request_data: RequestData::new(None, CipPath::new(0x1, 0x1), None),
+        request_data: RequestData::new(
+            None,
+            CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+            None,
+        ),
     };
 
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
@@ -149,8 +161,10 @@ fn test_message_cip_path_byte_size() {
 
 #[test]
 fn test_message_cip_path_request_byte_size() {
-    let message_router_request =
-        MessageRouterRequest::new(ServiceCode::GetAttributeAll, CipPath::new(0x1, 0x1));
+    let message_router_request = MessageRouterRequest::new(
+        ServiceCode::GetAttributeAll,
+        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+    );
 
     // Assert equality
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
@@ -197,7 +211,11 @@ fn test_message_cip_full_path_request_bytes() {
 
     let message_router_request = MessageRouterRequest::new(
         ServiceCode::GetAttributeSingle,
-        CipPath::new_full(0x4, 0x70, 0x3),
+        CipPath::new_full(
+            ASSEMBLY_CLASS_ID,
+            CLEARLINK_OUTPUT_ASSEMBLY_INSTANCE,
+            ASSEMBLY_DATA_ATTRIBUTE_ID,
+        ),
     );
 
     // Assert equality

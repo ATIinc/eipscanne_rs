@@ -1,6 +1,6 @@
-use binrw::{BinRead, BinWrite};
+mod common;
 
-use bilge::prelude::u4;
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
@@ -14,8 +14,16 @@ use eipscanne_rs::cip::types::{CipByte, CipShortString};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
-use eipscanne_rs::eip::packet::{EnIpPacketDescription, EncapsulationHeader};
+use eipscanne_rs::eip::constants::{
+    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
+    NO_ENCAPSULATION_TIMEOUT,
+};
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
+
+use common::IDENTITY_SESSION_HANDLE;
 
 #[test]
 fn test_deserialize_device_type() {
@@ -96,7 +104,7 @@ fn test_serialize_new_identity_request() {
     ];
 
     // create an empty packet
-    let identity_request_packet = RequestObjectAssembly::new_identity(0x6);
+    let identity_request_packet = RequestObjectAssembly::new_identity(IDENTITY_SESSION_HANDLE);
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
     let mut writer = std::io::Cursor::new(&mut identity_byte_array);
@@ -159,19 +167,7 @@ fn test_deserialize_just_cip_identity_response() {
             major: 2,
             minor: 93,
         },
-        status: IdentityStatusBits::new(
-            false,
-            false,
-            false,
-            false,
-            u4::new(0x0),
-            false,
-            false,
-            false,
-            false,
-            u4::new(0x0),
-        )
-        .into(),
+        status: IdentityStatusBits::default().into(),
         serial_number: 0x01ff3d32,
         product_name: CipShortString::from("ClearLink".to_string()),
     };
@@ -250,10 +246,11 @@ fn test_deserialize_cip_identity_response() {
             .unwrap();
 
     let expected_cip_identity_response = MessageRouterResponse {
-        service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true),
+        service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
         response_data: ResponseData {
             status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
+            additional_status: vec![],
             data: CipDataOpt::Typed(Box::new(IdentityResponse {
                 vendor_id: VendorId::TeknicInc,
                 device_type: DeviceType::GenericDevice,
@@ -262,19 +259,7 @@ fn test_deserialize_cip_identity_response() {
                     major: 2,
                     minor: 93,
                 },
-                status: IdentityStatusBits::new(
-                    false,
-                    false,
-                    false,
-                    false,
-                    u4::new(0x0),
-                    false,
-                    false,
-                    false,
-                    false,
-                    u4::new(0x0),
-                )
-                .into(),
+                status: IdentityStatusBits::default().into(),
                 serial_number: 0x01ff3d32,
                 product_name: CipShortString::from("ClearLink".to_string()),
             })),
@@ -382,26 +367,32 @@ fn test_deserialize_full_identity_response() {
 
     let identity_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
-    let expected_identity_response =
-        ResponseObjectAssembly {
-            packet_description: EnIpPacketDescription {
-                header: EncapsulationHeader {
-                    command: EnIpCommand::SendRrData,
-                    length: Some(44),
-                    session_handle: 0x06,
-                    status_code: EncapsStatusCode::Success,
-                    sender_context: [0x00; 8],
-                    options: 0x00,
-                },
-                command_specific_data: CommandSpecificData::SendRrData(
-                    RRPacketData::test_with_size(0x0, 0x0, Some(28)),
-                ),
+    let expected_identity_response = ResponseObjectAssembly {
+        header: EncapsulationHeader {
+            command: EnIpCommand::SendRrData,
+            length: Some(44),
+            session_handle: IDENTITY_SESSION_HANDLE,
+            status_code: EncapsStatusCode::Success,
+            sender_context: EMPTY_SENDER_CONTEXT,
+            options: DEFAULT_ENCAPSULATION_OPTIONS,
+        },
+        command_specific_data: CommandSpecificData::SendRrData(RRPacketData {
+            interface_handle: CIP_INTERFACE_HANDLE,
+            timeout: NO_ENCAPSULATION_TIMEOUT,
+            null_address_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::NullAddr,
+                packet_length: Some(0),
             },
-            cip_message: Some(MessageRouterResponse {
-                service_container: ServiceContainer::new(ServiceCode::GetAttributeAll, true).into(),
+            unconnected_data_item: CommonPacketDescriptor {
+                type_id: CommonPacketItemId::UnconnectedMessage,
+                packet_length: Some(28),
+            },
+            cip_message: MessageRouterResponse {
+                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0x0,
+                    additional_status: vec![],
                     data: CipDataOpt::Typed(Box::new(IdentityResponse {
                         vendor_id: VendorId::TeknicInc,
                         device_type: DeviceType::GenericDevice,
@@ -410,25 +401,16 @@ fn test_deserialize_full_identity_response() {
                             major: 2,
                             minor: 93,
                         },
-                        status: IdentityStatusBits::new(
-                            false,
-                            false,
-                            false,
-                            false,
-                            u4::new(0x0),
-                            false,
-                            false,
-                            false,
-                            false,
-                            u4::new(0x0),
-                        )
-                        .into(),
+                        status: IdentityStatusBits::default().into(),
                         serial_number: 0x01ff3d32,
                         product_name: CipShortString::from("ClearLink".to_string()),
                     })),
                 },
-            }),
-        };
+            }
+            .into(),
+            socket_addr_info_items: SocketAddrInfoItems::empty(),
+        }),
+    };
 
     // Assert equality
     assert_eq!(expected_identity_response, identity_response);
