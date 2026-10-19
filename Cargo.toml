@@ -1,3 +1,8 @@
+[workspace]
+members = ["hex_test_macros", "scanner"]
+# `cargo run --example`, `cargo test` and friends cover the library and the scanner without `-p`
+default-members = [".", "scanner"]
+
 [package]
 name = "eipscanne_rs"
 version = "0.3.0"
@@ -10,7 +15,4 @@ binrw = "0.15.2"
 hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
 
 [dev-dependencies]
-# Not actually a dependency of the package, just used for testing the examples
-clap = { version = "4.6.7", features = ["derive"] }
-tokio = { version = "1.53.2", features = ["full"] }
 pretty_assertions = "1.4.1"

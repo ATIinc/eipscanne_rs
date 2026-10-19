@@ -1,0 +1,19 @@
+[package]
+name = "scanner"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "The scanner side built on eipscanne_rs: sessions, explicit requests, class 1 I/O connections, and the examples"
+
+[dependencies]
+eipscanne_rs = { path = ".." }
+bilge = "0.5.0"
+binrw = "0.15.2"
+tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time", "signal"] }
+
+[dev-dependencies]
+# Used by the examples only
+clap = { version = "4.6.7", features = ["derive"] }
+rand = "0.9"
+hex-test-macros = { version = "0.1.0", path = "../hex_test_macros" }
+pretty_assertions = "1.4.1"

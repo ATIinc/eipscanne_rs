@@ -15,3 +15,12 @@ USER vscode
 
 # Claude Code CLI for terminal use (the VS Code extension bundles its own)
 RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# cargo tab completion. The stock script only globs `examples/*.rs` next to the root manifest, so it misses the
+# scanner's examples (a workspace member, with directory examples); ask cargo for the list instead
+RUN cat >> ~/.bashrc <<'BASHRC'
+
+# cargo tab completion, with example names taken from cargo (covers workspace members and directory examples)
+source "$(rustc --print sysroot)/etc/bash_completion.d/cargo"
+_get_examples() { cargo run --example 2>&1 | sed -n 's/^    //p'; }
+BASHRC
