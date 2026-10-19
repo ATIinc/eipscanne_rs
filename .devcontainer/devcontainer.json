@@ -1,29 +1,30 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/rust
 {
 	"name": "Rust",
-	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
-	"image": "mcr.microsoft.com/devcontainers/rust:2-trixie",
-	// Use 'mounts' to make the cargo cache persistent in a Docker Volume.
-	// "mounts": [
-	// 	{
-	// 		"source": "devcontainer-cargo-cache-${devcontainerId}",
-	// 		"target": "/usr/local/cargo",
-	// 		"type": "volume"
-	// 	}
-	// ]
-	// Features to add to the dev container. More info: https://containers.dev/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y iputils-ping",
-	// Configure tool-specific properties.
-	// "customizations": {},
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"initializeCommand": ".devcontainer/initializeHost.sh",
 	"runArgs": [
-		"--network=host"
-		// "--network=eip-scanner"
-	]
+		// Host network namespace, so EtherNet/IP devices on the host's networks are directly reachable
+		"--network=host",
+		// GH_TOKEN for gh (and git, via the host gitconfig's gh credential helper), see the DANGER note in initializeHost.sh
+		"--env-file",
+		"${localWorkspaceFolder}/.devcontainer/.env"
+	],
+	// Shared Claude Code config and auth (see CLAUDE_CONFIG_DIR in the Dockerfile)
+	"mounts": [
+		"type=bind,source=${localEnv:HOME}/.claude,target=/home/vscode/.claude"
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"anthropic.claude-code"
+			],
+			"settings": {
+				// With host networking, VS Code would try to auto-forward every port listening on the host (tailscaled,
+				// etc.), producing a stream of permission errors
+				"remote.autoForwardPorts": false
+			}
+		}
+	}
 }
