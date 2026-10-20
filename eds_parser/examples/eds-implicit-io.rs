@@ -15,8 +15,8 @@
 //! I/O travels over UDP 2222 in both directions, so the scanner must reach the adapter's Docker
 //! network; the devcontainer's host networking does (`tests/integration/README.md`).
 //!
-//! Another device: `--eds <its EDS file> --host <ip>`, plus `--connection <ConnectionN or name>`
-//! for a connection other than the first exclusive-owner one. The outputs are zeros, sent idle
+//! Another device: `--eds <its EDS file> --host <ip>`, plus `--connection <N>` to open
+//! `ConnectionN` instead of the first connection it can open. The outputs are zeros, sent idle
 //! (run flag cleared) unless `--run` is given, since an output assembly may drive real outputs.
 
 use std::time::{Duration, Instant};
@@ -40,6 +40,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
+use eds_parser::connection::Connection;
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -61,10 +62,9 @@ struct Args {
     #[arg(long, default_value = SAMPLE_ADAPTER_EDS)]
     eds: std::path::PathBuf,
 
-    /// The connection to open: its `ConnectionN` keyword or its name. Default: the first
-    /// exclusive-owner connection
+    /// The N of the `ConnectionN` to open. Default: the first connection this scanner can open
     #[arg(long)]
-    connection: Option<String>,
+    connection: Option<u32>,
 
     /// IP address of the adapter
     #[arg(long, default_value = "172.28.0.10")]
@@ -74,9 +74,10 @@ struct Args {
     #[arg(long, default_value_t = 10)]
     cycles: u32,
 
-    /// Open with a Large_Forward_Open (32-bit connection parameters)
+    /// `true`: open with a Large_Forward_Open (32-bit connection parameters); `false`: with a
+    /// Forward_Open. Default: a Large_Forward_Open only when a direction's size needs it
     #[arg(long)]
-    large: bool,
+    large: Option<bool>,
 
     /// Send the outputs with the run flag set instead of idle
     #[arg(long)]
@@ -90,13 +91,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= Read the EDS and pick the connection ============
     let text = std::fs::read_to_string(&args.eds)?;
     let eds = Eds::parse(&text)?;
-    let connection = match &args.connection {
-        Some(wanted) => eds
-            .connection(wanted)
-            .ok_or_else(|| format!("the EDS has no connection called {wanted}"))?,
-        None => eds
-            .first_exclusive_owner_connection()
-            .ok_or("the EDS offers no exclusive-owner connection")?,
+    let (number, connection): (u32, Connection) = match args.connection {
+        Some(number) => (number, eds.connection(number, args.large)?),
+        None => eds.first_connection(args.large)?,
     };
 
     let request = ForwardOpenRequest {
@@ -115,34 +112,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-        o2t_requested_packet_interval: connection.o2t_requested_packet_interval()?,
-        o2t_network_connection_parameters: connection
-            .o2t_network_connection_parameters(args.large)?,
-        t2o_requested_packet_interval: connection.t2o_requested_packet_interval()?,
-        t2o_network_connection_parameters: connection
-            .t2o_network_connection_parameters(args.large)?,
-        transport_type_trigger: connection.transport_type_trigger()?,
-        connection_path: connection.connection_path()?,
+        o2t_requested_packet_interval: connection.o2t_requested_packet_interval,
+        o2t_network_connection_parameters: connection.o2t_network_connection_parameters,
+        t2o_requested_packet_interval: connection.t2o_requested_packet_interval,
+        t2o_network_connection_parameters: connection.t2o_network_connection_parameters,
+        transport_type_trigger: connection.transport_type_trigger,
+        connection_path: connection.connection_path.clone(),
     };
-    let o2t_real_time_format = connection.o2t_real_time_format()?;
-    let t2o_real_time_format = connection.t2o_real_time_format()?;
+    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format;
+    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format;
 
     println!(
-        "{} ({}) from {}",
+        "Connection{number} ({}) from {}",
         connection.name,
-        connection.keyword,
         args.eds.display()
     );
-    println!("  path {}", hex(&connection.path));
-    println!(
-        "  O->T {} bytes every {} us, {o2t_real_time_format:?}",
-        connection.o2t.size, request.o2t_requested_packet_interval
-    );
-    println!(
-        "  T->O {} bytes every {} us, {t2o_real_time_format:?}",
-        connection.t2o.size, request.t2o_requested_packet_interval
-    );
-    println!("  {request:#?}");
+    println!("{connection:#?}");
 
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
     if !args.run && o2t_real_time_format != RealTimeFormat::Header32Bit {
@@ -160,7 +145,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The socket first: the adapter starts sending as soon as it has replied
     let socket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let outputs = vec![0u8; usize::from(connection.o2t.size)];
+    let outputs = vec![0u8; usize::from(connection.o2t_size)];
     let connection = forward_open(
         &mut session,
         request,

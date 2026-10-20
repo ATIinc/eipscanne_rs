@@ -24,6 +24,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 use scanner::error::Error;
@@ -85,10 +86,20 @@ async fn main() -> anyhow::Result<()> {
     // ========= Read the EDS and derive the connection ============
     let text = std::fs::read_to_string(&args.eds)
         .with_context(|| format!("reading {}", args.eds.display()))?;
-    let eds = Eds::parse(&text)?;
-    let connection: &Connection = eds
-        .first_exclusive_owner_connection()
-        .context("the EDS offers no exclusive-owner connection")?;
+    let (number, connection): (u32, Connection) = Eds::parse(&text)?.first_connection(None)?;
+
+    // The connection must carry the assemblies the structs are written for: configuration
+    // instance 1, then the output and input connection points
+    let expected_path =
+        CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE, INPUT_ASSEMBLY_INSTANCE);
+    if connection.connection_path != expected_path {
+        bail!(
+            "Connection{number} ({}) has the path {:?}, not the one the structs are written for: {expected_path:?}",
+            connection.name,
+            connection.connection_path
+        );
+    }
+
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
         priority_time_tick: PriorityTimeTick::builder()
@@ -105,35 +116,16 @@ async fn main() -> anyhow::Result<()> {
             originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-        o2t_requested_packet_interval: connection.o2t_requested_packet_interval()?,
-        o2t_network_connection_parameters: connection.o2t_network_connection_parameters(false)?,
-        t2o_requested_packet_interval: connection.t2o_requested_packet_interval()?,
-        t2o_network_connection_parameters: connection.t2o_network_connection_parameters(false)?,
-        transport_type_trigger: connection.transport_type_trigger()?,
-        connection_path: connection.connection_path()?,
+        o2t_requested_packet_interval: connection.o2t_requested_packet_interval,
+        o2t_network_connection_parameters: connection.o2t_network_connection_parameters,
+        t2o_requested_packet_interval: connection.t2o_requested_packet_interval,
+        t2o_network_connection_parameters: connection.t2o_network_connection_parameters,
+        transport_type_trigger: connection.transport_type_trigger,
+        connection_path: connection.connection_path.clone(),
     };
-    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
-    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
-    println!(
-        "{} ({}): path {}",
-        connection.name,
-        connection.keyword,
-        hex(&connection.path)
-    );
-
-    // The connection must carry the assemblies the structs are written for. The path ends with
-    // the two connection points: 2C <O->T> 2C <T->O>
-    if !connection.path.ends_with(&[
-        0x2C,
-        OUTPUT_ASSEMBLY_INSTANCE,
-        0x2C,
-        INPUT_ASSEMBLY_INSTANCE,
-    ]) {
-        bail!(
-            "the connection path {} does not end with the assemblies the structs are for ({OUTPUT_ASSEMBLY_INSTANCE} and {INPUT_ASSEMBLY_INSTANCE})",
-            hex(&connection.path)
-        );
-    }
+    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format;
+    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format;
+    println!("Connection{number} ({})", connection.name);
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
@@ -266,12 +258,4 @@ async fn main() -> anyhow::Result<()> {
     session.unregister().await?;
 
     Ok(())
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes
-        .iter()
-        .map(|byte| format!("{byte:02X}"))
-        .collect::<Vec<_>>()
-        .join(" ")
 }

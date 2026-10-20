@@ -4,14 +4,14 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "Reads an EtherNet/IP device's EDS file and turns one of its connections into a Forward_Open request"
+description = "Reads an EtherNet/IP device's EDS file and one of its connections into the values of a Forward_Open"
 
 [dependencies]
 eipscanne_rs = { path = ".." }
 bilge = "0.5.0"
 binrw = "0.15.2"
-pest = "2"
-pest_derive = "2"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_with = { version = "3.24.0", default-features = false, features = ["macros"] }
 
 [dev-dependencies]
 # Used by the examples, except hex-test-macros (tests)

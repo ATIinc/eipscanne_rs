@@ -71,6 +71,6 @@ the only edit a later phase makes here is filling in its pull request number bel
   directions, exclusive owner, 32-bit run/idle header on O->T data, `Forward_Close`.
 * Not planned: multicast, configuration data segments in the connection path, class 3 connected
   explicit messaging (`SendUnitData`). The types are left extensible for them.
-* The EDS parser is a separate workspace crate built on a `pest` grammar.
+* The EDS parser is a separate workspace crate; each kind of entry is a `serde` struct.
 * Existing Rust implementations were reviewed and not adopted; see "Related projects" in the
   top-level README.

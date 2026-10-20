@@ -2,16 +2,15 @@
 
 ## Goal
 
-Read a device's EDS file and give, for one of its connections, the fields of the Forward_Open and
-the two real-time formats that phase 3's `scanner::implicit::connection::forward_open` takes, and
-print the layout of its assemblies so the hand-written `binrw` assemblies of `scanner/assemblies/`
-can be written from it. The code reads top to bottom in the order the work happens: text →
-document → typed sections → Forward_Open fields.
+Read a device's EDS file into its params, assemblies and connections, and one connection into the
+values of the Forward_Open that opens it, in the `eipscanne_rs` types, plus the two real-time
+formats that phase 3's `scanner::implicit::connection::forward_open` takes. Each kind of entry is
+a struct whose fields are the entry's fields in file order; an entry that does not fit fails
+loudly, with its keyword and field number.
 
-The assemblies are written by a person or by Claude from the layout printout; the parser does not
-generate code. A generator can only emit a flat struct (`motor0_statusword`, ...), while the
-hand-written assemblies have per-motor groups, named bits, enums such as `MoveType`, and helpers
-such as `motor_input(n)`.
+The assemblies of `scanner/assemblies/` are hand-written `binrw` structs, with per-motor groups,
+named bits, enums such as `MoveType` and helpers such as `motor_input(n)`; the IO-HUB ones follow
+the integer types of the hub's EDS.
 
 ## Scope
 
@@ -20,120 +19,117 @@ such as `motor_input(n)`.
 * Crate `eds_parser/` (package `eds_parser`, `publish = false`, `license = "MIT OR Apache-2.0"`),
   in the root `members` and `default-members`, so `cargo test`, `cargo clippy` and
   `cargo run --example <name>` work from the root.
-* Dependencies: `pest`, `pest_derive`, `bilge`, `binrw`, `eipscanne_rs`. Dev-dependencies:
-  `scanner`, `tokio`, `clap`, `rand`, `anyhow` for the examples, and `hex-test-macros` for the
-  tests.
+* Dependencies: `bilge`, `binrw`, `eipscanne_rs`, `serde` (derive), `serde_with` (macros only).
+  Dev-dependencies: `scanner`, `tokio`, `clap`, `rand`, `anyhow` for the examples, and
+  `hex-test-macros` for the tests.
 
-### `src/lib.rs`
+### The file — `src/lib.rs`
 
-Module docs listing the four steps and the module that implements each. `Eds::parse(&str)` runs
-steps 1 to 3 into `Eds { params, assemblies, connections }`. `Eds::connection` finds a connection
-by its `ConnectionN` keyword or its name, `Eds::first_exclusive_owner_connection` gives the default
-one, and `Eds::assembly` finds an assembly by keyword. There are no re-exports: each type is
-imported from its module (`eds_parser::connection::Connection`).
+`Eds::parse(&str)` reads every `ParamN` of `[Params]`, `AssemN` of `[Assembly]` and `ConnectionN`
+of `[Connection Manager]` into `Eds { params, assemblies, connections }`, maps by N. Other sections
+and keywords (`Object_Name`, `EnumN`, vendor keywords, `AssemExaN`) are not read. The same keyword
+twice is an error.
+
+`Eds` resolves a connection's references when the connection is opened: a `NumberOrParam` to its
+number or the param's integer default, a path's `ParamN` to the default in as many little-endian
+bytes as the param's data size, and an `AssemN` format to the assembly's size field or the sum of
+its member sizes. A reference that is missing or has no usable value fails that connection.
+
+### Field values — `src/field_values.rs`
+
+The kinds of value a field holds, each read from the field's text by its `FromStr`, the only
+place field text is parsed besides plain integers:
+
+* `QuotedString`: a quoted string, adjacent quoted strings joined (`"AAA" "BBB"`), `L"..."` read
+  the same way, `\n`, `\t`, `\r` and `\<other character>` unescaped;
+* `NumberOrParam`: `Number(i64)` or `Param(u32)`; `DataFormat`: `Assem`, `AssemExa` or `Param`;
+* `ParamValue`: `Integer`, `Real` or `Text`, a param's minimum, maximum or default;
+* `PathTokens`: hex bytes and `[ParamN]` or `ParamN` references (`"20 04 24 [Param3] 2C 65"`);
+* `MemberReference`: `Param`, `Assem`, `Number` or `Path`.
+
+`number` reads decimal, `0x` hex and `0b` binary; `numbered` reads the N of `ParamN` and the like.
+
+### Entry structs — `src/entries.rs`
+
+`ParamEntry` (24 fields), `AssemblyEntry` (6 fields, then `members`, the remaining pairs as
+`AssemblyMember { size_bits, reference }`) and `ConnectionEntry` (17 fields) list every field of
+their entry in order, named after the field; the fields this crate does not use are private
+`IgnoredAny`s. The maps of `Eds` hold them by their N. Each struct's doc comment shows an example entry.
+They derive `serde::Deserialize`, and `file` implements `serde::Deserializer` for an `Entry`, so
+`ConnectionEntry::deserialize(&entry)` reads one:
+
+* an integer field (`u8`, `u16`, `u32`) from decimal, `0x` or `0b` text, range-checked;
+* an `Option` field as `None` when the field is empty;
+* a `Vec` field from the rest of the entry's fields up to the last non-empty one, each element
+  taking one field, or as many as it has fields when it is a struct;
+* any other field through its type's `FromStr` (`serde_with::DeserializeFromStr`);
+* a field past the end of a short entry as empty; a non-empty field past the struct's last field
+  is an error.
 
 ### Errors — `src/error.rs`
 
-One `Error { entry, message }` and `Result<T, E = Error>`. `entry` says where: `Assem100 (line
-212)` for an entry, `line 4, column 7` for a syntax error, `[Connection Manager]` for a missing
-section, `Connection2` for a connection this scanner cannot open.
+One `Error` enum: `Syntax`, `Value` (a field's text), `Reference`, `Refused`, `DefinedTwice`,
+`ExtraField`, `NoSuchConnection`, `NoConnection` (every refusal, by N), `InEntry`, which puts any
+of them in an entry and field, and `InConnection`, which puts one in `ConnectionN`. Every error says where: `Connection1: field 4: expected a number or a
+ParamN, found "x"`, `Connection2: this scanner opens class 1, cyclic, exclusive-owner connections;
+...`. The `FromStr` types return `Error::Value`.
 
-### Step 1 — syntax: `src/eds.pest`
+### Bits and codes — `src/masks.rs`
 
-All EDS syntax in one grammar file; whitespace (space, tab, `\r`, `\n`) and `$` comments are silent
-rules, so they may appear anywhere, including between the fields of one entry.
+`TriggerAndTransport` and `ConnectionParameters`: fields 1 and 2 of a `ConnectionEntry` as 32-bit
+`bilge` bitfields read from a number (`#[serde(from = "u32")]`), so each bit is named once and
+their `Debug` names every bit. `ConnectionParameters::shared_priority` and `real_time_format` (a
+3-bit code to `RealTimeFormat`) pick values from them.
 
-* `[Section]` headers: letters, digits, spaces, `/`, `-`, `_`, `.` (`[TCP/IP Interface Class]`),
-  looked up case-insensitively.
-* `Keyword = field, field, ...;` entries spanning any number of lines; empty fields (`,,`) and an
-  empty last field (`1,;`).
-* Field forms:
-  * quoted strings; adjacent strings join into one (`IconContents = "AAA" "BBB";`);
-  * integers: decimal with an optional `-`, and `0x` hex;
-  * words: any other unquoted token (`Param999`, `Assem100`, `EtherNetIP`, `Rx`, `TCP`, dates
-    `08-11-2025`, times `12:10:26`, revisions `1.6`).
-* A second rule for a path string: hex bytes and `[ParamN]` references
-  (`"20 04 24 [Param3] 2C 96 2C 64"`).
-* Not supported: `{ }` nested fields and `L"..."` strings, which fail with pest's line and column.
-  Backslashes in a string are kept as written, so an escaped quote ends the string and the entry
-  fails the same way. A `0b` number reads as a word.
+`ParamDescriptor`: field 4 of a `ParamEntry` as a 16-bit bitfield (`0x0004` supports scaling,
+`0x0010` read only). `CipDataType`: field 5 as an 8-bit `bilge` enum of the elementary data type
+codes, `0xC1` BOOL to `0xDE` STRINGI (`0xC8` is `Udint`), any other code `Unknown(code)`. Units
+(field 8) are free text, a `QuotedString`.
 
-### Step 2 — document: `src/document.rs`
+### The connection — `src/connection.rs`
 
-* `Document { sections }`, `Section { name, entries }`, `Entry { keyword, fields, line }`,
-  `Field { Empty, Integer(i64), Text(String), Word(String) }`, all crate-internal.
-* Section lookups ignore case; `Section::numbered_entries("Param")` gives `Param1`, `Param12`, ...
-* `Entry::integer`, `Entry::optional_integer` and `Entry::text` read a field by position, and
-  `Entry::error` / `Entry::bad_field` word every error about an entry, with its line:
-  `Param1 (line 2): field 6 should be the data size in bytes, found the text "four"`.
-* The only code that touches pest's parse tree.
+`eds.all_connections(large)` maps every N to its `Result<Connection>`: the connection, or why this
+scanner cannot open it. `eds.connection(number, large)` is the one for `ConnectionN`, and
+`eds.first_connection(large)` the first one this scanner can open, with its N. `large` is `Some(true)` for a Large_Forward_Open (32-bit connection parameters), `Some(false)` for
+a Forward_Open (16-bit), `None` for a Large_Forward_Open only when a direction's connection size
+is over 511 bytes.
 
-### Step 3 — typed sections
+`Connection { name, transport_type_trigger, o2t_requested_packet_interval,
+o2t_network_connection_parameters, o2t_real_time_format, o2t_size, t2o_..., connection_path }`
+holds the values in the library's types, named after the `ForwardOpenRequest` fields they fill;
+`o2t_size` and `t2o_size` are the application data in bytes. The caller writes the
+`ForwardOpenRequest` from them, with what an EDS does not describe: tick time and timeout ticks of
+the Forward_Open itself, timeout multiplier, connection IDs (`o2t_network_connection_id` 0: the
+target chooses it) and the connection triad.
 
-Each typed view resolves its references while it is built. Fields are read by position through
-named index constants (`const O2T_RPI: usize = 2;`); a field past the end of a short entry is
-`Empty`.
+Each value is picked from the `ConnectionEntry`, or the connection is refused with an `Error`;
+a refusal about a mask prints the mask with `Debug`, which shows what the connection offers:
 
-* `src/params.rs` — `Param { keyword, name, data_type, data_size, units, help, min, max, default,
-  enum_names }`, raw values: display scaling is ignored, so an RPI param is in microseconds
-  whatever its scaling fields say. `data_type` is the CIP type code; `Param::type_name` gives its
-  name (`UINT`) and `Param::is_bit_string` tells BYTE, WORD, DWORD and LWORD apart. `enum_names`
-  are the `(value, name)` pairs of the `EnumN` with the param's number, bit numbers for a bit
-  string and values otherwise.
-* `src/assembly.rs` — `Assembly { keyword, name, path, size, members }`:
-  * `path`: the bytes with `[ParamN]` resolved; `Assembly::instance()` reads them as a `CipPath`
-    and gives its instance segment (`20 04 24 64 30 03` -> 100), or `None`;
-  * `members: Vec<Member>`, with `Member { offset_bits, size_bits, param: Option<Param> }`, read
-    from the `bits, ParamN` pairs after the descriptor field, each placed right after the previous
-    one; `bits,` with no param is an opaque member, and `bits, AssemN` (a nested assembly) is
-    refused;
-  * the member bits must add up to `size * 8` when a size is given; an empty size is the sum of
-    the members.
-* `src/connection.rs` — `Connection { keyword, name, trigger_and_transport, connection_parameters,
-  o2t, t2o, path }`:
-  * `TriggerAndTransport` and `ConnectionParameters`: the two mask words as 32-bit `bilge`
-    bitfields, so each bit is named once;
-  * `o2t` / `t2o`: `DirectionSpec { requested_packet_interval: Option<u32>, size: u16, assembly:
-    Option<Assembly> }`. The RPI and size are a number or a `ParamN` default; `assembly` is the
-    `AssemN` the format field names, and gives the size when the size field is empty. EDS sizes
-    exclude the sequence count and the real-time header;
-  * `path`: the bytes after `[ParamN]` substitution (the param's default, in as many
-    little-endian bytes as its data size);
-  * configuration data the connection declares is not read.
-* `[File]`, `[Device]`, `[Port]`, `[Capacity]` and the object class sections are parsed into the
-  document but get no typed view.
-
-### Step 3 output — the layout printout
-
-`impl Display for Assembly`: a heading with keyword, name, instance and size, then one line per
-member with byte offset (`byte.bit` when not byte-aligned), bit size, CIP type name, param keyword
-and name, units and help, plus the enum names indented under their member. Example
-`eds-assemblies --eds <file> [--assembly Assem100]` prints it for one assembly, or lists which
-assemblies each connection carries and then prints every assembly. This output goes into the
-prompt when asking Claude to write `scanner/assemblies/<device>/`; reserved bytes become named
-`_reserved` fields, so every byte of the layout shows up in the struct.
-
-### Step 4 — Forward_Open fields: `src/forward_open.rs`
-
-An `impl Connection` with one method per Forward_Open field the EDS decides, named after the
-field, each returning the `eipscanne_rs` type. The caller writes the `ForwardOpenRequest` from
-them, with what an EDS does not describe: tick time and timeout ticks of the Forward_Open itself,
-timeout multiplier, connection IDs (`o2t_network_connection_id` 0: the target chooses it) and the
-connection triad.
-
-The masks list what the device *supports*; each method picks one value or refuses the connection
-with an `Error` naming it:
-
-| Method | From the EDS | Refused when |
+| Value | From the EDS | Refused when |
 |---|---|---|
 | `transport_type_trigger` | class 1, cyclic, `Direction::Client` | class 1, cyclic or exclusive owner not supported (input-only and listen-only are out of scope) |
-| `o2t_network_connection_parameters(large)`, `t2o_...` | point-to-point, exclusive owner; priority: scheduled, else high, else low, among those both directions support; fixed size if supported, else variable; resolved size plus `connection_size`'s overhead for class 1 and the direction's real-time format; 32-bit when `large` | not point-to-point, no shared priority, over 511 bytes without `large` |
-| `o2t_requested_packet_interval`, `t2o_...` | resolved RPI | none in the EDS |
-| `o2t_real_time_format`, `t2o_...` (the Forward_Open does not carry them) | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5–7 |
-| `connection_path` | the resolved path read as a `CipPath` | segments other than logical ones |
+| `*_network_connection_parameters` | point-to-point, exclusive owner; priority: scheduled, else high, else low, among those both directions support; fixed size if supported, else variable; the size plus `connection_size`'s overhead for class 1 and the direction's real-time format | not point-to-point, no shared priority, over 511 bytes with `Some(false)` |
+| `*_requested_packet_interval` | a number or a `ParamN`'s default, in microseconds | none in the EDS |
+| `*_size` | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
+| `*_real_time_format` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5–7 |
+| `connection_path` | the path read as a `CipPath` | segments other than logical ones |
 
 The client/server bit of the trigger and transport mask is ignored: vendors disagree on it, and
-the originator of a Forward_Open is always the client.
+the originator of a Forward_Open is always the client. When `first_connection` finds no connection
+it can open, its error lists each connection's refusal.
+
+### Sections and entries — `src/file.rs`
+
+`file::sections` splits the text into `Section { name, entries }` and `Entry { keyword, fields }`,
+each field kept as its trimmed raw text; crate-internal. The same file holds the entry's
+`Deserializer`.
+
+* `$` comments run to the end of the line. An entry spans any number of lines and ends with `;`;
+  its fields are separated by `,` and may be empty (`,,`, `1,;`).
+* `,`, `;` and `$` inside a quoted string (which `\"` does not end), and `,` inside `{ }`, do not
+  split.
+* A missing `;` or `=`, an unclosed `[` and an entry before the first section are errors quoting
+  where they are (`K 1: the entry has no =`).
 
 ### Example — `eds_parser/examples/eds-implicit-io.rs`
 
@@ -143,11 +139,12 @@ fixture (by its path under `CARGO_MANIFEST_DIR`) and `--host` is `172.28.0.10`, 
 `cargo run --example eds-implicit-io` runs against that container. The module docs give the
 commands that start the adapter and what the run prints.
 
-1. Read and parse the file; select the connection (`--connection Connection1` or its name; default:
-   the first exclusive-owner connection).
-2. Write the `ForwardOpenRequest` from the `Connection` methods and the originator constants of
-   `implicit-io` (`--large` for 32-bit parameter words), then print the connection name and
-   keyword, path, both sizes, RPIs, real-time formats and the whole request.
+1. Read the file and its connection (`--connection 1` for `Connection1`; default: the first
+   connection this scanner can open; `--large true` or `--large false` to choose the Forward_Open
+   service, automatic otherwise).
+2. Write the `ForwardOpenRequest` from the `Connection` fields and the originator constants of
+   `implicit-io`, then print the connection's N and name (`Connection1 (Exclusive Owner)`) and the
+   whole `Connection` (`{connection:#?}`).
 3. Register, `bind_io_socket`, `forward_open` with the request and the two real-time formats, the
    cyclic loop, `forward_close`, `unregister`. Each send tick builds the outputs with
    `build_o2t_packet` and sends them with `send_io_packet`; each received packet goes through
@@ -167,11 +164,11 @@ commands that start the adapter and what the run prints.
 The implicit counterpart of `io-hub-explicit-homing`, one linear file, with the IO-HUB assemblies
 included through `#[path = "../../scanner/assemblies"]` and errors reported through `anyhow`:
 
-1. Parse `--eds` (the local IO-HUB file), pick the first exclusive-owner connection, write its
-   `ForwardOpenRequest` from the `Connection` methods and the originator constants of
-   `implicit-io`, and print the connection path as hex.
-2. Check that the path ends with `2C 65 2C 64`, the connection points `OUTPUT_ASSEMBLY_INSTANCE`
-   and `INPUT_ASSEMBLY_INSTANCE` the structs are written for.
+1. Read the first connection this scanner can open from `--eds` (the local IO-HUB file), and
+   check that its path is `CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE,
+   INPUT_ASSEMBLY_INSTANCE)`, the assemblies the structs are written for.
+2. Write the `ForwardOpenRequest` from the `Connection` fields and the originator constants of
+   `implicit-io`.
 3. Register, `bind_io_socket`, `forward_open`; each cycle send
    `CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default()))` through `build_o2t_packet` and
    `send_io_packet` (idle unless `--run`; nothing is enabled either way; the outputs never change,
@@ -197,8 +194,8 @@ followed and the doc comment says the documentation may be wrong:
 
 ### Documentation
 
-* `eds_parser/README.md`: the four steps, the `ForwardOpenRequest` a caller writes, what each
-  method accepts and refuses, how to run `eds-implicit-io`, and how to write a device's
+* `eds_parser/README.md`: `Eds::parse` and the connection functions, the `ForwardOpenRequest` a caller writes,
+  what is accepted and refused, how to run `eds-implicit-io`, and how to write a device's
   assemblies.
 * The top-level README lists the crate and its examples; `tests/integration/README.md` describes
   the `eds-implicit-io` run against OpENer.
@@ -207,8 +204,10 @@ followed and the doc comment says the documentation may be wrong:
 ## Limits
 
 * Class 1 cyclic, exclusive owner, point-to-point only; one connection per run.
-* Configuration data is never read or sent.
-* Paths of logical segments only.
+* Configuration data is never read or sent; of the file, only `ParamN`, `AssemN` and
+  `ConnectionN` entries are read.
+* Paths of logical segments only; `SYMBOL_ANSI` in a path is refused.
+* `{ }` groups are split as one field but never read; `\xnn` and `\unnnn` escapes are not decoded.
 
 ## Tests
 
@@ -219,24 +218,27 @@ followed and the doc comment says the documentation may be wrong:
   `IconContents`, a `[TCP/IP Interface Class]` section, dates and times, an empty size resolved
   through `AssemN`, an RPI from `ParamN`, a `[ParamN]` in the path, configuration data to be
   ignored.
-* Grammar and document: inline snippets for every supported syntax form above, and failing
-  snippets for a missing `;`, an entry outside a section and `{ }` nested fields, which report
-  pest's line and column.
-* Params, assemblies, connections: inline snippets for data types and `EnumN` names, members
-  (opaque, nested, non-byte-aligned, a sum that does not match the size), a `[ParamN]` in a path,
-  `instance()` with 8-bit and 16-bit instance segments, the layout printout, a direction without
-  size or format.
-* Forward_Open fields: each refusal of the table, both size types, every real-time format, the
-  priority choice, the Large_Forward_Open size and the ignored client/server bit.
+* Sections and entries: comments, CRLF, separators inside strings and `{ }`, each syntax error
+  with where it is.
+* Field values: each `FromStr`, numbers in every notation.
+* Entry structs: fields filled in order, an empty `Option`, a missing trailing field, an extra
+  field, a `Vec` of member structs reading the rest of the fields, and the keyword and field
+  number in errors; a param with its descriptor and data type, an assembly with members, a
+  malformed connection.
+* The file: references resolved to param defaults, paths and assembly sizes; a duplicate entry
+  failing the parse, a missing param failing its connection.
+* Mask words: the shared priority, every real-time format code.
+* Connections: an IO-HUB style entry read into every value, each refusal of the table, both size
+  types, the automatic and the forced Large_Forward_Open, and picking the first connection this
+  scanner can open.
 * End to end (`tests/sample_adapter.rs`): the fixture's `Connection1`, with the originator of the
   library's Forward_Open test, builds the same Forward_Open bytes as that test; the input-only
-  `Connection2` is refused.
+  `Connection2` is refused with what it offers.
 
 ## Verification
 
 ```
 cargo fmt --all --check && cargo clippy --all-targets && cargo test
-cargo run --example eds-assemblies -- --eds docs/IO-HUB-4-E_EDS_File.eds --assembly Assem100
 ```
 
 Against the OpENer container from `tests/integration`, `cargo run --example eds-implicit-io` opens

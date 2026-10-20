@@ -1,250 +1,260 @@
-//! Step 3c: the `[Connection Manager]` section. A `ConnectionN` entry says what the device
-//! supports for one connection and where its data lives; its references to params and
-//! assemblies are resolved here, so `forward_open` only maps values.
+//! One `ConnectionEntry` as the values of the Forward_Open that opens it, or the reason this
+//! scanner cannot open it: it opens class 1, cyclic, exclusive-owner connections, point-to-point
+//! both ways.
 
 use std::io::Cursor;
 
-use bilge::prelude::{DebugBits, FromBits, bitsize, u2, u3, u5};
+use bilge::prelude::u9;
 use binrw::BinRead;
-use pest::Parser;
 
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionPriority, ConnectionSizeType, ConnectionType, Direction,
+    LargeNetworkConnectionParameters, NetworkConnectionParameters, ProductionTrigger,
+    RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters, TransportClass,
+    TransportTypeTrigger, connection_size,
+};
 use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::cip::types::CipUdint;
 
-use crate::assembly::{self, Assembly};
-use crate::document::{Document, EdsParser, Entry, Field, Rule, syntax_error};
+use crate::Eds;
+use crate::entries::ConnectionEntry;
 use crate::error::{Error, Result};
-use crate::params::{self, Param, is_param_reference};
+use crate::field_values::DataFormat;
+use crate::masks::real_time_format;
 
-/// The first mask word of a connection: which transport classes, triggers and application types
-/// the device supports on it
-#[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, Copy, Clone)]
-pub struct TriggerAndTransport {
-    /// Bit n set: transport class n is supported
-    pub transport_classes: u16,
-    pub cyclic: bool,
-    pub change_of_state: bool,
-    pub application: bool,
-    reserved_19_23: u5,
-    pub listen_only: bool,
-    pub input_only: bool,
-    pub exclusive_owner: bool,
-    pub redundant_owner: bool,
-    reserved_28_30: u3,
-    /// Ignored by `forward_open`: vendors disagree on it, and a Forward_Open's originator is
-    /// always the client
-    pub server: bool,
-}
-
-/// The second mask word of a connection: sizes, real-time formats, connection types and
-/// priorities the device supports, per direction
-#[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, Copy, Clone)]
-pub struct ConnectionParameters {
-    pub o2t_fixed_size: bool,
-    pub o2t_variable_size: bool,
-    pub t2o_fixed_size: bool,
-    pub t2o_variable_size: bool,
-    obsolete_o2t_bytes_per_slot: u2,
-    obsolete_t2o_bytes_per_slot: u2,
-    /// 0 modeless, 1 zero length, 2 (reserved), 3 heartbeat, 4 32-bit header, 5-7 others
-    pub o2t_real_time_format: u3,
-    reserved_11: bool,
-    pub t2o_real_time_format: u3,
-    reserved_15: bool,
-    pub o2t_null: bool,
-    pub o2t_multicast: bool,
-    pub o2t_point_to_point: bool,
-    reserved_19: bool,
-    pub t2o_null: bool,
-    pub t2o_multicast: bool,
-    pub t2o_point_to_point: bool,
-    reserved_23: bool,
-    pub o2t_low_priority: bool,
-    pub o2t_high_priority: bool,
-    pub o2t_scheduled_priority: bool,
-    reserved_27: bool,
-    pub t2o_low_priority: bool,
-    pub t2o_high_priority: bool,
-    pub t2o_scheduled_priority: bool,
-    reserved_31: bool,
-}
-
-/// One direction of a connection, with its references resolved
-#[derive(Debug, Clone, PartialEq)]
-pub struct DirectionSpec {
-    /// Requested packet interval in microseconds; `None` when the EDS gives none
-    pub requested_packet_interval: Option<u32>,
-    /// Bytes of application data, without the sequence count and real-time header
-    pub size: u16,
-    /// The assembly whose layout the data has, when the EDS names one
-    pub assembly: Option<Assembly>,
-}
-
-/// A `ConnectionN` entry; configuration data it declares is not read
+/// One connection of an EDS file, as the Forward_Open values it decides. The caller writes the
+/// `ForwardOpenRequest` from these and from what an EDS does not describe: tick time, timeouts,
+/// connection IDs and the connection triad.
+///
+/// This entry, with `Param1` defaulting to 1000000, `Param2` to 0x97 and `Assem100` 32 bytes:
+///
+/// ```text
+/// Connection1 = 0x04010002, 0x44440405, Param1,32,Assem150, Param1,,Assem100, ,, 0,Assem151,
+///               "Exclusive Owner", "", "20 04 24 [Param2] 2C 96 2C 64";
+/// ```
+///
+/// is the connection:
+///
+/// ```text
+/// name: "Exclusive Owner"
+/// transport_type_trigger: class 1, cyclic, client
+/// O->T: every 1000000 us, 32 bytes, Header32Bit; parameters: 38 bytes (32 + 2 sequence count
+///       + 4 run/idle header), fixed, scheduled, point-to-point, exclusive owner
+/// T->O: every 1000000 us, 32 bytes (Assem100's), Modeless; parameters: 34 bytes, fixed,
+///       scheduled, point-to-point, exclusive owner
+/// connection_path: 20 04 24 97 2C 96 2C 64 (class 4, instance 0x97, connection points 0x96
+///       and 0x64)
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct Connection {
-    /// `ConnectionN`, as written in the file
-    pub keyword: String,
+    /// `Exclusive Owner`
     pub name: String,
-    pub trigger_and_transport: TriggerAndTransport,
-    pub connection_parameters: ConnectionParameters,
-    pub o2t: DirectionSpec,
-    pub t2o: DirectionSpec,
-    /// The connection path bytes, with every `[ParamN]` replaced by the param's default
-    pub path: Vec<u8>,
+    pub transport_type_trigger: TransportTypeTrigger,
+    pub o2t_requested_packet_interval: CipUdint,
+    pub o2t_network_connection_parameters: NetworkConnectionParameters,
+    /// How the outputs signal run/idle; the Forward_Open does not carry it
+    pub o2t_real_time_format: RealTimeFormat,
+    /// Bytes of output data, without the sequence count and real-time header
+    pub o2t_size: u16,
+    pub t2o_requested_packet_interval: CipUdint,
+    pub t2o_network_connection_parameters: NetworkConnectionParameters,
+    /// How the inputs signal run/idle; the Forward_Open does not carry it
+    pub t2o_real_time_format: RealTimeFormat,
+    /// Bytes of input data, without the sequence count and real-time header
+    pub t2o_size: u16,
+    pub connection_path: CipPath,
 }
 
-/// Field positions of a `ConnectionN` entry
-const TRIGGER_AND_TRANSPORT: usize = 0;
-const CONNECTION_PARAMETERS: usize = 1;
-const O2T_RPI: usize = 2;
-const O2T_SIZE: usize = 3;
-const O2T_FORMAT: usize = 4;
-const T2O_RPI: usize = 5;
-const T2O_SIZE: usize = 6;
-const T2O_FORMAT: usize = 7;
-const NAME: usize = 12;
-const PATH: usize = 14;
+/// The largest connection size the 16-bit parameters of a Forward_Open hold
+const MAX_STANDARD_CONNECTION_SIZE: u16 = 511;
 
 // ======= Start of Connection impl ========
 
 impl Connection {
-    /// Every `ConnectionN` entry of the `[Connection Manager]` section, in file order
-    pub(crate) fn all(
-        document: &Document,
-        params: &[Param],
-        assemblies: &[Assembly],
-    ) -> Result<Vec<Connection>> {
-        let section = document
-            .section("Connection Manager")
-            .ok_or_else(|| Error {
-                entry: "[Connection Manager]".to_string(),
-                message: "the file has no such section".to_string(),
+    /// The Forward_Open values of a `ConnectionN` entry, or the reason this scanner cannot open
+    /// it, with what the connection offers
+    pub(crate) fn new(
+        entry: &ConnectionEntry,
+        eds: &Eds,
+        large: Option<bool>,
+    ) -> Result<Connection> {
+        let trigger_and_transport = entry.trigger_and_transport;
+        let connection_parameters = entry.connection_parameters;
+
+        // 0x04010002: class 1 (bit 1), cyclic (bit 16), exclusive owner (bit 26)
+        if !(trigger_and_transport.class_1()
+            && trigger_and_transport.cyclic()
+            && trigger_and_transport.exclusive_owner())
+        {
+            return Err(Error::Refused(format!(
+                "this scanner opens class 1, cyclic, exclusive-owner connections; this one offers {trigger_and_transport:?}"
+            )));
+        }
+        // 0x44440405: point-to-point O->T (bit 18) and T->O (bit 22), scheduled priority O->T
+        // (bit 26) and T->O (bit 30)
+        if !(connection_parameters.o2t_point_to_point()
+            && connection_parameters.t2o_point_to_point())
+        {
+            return Err(Error::Refused(format!(
+                "this scanner opens point-to-point connections both ways; this one offers {connection_parameters:?}"
+            )));
+        }
+        let priority: ConnectionPriority =
+            connection_parameters.shared_priority().ok_or_else(|| {
+                Error::Refused(format!(
+                    "no priority is supported both ways; this one offers {connection_parameters:?}"
+                ))
             })?;
-        section
-            .numbered_entries("Connection")
-            .map(|entry| Connection::from_entry(entry, params, assemblies))
-            .collect()
-    }
 
-    fn from_entry(entry: &Entry, params: &[Param], assemblies: &[Assembly]) -> Result<Connection> {
-        let trigger_and_transport: u32 =
-            entry.integer(TRIGGER_AND_TRANSPORT, "the trigger and transport mask")?;
-        let connection_parameters: u32 =
-            entry.integer(CONNECTION_PARAMETERS, "the connection parameters mask")?;
+        // 0x44440405: O->T format 4 (bits 8-10, 32-bit header), T->O format 0 (bits 12-14,
+        // modeless)
+        let o2t_code = connection_parameters.o2t_real_time_format();
+        let o2t_real_time_format: RealTimeFormat = real_time_format(o2t_code).ok_or_else(|| {
+            Error::Refused(format!("O->T real-time format {o2t_code} is not supported"))
+        })?;
+        let t2o_code = connection_parameters.t2o_real_time_format();
+        let t2o_real_time_format: RealTimeFormat = real_time_format(t2o_code).ok_or_else(|| {
+            Error::Refused(format!("T->O real-time format {t2o_code} is not supported"))
+        })?;
 
-        let o2t = direction(entry, O2T_RPI, O2T_SIZE, O2T_FORMAT, params, assemblies)?;
-        let t2o = direction(entry, T2O_RPI, T2O_SIZE, T2O_FORMAT, params, assemblies)?;
+        // Param1,32,Assem150, (fields 3-5): O->T every Param1's default microseconds, 32 bytes
+        let o2t_requested_packet_interval: CipUdint = match entry.o2t_rpi {
+            Some(rpi) => eds.value(rpi)?,
+            None => {
+                return Err(Error::Refused(
+                    "gives no O->T requested packet interval".into(),
+                ));
+            }
+        };
+        let o2t_size: u16 = match (entry.o2t_size, entry.o2t_format) {
+            (Some(size), _) => eds.value(size)?,
+            (None, Some(DataFormat::Assem(number))) => eds.assembly_size(number)?,
+            (None, _) => {
+                return Err(Error::Refused(
+                    "O->T has no size, and no AssemN format that gives one".into(),
+                ));
+            }
+        };
+        // Param1,,Assem100, (fields 6-8): T->O every Param1's default microseconds, as many
+        // bytes as Assem100
+        let t2o_requested_packet_interval: CipUdint = match entry.t2o_rpi {
+            Some(rpi) => eds.value(rpi)?,
+            None => {
+                return Err(Error::Refused(
+                    "gives no T->O requested packet interval".into(),
+                ));
+            }
+        };
+        let t2o_size: u16 = match (entry.t2o_size, entry.t2o_format) {
+            (Some(size), _) => eds.value(size)?,
+            (None, Some(DataFormat::Assem(number))) => eds.assembly_size(number)?,
+            (None, _) => {
+                return Err(Error::Refused(
+                    "T->O has no size, and no AssemN format that gives one".into(),
+                ));
+            }
+        };
 
-        let path_text = entry
-            .field(PATH)
-            .as_text()
-            .ok_or_else(|| entry.bad_field(PATH, "the connection path as a quoted string"))?;
+        // Sizes on the wire: the data plus the sequence count and the real-time header. O->T in
+        // the example: 32 + 2 + 4 = 38; T->O: 32 + 2 = 34
+        let o2t_connection_size: u16 =
+            connection_size(o2t_size, TransportClass::Class1, o2t_real_time_format);
+        let t2o_connection_size: u16 =
+            connection_size(t2o_size, TransportClass::Class1, t2o_real_time_format);
+        let large: bool = large
+            .unwrap_or(o2t_connection_size.max(t2o_connection_size) > MAX_STANDARD_CONNECTION_SIZE);
+        let o2t_network_connection_parameters = network_connection_parameters(
+            o2t_connection_size,
+            connection_parameters.o2t_fixed_size(),
+            priority,
+            large,
+        )
+        .ok_or_else(|| {
+            Error::Refused(format!(
+                "the O->T connection size of {o2t_connection_size} bytes needs a Large_Forward_Open"
+            ))
+        })?;
+        let t2o_network_connection_parameters = network_connection_parameters(
+            t2o_connection_size,
+            connection_parameters.t2o_fixed_size(),
+            priority,
+            large,
+        )
+        .ok_or_else(|| {
+            Error::Refused(format!(
+                "the T->O connection size of {t2o_connection_size} bytes needs a Large_Forward_Open"
+            ))
+        })?;
+
+        // "20 04 24 [Param2] 2C 96 2C 64": Param2's default in place of [Param2]
+        let path: Vec<u8> = eds.path(&entry.path)?;
+        let connection_path: CipPath = cip_path(&path).ok_or_else(|| {
+            Error::Refused(format!(
+                "its path {path:02X?} is not made of logical segments only"
+            ))
+        })?;
 
         Ok(Connection {
-            keyword: entry.keyword.clone(),
-            name: entry.text(NAME),
-            trigger_and_transport: TriggerAndTransport::from(trigger_and_transport),
-            connection_parameters: ConnectionParameters::from(connection_parameters),
-            o2t,
-            t2o,
-            path: resolve_path(path_text, params, entry)?,
+            name: entry.name.0.clone(),
+            transport_type_trigger: TransportTypeTrigger::builder()
+                .transport_class(TransportClass::Class1)
+                .production_trigger(ProductionTrigger::Cyclic)
+                .direction(Direction::Client)
+                .build(),
+            o2t_requested_packet_interval,
+            o2t_network_connection_parameters,
+            o2t_real_time_format,
+            o2t_size,
+            t2o_requested_packet_interval,
+            t2o_network_connection_parameters,
+            t2o_real_time_format,
+            t2o_size,
+            connection_path,
         })
     }
 }
 
 // ^^^^^^^^ End of Connection impl ^^^^^^^^
 
-/// One direction's RPI, size and format fields. The RPI and size are a number or a `ParamN`
-/// default; an empty size is the size of the format's `AssemN`.
-fn direction(
-    entry: &Entry,
-    rpi_index: usize,
-    size_index: usize,
-    format_index: usize,
-    params: &[Param],
-    assemblies: &[Assembly],
-) -> Result<DirectionSpec> {
-    let requested_packet_interval = value_or_param(
-        entry,
-        rpi_index,
-        params,
-        "a requested packet interval in microseconds",
-    )?;
-
-    let assembly = match entry.field(format_index).as_word() {
-        Some(format) => Some(assembly::lookup(assemblies, format, entry)?),
-        None => None,
+/// A point-to-point, exclusive-owner parameter word: 32-bit when `large`, else 16-bit, which
+/// `None` means `connection_size` does not fit. The size is fixed when the direction supports it,
+/// else variable. `(38, true, Scheduled, false)` is the 16-bit word for 38 bytes, fixed,
+/// scheduled, point-to-point, exclusive owner.
+fn network_connection_parameters(
+    connection_size: u16,
+    fixed_size_supported: bool,
+    priority: ConnectionPriority,
+    large: bool,
+) -> Option<NetworkConnectionParameters> {
+    let connection_size_type = match fixed_size_supported {
+        true => ConnectionSizeType::Fixed,
+        false => ConnectionSizeType::Variable,
     };
-
-    let size = match value_or_param(entry, size_index, params, "a size in bytes")? {
-        Some(size) => size,
-        None => assembly
-            .and_then(|assembly| assembly.size)
-            .ok_or_else(|| entry.bad_field(size_index, "a size, or a format with a size"))?,
-    };
-
-    Ok(DirectionSpec {
-        requested_packet_interval,
-        size,
-        assembly: assembly.cloned(),
-    })
-}
-
-/// A field that is a number, a `ParamN` whose default is used, or empty
-fn value_or_param<T: TryFrom<i64>>(
-    entry: &Entry,
-    index: usize,
-    params: &[Param],
-    expected: &str,
-) -> Result<Option<T>> {
-    let Field::Word(word) = entry.field(index) else {
-        return entry.optional_integer(index, expected);
-    };
-    if !is_param_reference(word) {
-        return Err(entry.bad_field(index, expected));
+    if large {
+        return Some(NetworkConnectionParameters::Large(
+            LargeNetworkConnectionParameters::builder()
+                .connection_size(connection_size)
+                .connection_size_type(connection_size_type)
+                .priority(priority)
+                .connection_type(ConnectionType::PointToPoint)
+                .redundant_owner(RedundantOwner::Exclusive)
+                .build(),
+        ));
     }
-    let default = params::lookup(params, word, entry)?
-        .default
-        .ok_or_else(|| entry.error(format!("refers to {word}, which has no default")))?;
-    T::try_from(default)
-        .map(Some)
-        .map_err(|_| entry.bad_field(index, expected))
+    Some(NetworkConnectionParameters::Standard(
+        StandardNetworkConnectionParameters::builder()
+            .connection_size(u9::try_new(connection_size).ok()?)
+            .connection_size_type(connection_size_type)
+            .priority(priority)
+            .connection_type(ConnectionType::PointToPoint)
+            .redundant_owner(RedundantOwner::Exclusive)
+            .build(),
+    ))
 }
 
-/// The bytes of a path string, each `[ParamN]` replaced by the param's default in as many
-/// little-endian bytes as its data size
-pub(crate) fn resolve_path(text: &str, params: &[Param], entry: &Entry) -> Result<Vec<u8>> {
-    let path = EdsParser::parse(Rule::path, text)
-        .map_err(|error| entry.error(format!("path {text:?}: {}", syntax_error(error).message)))?
-        .next()
-        .expect("the path rule matches once");
-
-    let mut bytes = Vec::new();
-    for pair in path.into_inner() {
-        match pair.as_rule() {
-            Rule::hex_byte => {
-                bytes.push(u8::from_str_radix(pair.as_str(), 16).expect("two hex digits"));
-            }
-            Rule::param_ref => {
-                let keyword = pair.as_str().trim_matches(['[', ']']);
-                let param = params::lookup(params, keyword, entry)?;
-                let default = param.default.ok_or_else(|| {
-                    entry.error(format!(
-                        "its path refers to {keyword}, which has no default"
-                    ))
-                })?;
-                bytes.extend_from_slice(&default.to_le_bytes()[..usize::from(param.data_size)]);
-            }
-            _ => {}
-        }
-    }
-    Ok(bytes)
-}
-
-/// Path bytes as a `CipPath`; `None` unless they are whole 16-bit words of logical segments
-pub(crate) fn read_path(bytes: &[u8]) -> Option<CipPath> {
+/// Path bytes as a `CipPath`; `None` unless they are whole 16-bit words of logical segments.
+/// `20 04 24 97 2C 96 2C 64` is class 4, instance 0x97, connection points 0x96 and 0x64.
+fn cip_path(bytes: &[u8]) -> Option<CipPath> {
     if !bytes.len().is_multiple_of(2) {
         return None;
     }
@@ -256,33 +266,21 @@ pub(crate) fn read_path(bytes: &[u8]) -> Option<CipPath> {
 mod tests {
     use super::*;
 
-    fn param(keyword: &str, data_size: u8, default: i64) -> Param {
-        Param {
-            keyword: keyword.to_string(),
-            name: String::new(),
-            data_type: 0xC8,
-            data_size,
-            units: String::new(),
-            help: String::new(),
-            min: None,
-            max: None,
-            default: Some(default),
-            enum_names: vec![],
-        }
-    }
+    /// Class 1, cyclic, exclusive owner
+    const TRIGGER_AND_TRANSPORT: u32 = 0x0401_0002;
+    /// Fixed sizes both ways, O->T 32-bit header, T->O modeless, point-to-point both ways, every
+    /// priority both ways
+    const CONNECTION_PARAMETERS: u32 = 0x7775_0405;
 
-    fn assembly(keyword: &str, size: Option<u16>) -> Assembly {
-        Assembly {
-            keyword: keyword.to_string(),
-            name: String::new(),
-            path: vec![],
-            size,
-            members: vec![],
-        }
-    }
-
-    /// The IO-HUB style entry: RPI from a param, sizes given, formats as assemblies
-    const CONNECTION: &str = r#"
+    /// The IO-HUB style entry: RPI from a param, the T->O size from its format, a param in the
+    /// path
+    const IO_HUB: &str = r#"
+[Params]
+    Param3 = 0,,,0,0xC6,1,"","","",,,1;
+    Param999 = 0,,,0,0xC8,4,"RPI","","",,,10000;
+[Assembly]
+    Assem100 = "Inputs", "", 228, 0, , ;
+    Assem101 = "Outputs", "", 148, 0, , ;
 [Connection Manager]
     Connection1 =
         0x04010002,             $ class 1, cyclic, exclusive owner
@@ -296,97 +294,195 @@ mod tests {
         "20 04 24 [Param3] 2C 65 2C 64";    $ Path
 "#;
 
-    #[test]
-    fn a_connection_resolves_its_params_and_assemblies() {
-        let document = Document::parse(CONNECTION).unwrap();
-        let params = [param("Param999", 4, 10_000), param("Param3", 1, 1)];
-        let assemblies = [
-            assembly("Assem100", Some(228)),
-            assembly("Assem101", Some(148)),
-        ];
-
-        let connections = Connection::all(&document, &params, &assemblies).unwrap();
-
-        let connection = &connections[0];
-        assert_eq!(connection.keyword, "Connection1");
-        assert_eq!(connection.name, "Four motors");
-        assert_eq!(connection.trigger_and_transport.transport_classes(), 0x0002);
-        assert!(connection.trigger_and_transport.cyclic());
-        assert!(connection.trigger_and_transport.exclusive_owner());
-        assert!(!connection.trigger_and_transport.input_only());
-        assert_eq!(
-            connection.connection_parameters.o2t_real_time_format(),
-            u3::new(4)
+    /// `Connection1` with the two masks and 32 bytes each way
+    fn read(trigger_and_transport: u32, connection_parameters: u32) -> Result<Connection> {
+        let eds = format!(
+            "[Connection Manager]\nConnection1 = {trigger_and_transport:#x}, {connection_parameters:#x}, \
+             1000000, 32, , 1000000, 32, , , , , , \"Exclusive owner\", \"\", \"20 04 24 97 2C 96 2C 64\";\n"
         );
-        assert_eq!(
-            connection.connection_parameters.t2o_real_time_format(),
-            u3::new(0)
-        );
-        assert!(connection.connection_parameters.o2t_point_to_point());
-        assert!(connection.connection_parameters.t2o_scheduled_priority());
-        assert_eq!(
-            connection.o2t,
-            DirectionSpec {
-                requested_packet_interval: Some(10_000),
-                size: 148,
-                assembly: Some(assemblies[1].clone()),
-            }
-        );
-        assert_eq!(connection.t2o.size, 228, "taken from Assem100");
-        assert_eq!(
-            connection.path,
-            vec![0x20, 0x04, 0x24, 0x01, 0x2C, 0x65, 0x2C, 0x64]
-        );
+        Eds::parse(&eds).unwrap().connection(1, None)
     }
 
-    fn entry() -> Entry {
-        Entry {
-            keyword: "Connection1".to_string(),
-            fields: vec![],
-            line: 3,
-        }
+    fn refusal<T: std::fmt::Debug>(result: Result<T>) -> String {
+        result.unwrap_err().to_string()
     }
 
-    #[test]
-    fn path_params_are_substituted_in_their_data_size() {
-        let params = [param("Param1", 1, 0x97), param("Param2", 2, 0x0102)];
-
-        let path = resolve_path("20 04 24 [Param1] 2C [Param2] 2C 64", &params, &entry()).unwrap();
-
-        assert_eq!(
-            path,
-            vec![0x20, 0x04, 0x24, 0x97, 0x2C, 0x02, 0x01, 0x2C, 0x64]
-        );
-    }
-
-    #[test]
-    fn an_unknown_path_param_names_the_connection() {
-        assert_eq!(
-            resolve_path("20 04 24 [Param7]", &[], &entry())
-                .unwrap_err()
-                .to_string(),
-            "Connection1 (line 3): refers to Param7, which the file does not define"
-        );
-    }
-
-    #[test]
-    fn a_direction_without_size_or_format_is_an_error() {
-        let document = Document::parse(
-            "[Connection Manager]\nConnection1 = 0x04010002, 0x77750405, 1000, , , 1000, 32, Assem100, ,, ,, \"n\", \"\", \"20 04 24 01 2C 65 2C 64\";\n",
+    fn standard(
+        connection_size: u16,
+        connection_size_type: ConnectionSizeType,
+        priority: ConnectionPriority,
+    ) -> NetworkConnectionParameters {
+        NetworkConnectionParameters::Standard(
+            StandardNetworkConnectionParameters::builder()
+                .connection_size(u9::new(connection_size))
+                .connection_size_type(connection_size_type)
+                .priority(priority)
+                .connection_type(ConnectionType::PointToPoint)
+                .redundant_owner(RedundantOwner::Exclusive)
+                .build(),
         )
-        .unwrap();
+    }
 
-        let error = Connection::all(&document, &[], &[assembly("Assem100", Some(32))]).unwrap_err();
+    #[test]
+    fn a_connection_reads_into_forward_open_values() {
+        let eds = Eds::parse(IO_HUB).unwrap();
+        let connection = eds.connection(1, None).unwrap();
 
+        assert_eq!(connection.name, "Four motors");
         assert_eq!(
-            error.to_string(),
-            "Connection1 (line 2): field 4 should be a size, or a format with a size, found nothing"
+            connection.o2t_requested_packet_interval, 10_000,
+            "from Param999"
+        );
+        assert_eq!(connection.t2o_requested_packet_interval, 10_000);
+        assert_eq!(connection.o2t_size, 148);
+        assert_eq!(connection.t2o_size, 228, "from Assem100");
+        assert_eq!(connection.o2t_real_time_format, RealTimeFormat::Header32Bit);
+        assert_eq!(connection.t2o_real_time_format, RealTimeFormat::Modeless);
+        assert_eq!(
+            connection.o2t_network_connection_parameters,
+            standard(
+                154,
+                ConnectionSizeType::Fixed,
+                ConnectionPriority::Scheduled
+            ),
+            "148 bytes, the sequence count and the 32-bit header"
+        );
+        assert_eq!(
+            connection.t2o_network_connection_parameters,
+            standard(
+                230,
+                ConnectionSizeType::Fixed,
+                ConnectionPriority::Scheduled
+            )
+        );
+        assert_eq!(
+            connection.connection_path,
+            CipPath::new_assembly_connection(1, 0x65, 0x64),
+            "[Param3] replaced by its default"
         );
     }
 
     #[test]
-    fn a_missing_connection_manager_section_is_an_error() {
-        let document = Document::parse("[File]\nRevision = 1.0;\n").unwrap();
-        assert!(Connection::all(&document, &[], &[]).is_err());
+    fn a_refusal_shows_what_the_connection_offers() {
+        let input_only = refusal(read(0x0201_0002, CONNECTION_PARAMETERS));
+        assert!(
+            input_only.starts_with(
+                "Connection1: this scanner opens class 1, cyclic, exclusive-owner connections; \
+                 this one offers TriggerAndTransport {"
+            ),
+            "{input_only}"
+        );
+        assert!(input_only.contains("input_only: true"), "{input_only}");
+
+        assert!(refusal(read(0x0401_0001, CONNECTION_PARAMETERS)).contains("class_1: false"));
+        assert!(refusal(read(0x0402_0002, CONNECTION_PARAMETERS)).contains("cyclic: false"));
+        // bit 18 (O->T) and bit 22 (T->O) off in turn
+        assert!(
+            refusal(read(TRIGGER_AND_TRANSPORT, 0x7771_0405)).contains("o2t_point_to_point: false")
+        );
+        assert!(
+            refusal(read(TRIGGER_AND_TRANSPORT, 0x7735_0405)).contains("t2o_point_to_point: false")
+        );
+        assert!(refusal(read(TRIGGER_AND_TRANSPORT, 0x1275_0405)).contains("no priority"));
+        assert_eq!(
+            refusal(read(TRIGGER_AND_TRANSPORT, 0x7775_0205)),
+            "Connection1: O->T real-time format 2 is not supported"
+        );
+    }
+
+    #[test]
+    fn the_client_server_bit_is_ignored() {
+        assert!(read(TRIGGER_AND_TRANSPORT | 0x8000_0000, CONNECTION_PARAMETERS).is_ok());
+    }
+
+    #[test]
+    fn size_type_is_fixed_when_supported_else_variable() {
+        let connection = read(TRIGGER_AND_TRANSPORT, 0x7775_040A).unwrap(); // variable only
+        assert_eq!(
+            connection.o2t_network_connection_parameters,
+            standard(
+                38,
+                ConnectionSizeType::Variable,
+                ConnectionPriority::Scheduled
+            )
+        );
+        assert_eq!(
+            connection.t2o_network_connection_parameters,
+            standard(
+                34,
+                ConnectionSizeType::Variable,
+                ConnectionPriority::Scheduled
+            )
+        );
+    }
+
+    #[test]
+    fn a_direction_without_rpi_or_size_is_refused() {
+        let eds = Eds::parse("[Connection Manager]\nConnection1 = 0x04010002, 0x77750405, 1000, 32, , , 32, , , , , , \"n\", \"\", \"20 04 24 01 2C 65 2C 64\";\n").unwrap();
+        assert_eq!(
+            refusal(eds.first_connection(None)),
+            "[Connection Manager]: no connection this scanner can open:\n  \
+             Connection1: gives no T->O requested packet interval"
+        );
+
+        let eds = Eds::parse("[Connection Manager]\nConnection1 = 0x04010002, 0x77750405, 1000, , , 1000, 32, , , , , , \"n\", \"\", \"20 04 24 01 2C 65 2C 64\";\n").unwrap();
+        assert_eq!(
+            refusal(eds.connection(1, None)),
+            "Connection1: O->T has no size, and no AssemN format that gives one"
+        );
+    }
+
+    #[test]
+    fn a_large_forward_open_is_picked_when_a_size_needs_it_or_when_asked() {
+        let eds = |t2o_size: u16| {
+            Eds::parse(&format!(
+                "[Connection Manager]\nConnection1 = 0x04010002, 0x77750405, 1000, 32, , 1000, {t2o_size}, , , , , , \"n\", \"\", \"20 04 24 01 2C 65 2C 64\";\n"
+            ))
+            .unwrap()
+        };
+        let t2o = |eds: Eds, large: Option<bool>| {
+            eds.connection(1, large)
+                .map(|connection| connection.t2o_network_connection_parameters)
+        };
+
+        // 510 bytes and the sequence count is 512, over the 511 of a Forward_Open
+        assert!(matches!(
+            t2o(eds(510), None),
+            Ok(NetworkConnectionParameters::Large(parameters)) if parameters.connection_size() == 512
+        ));
+        assert!(matches!(
+            t2o(eds(509), None),
+            Ok(NetworkConnectionParameters::Standard(_))
+        ));
+        assert!(matches!(
+            t2o(eds(32), Some(true)),
+            Ok(NetworkConnectionParameters::Large(_))
+        ));
+        assert_eq!(
+            refusal(eds(510).connection(1, Some(false))),
+            "Connection1: the T->O connection size of 512 bytes needs a Large_Forward_Open"
+        );
+    }
+
+    #[test]
+    fn the_first_connection_is_the_first_one_this_scanner_can_open() {
+        let eds = Eds::parse("[Connection Manager]
+Connection1 = 0x02010002, 0x44440305, 1000, 0, , 1000, 32, , , , , , \"Input Only\", \"\", \"20 04 24 97 2C FE 2C 64\";
+Connection2 = 0x04010002, 0x44440405, 1000, 32, , 1000, 32, , , , , , \"Exclusive Owner\", \"\", \"20 04 24 97 2C 96 2C 64\";
+").unwrap();
+
+        assert_eq!(eds.first_connection(None).unwrap().0, 2);
+        assert_eq!(
+            refusal(eds.connection(3, None)),
+            "Connection3: the EDS has no such connection"
+        );
+        assert_eq!(
+            refusal(
+                Eds::parse("[File]\nRevision = 1.0;\n")
+                    .unwrap()
+                    .first_connection(None)
+            ),
+            "[Connection Manager]: the EDS has no ConnectionN entries"
+        );
     }
 }
