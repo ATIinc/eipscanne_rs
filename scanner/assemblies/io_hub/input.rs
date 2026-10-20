@@ -1,6 +1,9 @@
 //! The input assembly of a Teknic IO-HUB-4-E (instance 100, 228 bytes): what the hub reports.
 //! ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E T2O Input Assembly:
 //! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60
+//!
+//! Written from that table. Where the hub's EDS declares another type, the original line is
+//! commented out above the one that follows the EDS.
 
 use binrw::{BinRead, BinWrite, binrw};
 
@@ -186,12 +189,16 @@ pub struct MotorInputData {
     pub position_target: CipDint,
     pub velocity_target: CipDint,
     pub torque_target: CipInt,
-    pub read_parameter_id_echo: CipUint,
+    // pub read_parameter_id_echo: CipUint,
+    /// INT, as the hub's EDS declares it (Param12 for motor 0)
+    pub read_parameter_id_echo: CipInt,
     pub read_parameter_value: CipDint,
     /// The move type of the last command, or an AOI error code when it was rejected
     pub move_type_ack: CipUsint,
+    // pub move_number_ack: CipUint,
+    /// INT, as the hub's EDS declares it (Param15 for motor 0)
     #[brw(pad_after = 3)]
-    pub move_number_ack: CipUint,
+    pub move_number_ack: CipInt,
 }
 
 // ======= Start of MotorInputData impl ========
@@ -210,24 +217,38 @@ impl MotorInputData {
 
 // ^^^^^^^^ End of MotorInputData impl ^^^^^^^^
 
-/// Analog inputs I/O-0 through I/O-12, in millivolts
+/// Analog inputs I/O-0 through I/O-12, in millivolts. UINT, as the hub's EDS declares them
+/// (Param133-Param145)
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
 pub struct AnalogInputs {
-    pub io0: CipInt,
-    pub io1: CipInt,
-    pub io2: CipInt,
-    pub io3: CipInt,
-    pub io4: CipInt,
-    pub io5: CipInt,
-    pub io6: CipInt,
-    pub io7: CipInt,
-    pub io8: CipInt,
-    pub io9: CipInt,
-    pub io10: CipInt,
-    pub io11: CipInt,
-    pub io12: CipInt,
+    // pub io0: CipInt,
+    // pub io1: CipInt,
+    // pub io2: CipInt,
+    // pub io3: CipInt,
+    // pub io4: CipInt,
+    // pub io5: CipInt,
+    // pub io6: CipInt,
+    // pub io7: CipInt,
+    // pub io8: CipInt,
+    // pub io9: CipInt,
+    // pub io10: CipInt,
+    // pub io11: CipInt,
+    // pub io12: CipInt,
+    pub io0: CipUint,
+    pub io1: CipUint,
+    pub io2: CipUint,
+    pub io3: CipUint,
+    pub io4: CipUint,
+    pub io5: CipUint,
+    pub io6: CipUint,
+    pub io7: CipUint,
+    pub io8: CipUint,
+    pub io9: CipUint,
+    pub io10: CipUint,
+    pub io11: CipUint,
+    pub io12: CipUint,
 }
 
 /// Digital inputs I/O-0 through I/O-12
