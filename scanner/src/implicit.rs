@@ -11,9 +11,11 @@
 //! ```
 //!
 //! The Forward_Open and Forward_Close are unconnected messages, but they only serve the I/O
-//! connection, so they live here rather than in `explicit`. Stage 3 keeps no state: the caller
+//! connection, so they live here rather than in `explicit`. `eds` writes the Forward_Open of a
+//! connection a device's EDS file describes. Stage 3 keeps no state: the caller
 //! owns the sequence numbers and the deadline (see the `implicit-io` example).
 
 pub mod connection;
+pub mod eds;
 pub mod o2t;
 pub mod t2o;

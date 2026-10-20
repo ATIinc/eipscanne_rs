@@ -17,8 +17,11 @@ scanner/src/session.rs                the encapsulation session (TCP 44818), sha
                                       of messaging
 scanner/src/explicit.rs               explicit (unconnected) messaging: send_request,
                                       decode_reply, read_identity
-scanner/src/implicit.rs               implicit messaging: module docs and three `pub mod` lines
+scanner/src/implicit.rs               implicit messaging: module docs and four `pub mod` lines
 scanner/src/implicit/connection.rs    OpenConnection, forward_open, forward_close
+scanner/src/implicit/eds.rs           a connection of an EDS file as its Forward_Open:
+                                      forward_open_request, o2t_ and t2o_real_time_format,
+                                      first_openable_connection (phase 4)
 scanner/src/implicit/o2t.rs           the outputs: build_o2t_packet, send_io_packet
 scanner/src/implicit/t2o.rs           the inputs: bind_io_socket, recv_io_packet,
                                       accept_t2o_packet, input_timeout, FIRST_PACKET_GRACE
@@ -76,12 +79,13 @@ bracket an I/O connection, so they sit under `implicit`.
   `cargo clippy` cover the library and the scanner from the root without `-p`. The workspace has
   one `Cargo.lock`, at the root.
 * `scanner/` is the package `scanner` with `publish = false` (the name is taken on crates.io). Its
-  dependencies are `eipscanne_rs`, `tokio`, `binrw` and `bilge`, with no error-handling crate; its
-  dev-dependencies are `clap` and `rand` (for the examples), `hex-test-macros` and
-  `pretty_assertions`.
+  dependencies are `eipscanne_rs`, `eds_parser` (for `implicit::eds`), `tokio`, `binrw` and
+  `bilge`, with no error-handling crate; its dev-dependencies are `clap` and `rand` (for the
+  examples), `hex-test-macros` and `pretty_assertions`.
 * Every example is in `scanner/examples/`: `read-identity`, `clearlink-explicit-outputs`,
-  `io-hub-explicit-homing` and `implicit-io`. The library has no examples and no dev-dependency
-  on the scanner, `tokio` or `clap`.
+  `io-hub-explicit-homing` and `implicit-io`, plus phase 4's `eds-implicit-io` and
+  `io-hub-implicit`. The library has no examples and no dev-dependency on the scanner, `tokio` or
+  `clap`.
 * Every example is a single file that reads top to bottom and parses its arguments with `clap`;
   the ones that wait or keep hardware moving (`implicit-io`, `io-hub-explicit-homing`) handle
   Ctrl+C. The device assemblies live outside the library in `scanner/assemblies/` (`clearlink`,
@@ -112,7 +116,10 @@ examples use which module. Then `pub mod error`, `explicit`, `implicit` and `ses
   * `UnexpectedPacket(String)`: an I/O packet that is not the next input of the connection; the
     caller reports it and waits for the next one;
   * `OutputSize { connection_size_type, data_size, actual }`: the outputs do not fit the
-    connection.
+    connection;
+  * `Eds(eds_parser::error::Error)`: an EDS file that does not read, or a connection that refers to
+    what it does not define;
+  * `UnsupportedConnection(String)`: a connection of an EDS file this scanner does not open.
 * `Rejection` is the library's plain data (service, general status, Additional Status words).
   The hand-written `Display` writes the service and general status by their `Debug` names, then
   the Connection Manager extended status from `rejection.extended_status()` by name, or any other

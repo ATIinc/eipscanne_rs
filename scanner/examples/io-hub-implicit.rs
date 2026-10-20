@@ -28,6 +28,9 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 use scanner::error::Error;
 use scanner::implicit::connection::{OpenConnection, forward_close, forward_open};
+use scanner::implicit::eds::{
+    first_openable_connection, forward_open_request, o2t_real_time_format, t2o_real_time_format,
+};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
@@ -39,7 +42,7 @@ use eds_parser::connection_manager::Connection;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
-#[path = "../../scanner/assemblies"]
+#[path = "../assemblies"]
 mod assemblies {
     pub mod io_hub;
 }
@@ -86,8 +89,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let text = std::fs::read_to_string(&args.eds)
         .map_err(|error| format!("reading {}: {error}", args.eds.display()))?;
     let eds = Eds::parse(&text)?;
-    let number: u32 = eds.first_openable_connection(None)?;
-    let connection: &Connection = eds.connection(number)?;
+    let number: u32 = first_openable_connection(&eds, None)?;
+    let connection: &Connection = &eds.connections[&number];
 
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
@@ -106,7 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
         // The RPIs, network connection parameters, transport class and trigger, and path
-        ..eds.forward_open_request(number, None)?
+        ..forward_open_request(&eds, connection, None)?
     };
 
     // The connection must carry the assemblies the structs are written for: configuration
@@ -121,8 +124,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .into());
     }
-    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
-    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
+    let o2t_real_time_format: RealTimeFormat = o2t_real_time_format(connection)?;
+    let t2o_real_time_format: RealTimeFormat = t2o_real_time_format(connection)?;
     println!("Connection{number} ({})", connection.name);
 
     // ========= 1. Register the session ============

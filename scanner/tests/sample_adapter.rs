@@ -15,6 +15,7 @@ use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use eds_parser::Eds;
+use scanner::implicit::eds::forward_open_request;
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
 
@@ -34,7 +35,7 @@ fn request(eds: &Eds) -> ForwardOpenRequest {
             originator_serial_number: 0x0001_2345,
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-        ..eds.forward_open_request(1, None).unwrap()
+        ..forward_open_request(eds, &eds.connections[&1], None).unwrap()
     }
 }
 

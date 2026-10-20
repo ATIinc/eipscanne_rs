@@ -7,7 +7,7 @@ use std::fmt;
 /// What every fallible call of the crate returns
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-/// What can go wrong reading an EDS file or opening one of its connections, each with its message
+/// What can go wrong reading an EDS file or resolving what it refers to, each with its message
 #[derive(Debug)]
 pub enum Error {
     /// Text that is not EDS syntax: pest's message, which shows where it is
@@ -19,10 +19,6 @@ pub enum Error {
     /// not define, a param without an integer default, a direction without an RPI or a size, a
     /// number out of range
     Reference(String),
-    /// A connection this scanner does not open, with what the connection offers
-    Refused(String),
-    /// No `ConnectionN` with the N asked for, or none this scanner can open
-    NoConnection(String),
 }
 
 // The error must cross tasks and fit any application's error handling
@@ -35,13 +31,11 @@ const _: () = {
 
 impl Error {
     /// The same error, with where it happened in front of its message: `O->T`, `Connection1`
-    pub(crate) fn context(self, place: impl fmt::Display) -> Error {
+    pub fn context(self, place: impl fmt::Display) -> Error {
         match self {
             Error::Syntax(message) => Error::Syntax(format!("{place}: {message}")),
             Error::Entry(message) => Error::Entry(format!("{place}: {message}")),
             Error::Reference(message) => Error::Reference(format!("{place}: {message}")),
-            Error::Refused(message) => Error::Refused(format!("{place}: {message}")),
-            Error::NoConnection(message) => Error::NoConnection(format!("{place}: {message}")),
         }
     }
 }
@@ -49,11 +43,9 @@ impl Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Error::Syntax(message)
-            | Error::Entry(message)
-            | Error::Reference(message)
-            | Error::Refused(message)
-            | Error::NoConnection(message) => f.write_str(message),
+            Error::Syntax(message) | Error::Entry(message) | Error::Reference(message) => {
+                f.write_str(message)
+            }
         }
     }
 }

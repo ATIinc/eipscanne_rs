@@ -1,5 +1,5 @@
-//! Reads a device's EDS file into its params, assemblies and connections, and one connection into
-//! the values of the Forward_Open that opens it from the `scanner` crate.
+//! Reads a device's EDS file into its params, assemblies and connections, and resolves what a
+//! connection refers to. The `scanner` crate's `implicit::eds` writes a connection's Forward_Open.
 //!
 //! An EDS file is `[Section]` headers, each followed by `Keyword = field, field, ...;` entries.
 //! Each kind of entry read here is a struct whose fields are the entry's fields in file order, in
@@ -18,25 +18,18 @@
 //! params              [Params]: Param, its descriptor and data type
 //! assembly            [Assembly]: Assembly and its members
 //! connection_manager  [Connection Manager]: Connection and its two mask words
-//! forward_open        a Connection as the fields of a ForwardOpenRequest, or why it is refused
-//! error               Error: Syntax, Entry, Reference, Refused or NoConnection, with its message
+//! error               Error: Syntax, Entry or Reference, with its message
 //! ```
-//!
-//! Nothing here touches the network: the `eds-implicit-io` example writes the
-//! `ForwardOpenRequest` and hands it to the scanner.
 
 pub mod assembly;
 pub mod connection_manager;
 pub mod error;
 mod fields;
-mod forward_open;
 pub mod params;
 mod syntax;
 pub mod values;
 
 use std::collections::BTreeMap;
-
-use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 
 use assembly::Assembly;
 use connection_manager::Connection;
@@ -96,81 +89,17 @@ impl Eds {
         Ok(eds)
     }
 
-    /// `ConnectionN`: `eds.connection(1)` is `Connection1`
-    pub fn connection(&self, number: u32) -> Result<&Connection> {
-        self.connections.get(&number).ok_or_else(|| {
-            Error::NoConnection(format!(
-                "Connection{number}: the EDS has no such connection"
-            ))
-        })
-    }
-
-    /// The N of the first `ConnectionN` this scanner can open, or why each one cannot be opened;
-    /// `large` as for `forward_open_request`
-    pub fn first_openable_connection(&self, large: Option<bool>) -> Result<u32> {
-        if self.connections.is_empty() {
-            return Err(Error::NoConnection(
-                "[Connection Manager]: the EDS has no ConnectionN entries".to_string(),
-            ));
-        }
-        let mut refusals = String::new();
-        for &number in self.connections.keys() {
-            match self.forward_open_request(number, large) {
-                Ok(_) => return Ok(number),
-                Err(refusal) => refusals.push_str(&format!("\n  {refusal}")),
-            }
-        }
-        Err(Error::NoConnection(format!(
-            "[Connection Manager]: no connection this scanner can open:{refusals}"
-        )))
-    }
-
-    /// The Forward_Open fields `ConnectionN` decides: both RPIs, both network connection
-    /// parameters, the transport class and trigger, and the connection path. Every other field is
-    /// zero, for the caller to set:
-    ///
-    /// ```text
-    /// let request = ForwardOpenRequest {
-    ///     priority_time_tick: ...,
-    ///     timeout_ticks: 5,
-    ///     o2t_network_connection_id: 0,
-    ///     t2o_network_connection_id: 0x1234_5678,
-    ///     connection_triad: ConnectionTriad { ... },
-    ///     connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-    ///     ..eds.forward_open_request(1, None)?
-    /// };
-    /// ```
-    ///
-    /// `large` picks a Large_Forward_Open (32-bit connection parameters) or a Forward_Open
-    /// (16-bit); with `None`, a Large_Forward_Open only when a direction's connection size needs
-    /// it.
-    pub fn forward_open_request(
-        &self,
-        number: u32,
-        large: Option<bool>,
-    ) -> Result<ForwardOpenRequest> {
-        let connection = self.connection(number)?;
-        forward_open::request(self, connection, large)
-            .map_err(|error| error.context(format_args!("Connection{number}")))
-    }
-
-    /// Bytes of output data, without the sequence count and real-time header:
-    /// `Param1,32,Assem150` is 32
-    pub fn o2t_size(&self, number: u32) -> Result<u16> {
-        let connection = self.connection(number)?;
-        self.data_size(connection.o2t_size, connection.o2t_format)
-            .map_err(|error| error.context(format_args!("Connection{number}: O->T")))
-    }
-
     /// A direction's RPI in microseconds: the number, or the default of the `ParamN` it names
-    pub(crate) fn requested_packet_interval(&self, rpi: Option<NumberOrParam>) -> Result<u32> {
+    pub fn requested_packet_interval(&self, rpi: Option<NumberOrParam>) -> Result<u32> {
         self.resolve(
             rpi.ok_or_else(|| Error::Reference("has no requested packet interval".to_string()))?,
         )
     }
 
-    /// A direction's bytes of data: its size field, else the size of its `AssemN` format
-    pub(crate) fn data_size(
+    /// A direction's bytes of data, without the sequence count and real-time header: its size
+    /// field, else the size of its `AssemN` format. `Param1,32,Assem150` is 32, `Param1,,Assem100`
+    /// the size of Assem100.
+    pub fn data_size(
         &self,
         size: Option<NumberOrParam>,
         format: Option<DataFormat>,
@@ -207,7 +136,7 @@ impl Eds {
     /// The bytes of a path, each `ParamN` replaced by its default in as many little-endian bytes
     /// as its data size: `"20 04 24 [Param2] 2C 96"` is `20 04 24 97 2C 96` for a 1-byte `Param2`
     /// (field 6) defaulting to 0x97
-    pub(crate) fn path_bytes(&self, path: &Path) -> Result<Vec<u8>> {
+    pub fn path_bytes(&self, path: &Path) -> Result<Vec<u8>> {
         let mut bytes: Vec<u8> = Vec::new();
         for part in &path.0 {
             match *part {

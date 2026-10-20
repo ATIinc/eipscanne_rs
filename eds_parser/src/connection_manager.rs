@@ -1,15 +1,11 @@
 //! `[Connection Manager]`: the `ConnectionN` entries, each a connection the device accepts, and
 //! the two mask words that start one. A set mask bit means the device supports that option on the
-//! connection. Their `Debug` names every bit, which is how a refusal shows what a connection
-//! offers.
+//! connection, and their `Debug` names every bit.
 
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, u5, u9};
 
-use eipscanne_rs::cip::connection_manager::parameters::{ConnectionPriority, RealTimeFormat};
-
 use eds_parser_derive::{FromEntry, FromField};
 
-use crate::error::{Error, Result};
 use crate::fields::Unread;
 use crate::values::{DataFormat, NumberOrParam, Path};
 
@@ -49,24 +45,6 @@ pub struct Connection {
     safety_async: Unread,
     safety_max_consumer_number: Unread,
 }
-
-// ======= Start of Connection impl ========
-
-impl Connection {
-    /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (bits 8-10)
-    pub fn o2t_real_time_format(&self) -> Result<RealTimeFormat> {
-        RealTimeFormat::try_from(self.connection_parameters.o2t_real_time_transfer_format())
-            .map_err(|error| error.context("O->T"))
-    }
-
-    /// How the inputs signal run/idle: `0x44440405` is `Modeless` (bits 12-14)
-    pub fn t2o_real_time_format(&self) -> Result<RealTimeFormat> {
-        RealTimeFormat::try_from(self.connection_parameters.t2o_real_time_transfer_format())
-            .map_err(|error| error.context("T->O"))
-    }
-}
-
-// ^^^^^^^^ End of Connection impl ^^^^^^^^
 
 /// Field 1 of `Connection1 = 0x04010002, 0x44440405, Param1,32,Assem150, ...`: the transport
 /// classes, triggers and application types the connection supports. `0x04010002` is class 1
@@ -150,27 +128,6 @@ pub struct ConnectionParameters {
     pub t2o_priorities: Priorities,
 }
 
-// ======= Start of ConnectionParameters impl ========
-
-impl ConnectionParameters {
-    /// The best priority both directions support: scheduled, else high, else low. `0x44440405`
-    /// (scheduled only, both ways) is `Scheduled`; `0x3775_0405` (T->O low and high) is `High`.
-    pub fn shared_priority(&self) -> Option<ConnectionPriority> {
-        let (o2t, t2o) = (self.o2t_priorities(), self.t2o_priorities());
-        if o2t.scheduled() && t2o.scheduled() {
-            Some(ConnectionPriority::Scheduled)
-        } else if o2t.high() && t2o.high() {
-            Some(ConnectionPriority::High)
-        } else if o2t.low() && t2o.low() {
-            Some(ConnectionPriority::Low)
-        } else {
-            None
-        }
-    }
-}
-
-// ^^^^^^^^ End of ConnectionParameters impl ^^^^^^^^
-
 /// The connection size types one direction supports
 #[bitsize(2)]
 #[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
@@ -188,26 +145,9 @@ pub enum RealTimeTransferFormat {
     ZeroLength = 1,
     Heartbeat = 3,
     Header32Bit = 4,
-    /// 2 (reserved) and 5 to 7
+    /// 2 and 5 to 7
     #[fallback]
-    Unsupported(u3),
-}
-
-/// The library's `RealTimeFormat` for a code this scanner supports
-impl TryFrom<RealTimeTransferFormat> for RealTimeFormat {
-    type Error = Error;
-
-    fn try_from(format: RealTimeTransferFormat) -> Result<RealTimeFormat> {
-        match format {
-            RealTimeTransferFormat::Modeless => Ok(RealTimeFormat::Modeless),
-            RealTimeTransferFormat::ZeroLength => Ok(RealTimeFormat::ZeroLength),
-            RealTimeTransferFormat::Heartbeat => Ok(RealTimeFormat::Heartbeat),
-            RealTimeTransferFormat::Header32Bit => Ok(RealTimeFormat::Header32Bit),
-            RealTimeTransferFormat::Unsupported(code) => Err(Error::Refused(format!(
-                "real-time transfer format {code} is not supported"
-            ))),
-        }
-    }
+    Reserved(u3),
 }
 
 /// The connection types one direction supports

@@ -21,9 +21,10 @@ the integer types of the hub's EDS.
   `cargo run --example <name>` work from the root.
 * Crate `eds_parser_derive/` (proc-macro, in `members`): `#[derive(FromEntry)]` and
   `#[derive(FromField)]`, which Rust requires to live in a proc-macro crate of their own.
-* Dependencies: `bilge`, `binrw`, `eds_parser_derive`, `eipscanne_rs`, `parse_int`,
-  `pest`, `pest_derive`, `unescaper`. Dev-dependencies: `scanner`, `tokio`, `clap`, `rand` for the
-  examples, and `hex-test-macros` for the tests.
+* Dependencies: `bilge`, `eds_parser_derive`, `parse_int`, `pest`, `pest_derive`, `unescaper`;
+  no EtherNet/IP types. The `scanner` crate depends on `eds_parser` for `implicit::eds` (a
+  comment there notes it may be worth a feature gate), and holds the two examples, the end-to-end
+  test and its fixture.
 
 ### The file — `src/lib.rs`
 
@@ -37,10 +38,12 @@ number or the param's integer default, a path's `ParamN` to the default in as ma
 bytes as the param's data size, and an `AssemN` format to the assembly's size field or the sum of
 its member sizes. A reference that is missing or has no usable value fails that connection.
 
-Every error is an `error::Error` of one of five kinds, `Syntax`, `Entry`, `Reference`, `Refused`
-or `NoConnection`, whose message says where: the keyword, field and line while reading
+`eds.requested_packet_interval`, `eds.data_size` and `eds.path_bytes` resolve a connection's
+fields. Every error is an `error::Error` of one of three kinds, `Syntax`, `Entry` or `Reference`,
+whose message says where: the keyword, field and line while reading
 (`Connection1: field 4: line 3: Param999,x,Assem101,: expected a number or a ParamN, found "x"`),
-the connection while opening (`Connection1: refers to Param7, which the file does not define`).
+the reference while resolving (`refers to Param7, which the file does not define`);
+`error.context(place)` puts more of where in front (`O->T: ...`).
 
 ### Sections and entries — `src/eds.pest`, `src/syntax.rs`
 
@@ -92,45 +95,48 @@ is `Udint`, any other code `Unknown(code)`) are `bilge` types deriving `FromFiel
 mask words of a `Connection`, `TriggerAndTransport` and `ConnectionParameters`, their bits grouped
 as the EDS comments group them (`TransportClasses`, `Triggers`, `ApplicationTypes`; per direction
 `SizeTypes`, `RealTimeTransferFormat`, `ConnectionTypes`, `Priorities`), so their `Debug` names
-every bit. `ConnectionParameters::shared_priority` and `Connection::o2t_real_time_format` and
-`t2o_real_time_format` pick values from them.
+every bit. `RealTimeTransferFormat` codes 2 and 5 to 7 are `Reserved(code)`.
 
-### The connection — `src/forward_open.rs`
+### The connection — `scanner/src/implicit/eds.rs`
 
-`eds.forward_open_request(number, large)` is the `ForwardOpenRequest` for `ConnectionN` with the
-fields the EDS decides: both requested packet intervals, both network connection parameters, the
-transport class and trigger, and the connection path. Every other field is zero, for the caller to
-set around `..eds.forward_open_request(number, large)?`: tick time and timeout ticks of the
+`forward_open_request(&eds, connection, large)` is the `ForwardOpenRequest` for a `Connection`
+with the fields the EDS decides: both requested packet intervals, both network connection
+parameters, the transport class and trigger, and the connection path. Every other field is zero,
+for the caller to set around `..forward_open_request(&eds, connection, large)?`: tick time and timeout ticks of the
 Forward_Open itself, timeout multiplier, connection IDs (`o2t_network_connection_id` 0: the target
 chooses it) and the connection triad. `large` is `Some(true)` for a Large_Forward_Open (32-bit
 connection parameters), `Some(false)` for a Forward_Open (16-bit), `None` for a Large_Forward_Open
 only when a direction's connection size is over 511 bytes.
 
-`eds.connection(number)` is `ConnectionN` itself (its name, masks and the two real-time formats
-`forward_open` takes), `eds.first_openable_connection(large)` the N of the first connection this
-scanner can open, and `eds.o2t_size(number)` its bytes of output data.
+`o2t_real_time_format(connection)` and `t2o_real_time_format(connection)` are the two real-time
+formats `forward_open` takes, and `first_openable_connection(&eds, large)` the N of the first
+connection this scanner can open. A caller finds `ConnectionN` in `eds.connections`, and its bytes
+of output data with `eds.data_size(connection.o2t_size, connection.o2t_format)`.
 
-Each value is picked from the `Connection`, or the request is refused with an error; a refusal
-about a mask prints the mask with `Debug`, which shows what the connection offers:
+Each value is picked from the `Connection`. An EDS reference that does not resolve is
+`scanner::error::Error::Eds`; a connection this scanner does not open is
+`Error::UnsupportedConnection`, and a refusal about a mask prints the mask with `Debug`, which
+shows what the connection offers:
 
 | Value | From the EDS | Refused when |
 |---|---|---|
 | `transport_type_trigger` | class 1, cyclic, `Direction::Client` | class 1, cyclic or exclusive owner not supported (input-only and listen-only are out of scope) |
 | `*_network_connection_parameters` | point-to-point, exclusive owner; priority: scheduled, else high, else low, among those both directions support; fixed size if supported, else variable; the data size plus `connection_size`'s overhead for class 1 and the direction's real-time format | not point-to-point, no shared priority, over 511 bytes with `Some(false)` |
 | `*_requested_packet_interval` | a number or a `ParamN`'s default, in microseconds | none in the EDS |
-| data size (`o2t_size`) | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
-| `*_real_time_format()` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5–7 |
+| data size (`eds.data_size`) | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
+| `*_real_time_format` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5–7 |
 | `connection_path` | the path, `[ParamN]` replaced by the param's default, read as a `CipPath` | segments other than logical ones |
 
 The client/server bit of the trigger and transport mask is ignored: vendors disagree on it, and
 the originator of a Forward_Open is always the client. When `first_openable_connection` finds no
-connection it can open, its error lists each connection's refusal.
+connection it can open, its error lists each connection's refusal (`Connection2: ...`).
 
-### Example — `eds_parser/examples/eds-implicit-io.rs`
+### Example — `scanner/examples/eds-implicit-io.rs`
 
 The stages of `implicit-io`, with the connection settings taken from an EDS, not from flags. Its
 defaults describe the OpENer adapter of `tests/integration`: `--eds` is the `sample_adapter.eds`
-fixture (by its path under `CARGO_MANIFEST_DIR`) and `--host` is `172.28.0.10`, so
+fixture (`scanner/tests/fixtures`, by its path under `CARGO_MANIFEST_DIR`) and `--host` is
+`172.28.0.10`, so
 `cargo run --example eds-implicit-io` runs against that container. The module docs give the
 commands that start the adapter and what the run prints.
 
@@ -138,7 +144,7 @@ commands that start the adapter and what the run prints.
    connection this scanner can open; `--large true` or `--large false` to choose the Forward_Open
    service, automatic otherwise).
 2. Write the `ForwardOpenRequest` from the originator constants of `implicit-io` and
-   `..eds.forward_open_request(number, large)?`, then print the connection's N and name
+   `..forward_open_request(&eds, connection, large)?`, then print the connection's N and name
    (`Connection1 (Exclusive Owner) from <file>`) and the whole request (`{request:#?}`).
 3. Register, `bind_io_socket`, `forward_open` with the request and the two real-time formats, the
    cyclic loop, `forward_close`, `unregister`. Each send tick builds the outputs with
@@ -154,17 +160,17 @@ commands that start the adapter and what the run prints.
 5. The exchange ends after `--cycles` output packets, on the input timeout or on Ctrl+C; the
    connection is closed and the session unregistered in all three cases.
 
-### Example — `eds_parser/examples/io-hub-implicit.rs`
+### Example — `scanner/examples/io-hub-implicit.rs`
 
 The implicit counterpart of `io-hub-explicit-homing`, one linear file, with the IO-HUB assemblies
-included through `#[path = "../../scanner/assemblies"]` and errors returned as
+included through `#[path = "../assemblies"]` and errors returned as
 `Box<dyn std::error::Error>`:
 
 1. Read the first connection this scanner can open from `--eds` (the local IO-HUB file), and
    check that its request's path is `CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE,
    INPUT_ASSEMBLY_INSTANCE)`, the assemblies the structs are written for.
 2. Write the `ForwardOpenRequest` from the originator constants of `implicit-io` and
-   `..eds.forward_open_request(number, None)?`.
+   `..forward_open_request(&eds, connection, None)?`.
 3. Register, `bind_io_socket`, `forward_open`; each cycle send
    `CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default()))` through `build_o2t_packet` and
    `send_io_packet` (idle unless `--run`; nothing is enabled either way; the outputs never change,
@@ -190,9 +196,10 @@ followed and the doc comment says the documentation may be wrong:
 
 ### Documentation
 
-* `eds_parser/README.md`: `Eds::parse` and the connection functions, the `ForwardOpenRequest` a caller writes,
-  what is accepted and refused, how to run `eds-implicit-io`, and how to write a device's
-  assemblies.
+* `eds_parser/README.md`: the modules, `Eds::parse` and the reference functions.
+* `scanner/examples/README.md`: the `ForwardOpenRequest` a caller writes with `implicit::eds`, what
+  is accepted and refused, how to run `eds-implicit-io` and `io-hub-implicit`, and how to write a
+  device's assemblies.
 * The top-level README lists the crate and its examples; `tests/integration/README.md` describes
   the `eds-implicit-io` run against OpENer.
 * `phases/README.md` lists phase 4's pull request.
@@ -207,14 +214,14 @@ followed and the doc comment says the documentation may be wrong:
 
 ## Tests
 
-* Fixture `eds_parser/tests/fixtures/sample_adapter.eds`, written for this crate (no third-party
-  file): the connection the OpENer container accepts (configuration 151, O->T 150, T->O 100,
+* Fixture `scanner/tests/fixtures/sample_adapter.eds`, written for this repository (no
+  third-party file): the connection the OpENer container accepts (configuration 151, O->T 150, T->O 100,
   32 bytes each, 32-bit header O->T, modeless T->O, scheduled priority, RPI param defaulting to
   1 s) plus an input-only connection. It also covers CRLF line endings, a joined multi-line
   `IconContents`, a `[TCP/IP Interface Class]` section, dates and times, an empty size resolved
   through `AssemN`, an RPI from `ParamN`, a `[ParamN]` in the path, configuration data to be
   ignored.
-* End to end (`tests/sample_adapter.rs`): the fixture's `Connection1`, with the originator of the
+* End to end (`scanner/tests/sample_adapter.rs`): the fixture's `Connection1`, with the originator of the
   library's Forward_Open test, builds the same Forward_Open bytes as that test.
 
 ## Verification

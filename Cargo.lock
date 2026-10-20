@@ -202,17 +202,10 @@ name = "eds_parser"
 version = "0.1.0"
 dependencies = [
  "bilge",
- "binrw",
- "clap",
  "eds_parser_derive",
- "eipscanne_rs",
- "hex-test-macros",
  "parse_int",
  "pest",
  "pest_derive",
- "rand",
- "scanner",
- "tokio",
  "unescaper",
 ]
 
@@ -527,6 +520,7 @@ dependencies = [
  "bilge",
  "binrw",
  "clap",
+ "eds_parser",
  "eipscanne_rs",
  "hex-test-macros",
  "pretty_assertions",

@@ -33,6 +33,9 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::error::Error;
 use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::eds::{
+    first_openable_connection, forward_open_request, o2t_real_time_format, t2o_real_time_format,
+};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
@@ -93,9 +96,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let eds = Eds::parse(&text)?;
     let number: u32 = match args.connection {
         Some(number) => number,
-        None => eds.first_openable_connection(args.large)?,
+        None => first_openable_connection(&eds, args.large)?,
     };
-    let connection: &Connection = eds.connection(number)?;
+    let connection: &Connection = eds
+        .connections
+        .get(&number)
+        .ok_or_else(|| format!("Connection{number}: the EDS has no such connection"))?;
 
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
@@ -114,11 +120,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
         // The RPIs, network connection parameters, transport class and trigger, and path
-        ..eds.forward_open_request(number, args.large)?
+        ..forward_open_request(&eds, connection, args.large)?
     };
-    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
-    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
-    let outputs = vec![0u8; usize::from(eds.o2t_size(number)?)];
+    let o2t_real_time_format: RealTimeFormat = o2t_real_time_format(connection)?;
+    let t2o_real_time_format: RealTimeFormat = t2o_real_time_format(connection)?;
+    let outputs =
+        vec![0u8; usize::from(eds.data_size(connection.o2t_size, connection.o2t_format)?)];
 
     println!(
         "Connection{number} ({}) from {}",
