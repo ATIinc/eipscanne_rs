@@ -1,6 +1,9 @@
 //! The output assembly of a Teknic IO-HUB-4-E (instance 101, 148 bytes): what the scanner
 //! commands. ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E O2T Output Assembly:
 //! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=62
+//!
+//! Written from that table. Where the hub's EDS declares another type, the original line is
+//! commented out above the one that follows the EDS.
 
 use binrw::{BinRead, BinWrite, binrw};
 
@@ -68,8 +71,14 @@ pub struct MotorOutputData {
     pub move_param_4: CipDint,
     /// A `MoveType`; the hub acts on it when `move_number` changes
     pub move_type: CipUsint,
+    // pub move_number: CipUint,
+    /// INT, as the hub's EDS declares it (Param107 for motor 0)
     pub move_number: CipInt,
+    // pub read_parameter_id: CipUint,
+    /// INT, as the hub's EDS declares it (Param108 for motor 0)
     pub read_parameter_id: CipInt,
+    // pub write_parameter_id: CipUint,
+    /// INT, as the hub's EDS declares it (Param109 for motor 0)
     pub write_parameter_id: CipInt,
     #[brw(pad_after = 1)]
     pub write_parameter_value: CipDint,
@@ -116,10 +125,9 @@ pub struct DigitalOutputs {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct IoOutputData {
     pub digital_outputs: DigitalOutputs,
+    // pub analog_output_io12_ua: CipInt,
     /// Analog output on I/O-12 in microamps (0-20000). UINT, as the hub's EDS declares it
-    /// (Param102). The Software Reference lists the matching `AnalogOut_IO12_uA` tag as INT
-    /// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=57); the
-    /// EDS is followed here, and the documentation may be wrong.
+    /// (Param102)
     pub analog_output_io12_ua: CipUint,
     /// PWM duty cycles of I/O-0 through I/O-11 (0 = 0 %, 255 = 100 %)
     pub pwm_duty_cycles: [CipUsint; 12],

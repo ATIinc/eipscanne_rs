@@ -6,7 +6,7 @@
 //! explicit            Unconnected messaging: one request, one reply
 //!   connected         A class 3 connection: requests over Send Unit Data
 //! connection_manager  Forward_Open and Forward_Close, shared by both kinds of connection
-//! implicit            A class 1 I/O connection: cyclic I/O over UDP 2222
+//! implicit            A class 1 I/O connection (also from an EDS file): cyclic I/O over UDP 2222
 //! error               The one error type of every fallible call
 //! ```
 

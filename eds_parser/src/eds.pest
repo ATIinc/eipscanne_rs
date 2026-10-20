@@ -1,36 +1,26 @@
-// The syntax of an EDS file, and nothing about its meaning.
-//
-// Whitespace and `$` comments are silent and may appear anywhere, including between the fields of
-// one entry, so an entry can span any number of lines.
+// The syntax of an EDS file: sections, entries and the raw text of each field. What a field means
+// is read later, by the entry it is in.
 
 WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
 COMMENT    = _{ "$" ~ (!NEWLINE ~ ANY)* }
 
 file    = { SOI ~ section* ~ EOI }
 section = { header ~ entry* }
-
-// `[Section Name]`: letters, digits, spaces and a few punctuation characters
-header       = _{ "[" ~ section_name ~ "]" }
-section_name = @{ (ASCII_ALPHANUMERIC | " " | "/" | "-" | "_" | ".")+ }
-
-// `Keyword = field, field, ...;` with any field allowed to be empty
-entry   = { keyword ~ "=" ~ fields ~ ";" }
+header  = ${ "[" ~ name ~ "]" }
+name    = @{ (!("]" | NEWLINE) ~ ANY)+ }
+entry   = { keyword ~ "=" ~ field ~ (comma ~ field)* ~ semicolon }
 keyword = @{ (ASCII_ALPHANUMERIC | "_")+ }
-fields  = { field ~ ("," ~ field)* }
-field   = { text | integer | word | empty }
 
-// Adjacent quoted strings are one text (`IconContents = "AAA" "BBB";`)
-text   = { string+ }
-string = @{ "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+// Rules of their own, so a syntax error can say it expected one
+comma     = { "," }
+semicolon = { ";" }
 
-// A number is only a number when nothing word-like follows it, so `08-11-2025` and `1.6` are words
-integer = @{ ("0x" ~ ASCII_HEX_DIGIT+ | "-"? ~ ASCII_DIGIT+) ~ !word_char }
-word    = @{ word_char+ }
-word_char = _{ ASCII_ALPHANUMERIC | "_" | "-" | ":" | "." | "/" | "+" }
-empty   = { "" }
+// Any mix of strings, { } groups and bare text, or nothing: `0x0401`, `"In" "put"`, `{1, 2}`, ``
+field      = { (string | group | bare)* }
+string     = ${ "L"? ~ "\"" ~ characters ~ "\"" }
+characters = @{ ("\\" ~ ANY | !"\"" ~ ANY)* }
+group      = { "{" ~ field ~ (comma ~ field)* ~ "}" }
+bare       = @{ (!("," | ";" | "=" | "[" | "]" | "\"" | "{" | "}" | "$" | WHITESPACE) ~ ANY)+ }
 
-// The path string of a connection: hex bytes and `[ParamN]` references to a param's default
-path       = { SOI ~ (param_ref | hex_byte)* ~ EOI }
-hex_byte   = @{ ASCII_HEX_DIGIT ~ ASCII_HEX_DIGIT }
-param_ref  = ${ "[" ~ param_name ~ "]" }
-param_name = @{ ^"Param" ~ ASCII_DIGIT+ }
+// The text of a field that is only quoted strings, or nothing: `"Input " L"Assembly"`, ``
+strings = { SOI ~ string* ~ EOI }
