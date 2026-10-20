@@ -220,8 +220,8 @@ names the EDS param:
   `IconContents`, a `[TCP/IP Interface Class]` section, dates and times, an empty size resolved
   through `AssemN`, an RPI from `ParamN`, a `[ParamN]` in the path, configuration data to be
   ignored.
-* End to end (`scanner/tests/sample_adapter.rs`): the fixture's `Connection1`, with the originator of the
-  library's Forward_Open test, builds the same Forward_Open bytes as that test.
+* End to end (`scanner/tests/eds_forward_open.rs`): the fixture's `Connection1`, with the
+  originator of the library's Forward_Open test, builds the same Forward_Open bytes as that test.
 
 ## Verification
 
