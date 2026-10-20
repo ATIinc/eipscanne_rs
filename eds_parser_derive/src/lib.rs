@@ -9,9 +9,9 @@ use syn::{Data, DataStruct, DeriveInput, Error, Fields, parse_macro_input};
 /// own `FromEntry`: a value of one field from the next field, a `Vec` from the rest of the entry:
 ///
 /// ```text
-/// #[derive(FromEntry)]                    impl FromEntry for Assembly {
-/// pub struct Assembly {                       fn from_entry(entry: &mut Entry) -> Result<Self> {
-///     pub name: String,                           Ok(Assembly {
+/// #[derive(FromEntry)]                    impl FromEntry for AssemblyEntry {
+/// pub struct AssemblyEntry {                  fn from_entry(entry: &mut Entry) -> Result<Self> {
+///     pub name: String,                           Ok(AssemblyEntry {
 ///     ...                                             name: FromEntry::from_entry(entry)?,
 ///     pub members: Vec<AssemblyMember>,               ...
 /// }                                                   members: FromEntry::from_entry(entry)?,

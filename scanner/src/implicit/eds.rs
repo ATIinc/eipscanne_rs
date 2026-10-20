@@ -3,7 +3,7 @@
 //! point-to-point both ways. The caller sets what an EDS does not describe:
 //!
 //! ```text
-//! let connection: &Connection = &eds.connections[&first_openable_connection(&eds, None)?];
+//! let connection: &ConnectionEntry = &eds.connections[&first_openable_connection(&eds, None)?];
 //! let request = ForwardOpenRequest {
 //!     priority_time_tick: ...,
 //!     timeout_ticks: 5,
@@ -23,7 +23,9 @@ use bilge::prelude::{Integer, u9};
 use binrw::BinRead;
 
 use eds_parser::Eds;
-use eds_parser::connection_manager::{Connection, ConnectionParameters, RealTimeTransferFormat};
+use eds_parser::connection_manager::{
+    ConnectionEntry, ConnectionParametersMask, RealTimeTransferFormat,
+};
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
@@ -82,7 +84,7 @@ pub fn first_openable_connection(eds: &Eds, large: Option<bool>) -> Result<u32> 
 /// ```
 pub fn forward_open_request(
     eds: &Eds,
-    connection: &Connection,
+    connection: &ConnectionEntry,
     large: Option<bool>,
 ) -> Result<ForwardOpenRequest> {
     let trigger_and_transport = connection.trigger_and_transport;
@@ -238,7 +240,7 @@ fn cip_path(bytes: &[u8]) -> Option<CipPath> {
 }
 
 /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (bits 8-10)
-pub fn o2t_real_time_format(connection: &Connection) -> Result<RealTimeFormat> {
+pub fn o2t_real_time_format(connection: &ConnectionEntry) -> Result<RealTimeFormat> {
     real_time_format(
         "O->T",
         connection
@@ -248,7 +250,7 @@ pub fn o2t_real_time_format(connection: &Connection) -> Result<RealTimeFormat> {
 }
 
 /// How the inputs signal run/idle: `0x44440405` is `Modeless` (bits 12-14)
-pub fn t2o_real_time_format(connection: &Connection) -> Result<RealTimeFormat> {
+pub fn t2o_real_time_format(connection: &ConnectionEntry) -> Result<RealTimeFormat> {
     real_time_format(
         "T->O",
         connection
@@ -272,7 +274,7 @@ fn real_time_format(direction: &str, format: RealTimeTransferFormat) -> Result<R
 
 /// The best priority both directions support: scheduled, else high, else low. `0x44440405`
 /// (scheduled only, both ways) is `Scheduled`; `0x3775_0405` (T->O low and high) is `High`.
-fn shared_priority(connection_parameters: ConnectionParameters) -> Option<ConnectionPriority> {
+fn shared_priority(connection_parameters: ConnectionParametersMask) -> Option<ConnectionPriority> {
     let (o2t, t2o) = (
         connection_parameters.o2t_priorities(),
         connection_parameters.t2o_priorities(),

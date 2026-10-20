@@ -6,8 +6,8 @@ use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, 
 
 use eds_parser_derive::{FromEntry, FromField};
 
-use crate::fields::Unread;
-use crate::values::{DataFormat, NumberOrParam, Path};
+use crate::error::{Error, Result};
+use crate::fields::{FromField, NumberOrParam, Path, Unread, numbered};
 
 /// `ConnectionN` of `[Connection Manager]`, its fields in file order:
 ///
@@ -24,9 +24,9 @@ use crate::values::{DataFormat, NumberOrParam, Path};
 ///     "20 04 24 [Param2] 2C 96 2C 64";    $ path
 /// ```
 #[derive(Debug, Clone, PartialEq, FromEntry)]
-pub struct Connection {
-    pub trigger_and_transport: TriggerAndTransport,
-    pub connection_parameters: ConnectionParameters,
+pub struct ConnectionEntry {
+    pub trigger_and_transport: TriggerAndTransportMask,
+    pub connection_parameters: ConnectionParametersMask,
     /// Microseconds
     pub o2t_rpi: Option<NumberOrParam>,
     /// Bytes of data, without the sequence count and real-time header
@@ -51,7 +51,7 @@ pub struct Connection {
 /// (bit 1), cyclic (bit 16), exclusive owner (bit 26).
 #[bitsize(32)]
 #[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy, FromField)]
-pub struct TriggerAndTransport {
+pub struct TriggerAndTransportMask {
     /// Bits 0-15
     pub transport_classes: TransportClasses,
     /// Bits 16-23
@@ -105,7 +105,7 @@ pub struct ApplicationTypes {
 /// priority both ways (bits 26, 30).
 #[bitsize(32)]
 #[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy, FromField)]
-pub struct ConnectionParameters {
+pub struct ConnectionParametersMask {
     /// Bits 0-1
     pub o2t_size_types: SizeTypes,
     /// Bits 2-3
@@ -168,4 +168,29 @@ pub struct Priorities {
     pub high: bool,
     pub scheduled: bool,
     reserved: u1,
+}
+
+/// The data format of a connection direction: `Assem100`, `AssemExa100`, `Param4`
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DataFormat {
+    Assem(u32),
+    AssemExa(u32),
+    Param(u32),
+}
+
+/// `Assem100` -> `Assem(100)`, `AssemExa7` -> `AssemExa(7)`, `Param4` -> `Param(4)`
+impl FromField for DataFormat {
+    fn from_field(text: &str) -> Result<DataFormat> {
+        if let Some(number) = numbered(text, "AssemExa") {
+            Ok(DataFormat::AssemExa(number))
+        } else if let Some(number) = numbered(text, "Assem") {
+            Ok(DataFormat::Assem(number))
+        } else if let Some(number) = numbered(text, "Param") {
+            Ok(DataFormat::Param(number))
+        } else {
+            Err(Error::Entry(format!(
+                "expected an AssemN, AssemExaN or ParamN, found {text:?}"
+            )))
+        }
+    }
 }

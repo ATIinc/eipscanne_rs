@@ -31,20 +31,13 @@ pub(crate) struct Section<'a> {
 
 /// `Connection1 = 0x04010002, 0x77750405, ...;`, its fields read one after another in file order.
 /// A field that does not read as its type is an error naming the entry, the field and the line it
-/// is on:
-///
-/// ```text
-/// Connection1: field 4
-///
-/// Caused by:
-///     0: line 2389: Param999,x,Assem101,  $ O->T RPI, size, format
-///     1: expected a number or a ParamN, found "x"
-/// ```
+/// is on: `Connection1: field 4: line 3: Param999,x,Assem101,: expected a number or a ParamN, found
+/// "x": invalid digit found in string`.
 pub(crate) struct Entry<'a> {
     pub keyword: &'a str,
     /// Each field as the grammar found it, with where it is in the file
     fields: Vec<Pair<'a, Rule>>,
-    /// Where the entry's `;` is
+    /// Just past the entry's `;`
     end: Position<'a>,
     /// How many fields are read; the next one is `fields[fields_read]`
     fields_read: usize,
@@ -131,37 +124,23 @@ impl<'a> Entry<'a> {
 ///   = expected `,`, `;`, a string, a { } group, or a value
 /// ```
 pub(crate) fn sections(text: &str) -> Result<Vec<Section<'_>>> {
-    let file = EdsGrammar::parse(Rule::file, text)
+    Ok(EdsGrammar::parse(Rule::file, text)
         .map_err(|error| Error::Syntax(error.renamed_rules(rule_description).to_string()))?
-        .next()
-        .expect("the grammar matches one file");
-    Ok(file
-        .into_inner()
+        .flat_map(|file| file.into_inner())
         .filter(|pair| pair.as_rule() == Rule::section)
         .map(section)
         .collect())
 }
 
-/// What is inside each quoted string of a field's text, when it is only quoted strings:
-/// `"Input " L"Assembly"` is `Input ` and `Assembly`, and empty text is none of them
-pub(crate) fn quoted_strings(text: &str) -> Option<Vec<&str>> {
-    let strings = EdsGrammar::parse(Rule::strings, text).ok()?;
-    Some(
-        strings
-            .flatten()
-            .filter(|pair| pair.as_rule() == Rule::characters)
-            .map(|pair| pair.as_str())
-            .collect(),
-    )
-}
-
 fn section(pair: Pair<Rule>) -> Section {
     let mut children = pair.into_inner();
-    let header = children.next().expect("a section starts with its header");
+    let header = children
+        .next()
+        .expect("eds.pest: section = { header ~ entry* }");
     let name = header
         .into_inner()
         .next()
-        .expect("a header holds the section's name");
+        .expect(r#"eds.pest: header = ${ "[" ~ name ~ "]" }"#);
     Section {
         name: name.as_str().trim(),
         entries: children.map(entry).collect(),
@@ -169,18 +148,17 @@ fn section(pair: Pair<Rule>) -> Section {
 }
 
 fn entry(pair: Pair<Rule>) -> Entry {
+    let end = pair.as_span().end_pos();
     let mut children = pair.into_inner();
-    let keyword = children.next().expect("an entry starts with its keyword");
-    let semicolon = children
-        .clone()
-        .find(|child| child.as_rule() == Rule::semicolon)
-        .expect("an entry ends with its ;");
+    let keyword = children
+        .next()
+        .expect(r#"eds.pest: entry = { keyword ~ "=" ~ field ~ (comma ~ field)* ~ semicolon }"#);
     Entry {
         keyword: keyword.as_str(),
         fields: children
             .filter(|child| child.as_rule() == Rule::field)
             .collect(),
-        end: semicolon.as_span().start_pos(),
+        end,
         fields_read: 0,
     }
 }
@@ -199,4 +177,17 @@ fn rule_description(rule: &Rule) -> String {
         Rule::WHITESPACE | Rule::COMMENT => "whitespace or a $ comment",
     }
     .to_string()
+}
+
+/// What is inside each quoted string of a field's text, when it is only quoted strings:
+/// `"Input " L"Assembly"` is `Input ` and `Assembly`, and empty text is none of them
+pub(crate) fn quoted_strings(text: &str) -> Option<Vec<&str>> {
+    let strings = EdsGrammar::parse(Rule::strings, text).ok()?;
+    Some(
+        strings
+            .flatten()
+            .filter(|pair| pair.as_rule() == Rule::characters)
+            .map(|pair| pair.as_str())
+            .collect(),
+    )
 }

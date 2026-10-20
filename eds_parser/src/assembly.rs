@@ -2,8 +2,8 @@
 
 use eds_parser_derive::FromEntry;
 
-use crate::fields::Unread;
-use crate::values::{MemberReference, NumberOrParam, Path};
+use crate::error::{Error, Result};
+use crate::fields::{FromField, NumberOrParam, Path, Unread, numbered};
 
 /// `AssemN` of `[Assembly]`, its fields in file order: six fields, then `member size, member
 /// reference` pairs up to the last non-empty field:
@@ -20,7 +20,7 @@ use crate::values::{MemberReference, NumberOrParam, Path};
 ///     8,;
 /// ```
 #[derive(Debug, Clone, PartialEq, FromEntry)]
-pub struct Assembly {
+pub struct AssemblyEntry {
     pub name: String,
     pub path: Option<Path>,
     /// Bytes of data
@@ -44,4 +44,34 @@ pub struct Assembly {
 pub struct AssemblyMember {
     pub size_bits: Option<u16>,
     pub reference: Option<MemberReference>,
+}
+
+/// What an assembly member holds: `Param1`, `Assem101`, `0x1F`, `"20 04 24 01"`
+#[derive(Debug, Clone, PartialEq)]
+pub enum MemberReference {
+    Param(u32),
+    Assem(u32),
+    Number(i64),
+    Path(Path),
+}
+
+/// `Param1` -> `Param(1)`, `Assem101` -> `Assem(101)`, `0x1F` -> `Number(31)`, `"24 01"` -> `Path`
+impl FromField for MemberReference {
+    fn from_field(text: &str) -> Result<MemberReference> {
+        if let Some(number) = numbered(text, "Param") {
+            Ok(MemberReference::Param(number))
+        } else if let Some(number) = numbered(text, "Assem") {
+            Ok(MemberReference::Assem(number))
+        } else if text.contains('"') {
+            Path::from_field(text).map(MemberReference::Path)
+        } else {
+            parse_int::parse(text)
+                .map(MemberReference::Number)
+                .map_err(|cause| {
+                    Error::Entry(format!(
+                        "expected a ParamN, AssemN, number or path, found {text:?}: {cause}"
+                    ))
+                })
+        }
+    }
 }

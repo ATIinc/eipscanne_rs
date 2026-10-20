@@ -4,8 +4,8 @@ use bilge::prelude::{DebugBits, FromBits, bitsize, u2};
 
 use eds_parser_derive::{FromEntry, FromField};
 
-use crate::fields::Unread;
-use crate::values::ParamValue;
+use crate::error::{Error, Result};
+use crate::fields::{FromField, Unread};
 
 /// `ParamN` of `[Params]`, its fields in file order:
 ///
@@ -25,7 +25,7 @@ use crate::values::ParamValue;
 ///     1;                          $ decimal precision
 /// ```
 #[derive(Debug, Clone, PartialEq, FromEntry)]
-pub struct Param {
+pub struct ParamEntry {
     reserved: Unread,
     link_path_size: Unread,
     link_path: Unread,
@@ -118,4 +118,29 @@ pub enum CipDataType {
 
     #[fallback]
     Unknown(u8),
+}
+
+/// A value in a param's data type, its minimum, maximum or default: `1000`, `0x97`, `2.5`, `"on"`
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParamValue {
+    Integer(i64),
+    Real(f64),
+    Text(String),
+}
+
+/// `0x97` -> `Integer(151)`, `2.5` -> `Real(2.5)`, `"on"` -> `Text("on")`
+impl FromField for ParamValue {
+    fn from_field(text: &str) -> Result<ParamValue> {
+        if let Ok(integer) = parse_int::parse(text) {
+            return Ok(ParamValue::Integer(integer));
+        }
+        if let Ok(real) = text.parse::<f64>() {
+            return Ok(ParamValue::Real(real));
+        }
+        String::from_field(text).map(ParamValue::Text).map_err(|_| {
+            Error::Entry(format!(
+                "expected a number or a quoted string, found {text:?}"
+            ))
+        })
+    }
 }

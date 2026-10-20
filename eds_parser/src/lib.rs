@@ -11,32 +11,28 @@
 //! syntax              the text split into sections and entries by the grammar in eds.pest, and an
 //!                     entry's fields read in file order
 //! fields              FromEntry (derived by the eds_parser_derive crate) for a struct read from
-//!                     consecutive fields, and FromField (derived there for bilge types) for the
-//!                     value of one field
-//! values              the kinds of value a field holds beyond strings and integers
-//!                     (NumberOrParam, DataFormat, Path, ...)
-//! params              [Params]: Param, its descriptor and data type
-//! assembly            [Assembly]: Assembly and its members
-//! connection_manager  [Connection Manager]: Connection and its two mask words
+//!                     consecutive fields, FromField (derived there for bilge types) for the value
+//!                     of one field, and the values of more than one section (NumberOrParam, Path)
+//! params              [Params]: ParamEntry, its descriptor, data type and values
+//! assembly            [Assembly]: AssemblyEntry, its members and what they refer to
+//! connection_manager  [Connection Manager]: ConnectionEntry, its two mask words and data format
 //! error               Error: Syntax, Entry or Reference, with its message
 //! ```
 
 pub mod assembly;
 pub mod connection_manager;
 pub mod error;
-mod fields;
+pub mod fields;
 pub mod params;
 mod syntax;
-pub mod values;
 
 use std::collections::BTreeMap;
 
-use assembly::Assembly;
-use connection_manager::Connection;
+use assembly::AssemblyEntry;
+use connection_manager::{ConnectionEntry, DataFormat};
 use error::{Error, Result};
-use fields::numbered;
-use params::Param;
-use values::{DataFormat, NumberOrParam, ParamValue, Path, PathPart};
+use fields::{NumberOrParam, Path, PathPart, numbered};
+use params::{ParamEntry, ParamValue};
 
 /// The params, assemblies and connections of an EDS file, by their N. In this file, `params` holds
 /// `Param1`, `assemblies` holds `Assem100` and `connections` holds `Connection1`:
@@ -53,9 +49,9 @@ use values::{DataFormat, NumberOrParam, ParamValue, Path, PathPart};
 /// ```
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Eds {
-    pub params: BTreeMap<u32, Param>,
-    pub assemblies: BTreeMap<u32, Assembly>,
-    pub connections: BTreeMap<u32, Connection>,
+    pub params: BTreeMap<u32, ParamEntry>,
+    pub assemblies: BTreeMap<u32, AssemblyEntry>,
+    pub connections: BTreeMap<u32, ConnectionEntry>,
 }
 
 // ======= Start of Eds impl ========
@@ -91,7 +87,7 @@ impl Eds {
 
     /// A direction's RPI in microseconds: the number, or the default of the `ParamN` it names
     pub fn requested_packet_interval(&self, rpi: Option<NumberOrParam>) -> Result<u32> {
-        self.resolve(
+        self.resolve_value(
             rpi.ok_or_else(|| Error::Reference("has no requested packet interval".to_string()))?,
         )
     }
@@ -105,31 +101,11 @@ impl Eds {
         format: Option<DataFormat>,
     ) -> Result<u16> {
         match (size, format) {
-            (Some(size), _) => self.resolve(size),
+            (Some(size), _) => self.resolve_value(size),
             (None, Some(DataFormat::Assem(number))) => self.assembly_size(number),
             (None, _) => Err(Error::Reference(
                 "has no size, and no AssemN format that gives one".to_string(),
             )),
-        }
-    }
-
-    /// The number a field holds, or the default of the `ParamN` it names, as a `T`: `32` is 32,
-    /// and `Param1` is 1000000 for `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`
-    /// (field 12). A number `T` cannot hold is an error naming where it comes from and `T`:
-    /// `70000 is out of range for u16`, `Param3's default 70000 is out of range for u16`
-    pub(crate) fn resolve<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
-        let type_name = std::any::type_name::<T>();
-        match value {
-            NumberOrParam::Number(number) => T::try_from(number)
-                .map_err(|_| Error::Reference(format!("{number} is out of range for {type_name}"))),
-            NumberOrParam::Param(param) => {
-                let default = self.param_default(param)?;
-                T::try_from(default).map_err(|_| {
-                    Error::Reference(format!(
-                        "Param{param}'s default {default} is out of range for {type_name}"
-                    ))
-                })
-            }
         }
     }
 
@@ -162,14 +138,14 @@ impl Eds {
     /// Assem100 = "In", "", 32, 0x0000,,;                      $ Assem100: 32 bytes
     /// Assem101 = "Out", "", , 0x0000,,, 16,Param2, 8,;        $ Assem101: 16 + 8 bits, 3 bytes
     /// ```
-    pub(crate) fn assembly_size(&self, number: u32) -> Result<u16> {
+    fn assembly_size(&self, number: u32) -> Result<u16> {
         let assembly = self.assemblies.get(&number).ok_or_else(|| {
             Error::Reference(format!(
                 "refers to Assem{number}, which the file does not define"
             ))
         })?;
         if let Some(size) = assembly.size {
-            return self.resolve(size);
+            return self.resolve_value(size);
         }
 
         let bits: u32 = assembly
@@ -188,12 +164,24 @@ impl Eds {
             })
     }
 
-    fn param(&self, number: u32) -> Result<&Param> {
-        self.params.get(&number).ok_or_else(|| {
-            Error::Reference(format!(
-                "refers to Param{number}, which the file does not define"
-            ))
-        })
+    /// The number a field holds, or the default of the `ParamN` it names, as a `T`: `32` is 32,
+    /// and `Param1` is 1000000 for `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`
+    /// (field 12). A number `T` cannot hold is an error naming where it comes from and `T`:
+    /// `70000 is out of range for u16`, `Param3's default 70000 is out of range for u16`
+    fn resolve_value<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
+        let type_name = std::any::type_name::<T>();
+        match value {
+            NumberOrParam::Number(number) => T::try_from(number)
+                .map_err(|_| Error::Reference(format!("{number} is out of range for {type_name}"))),
+            NumberOrParam::Param(param) => {
+                let default = self.param_default(param)?;
+                T::try_from(default).map_err(|_| {
+                    Error::Reference(format!(
+                        "Param{param}'s default {default} is out of range for {type_name}"
+                    ))
+                })
+            }
+        }
     }
 
     fn param_default(&self, number: u32) -> Result<i64> {
@@ -203,6 +191,14 @@ impl Eds {
                 "refers to Param{number}, which has no integer default"
             ))),
         }
+    }
+
+    fn param(&self, number: u32) -> Result<&ParamEntry> {
+        self.params.get(&number).ok_or_else(|| {
+            Error::Reference(format!(
+                "refers to Param{number}, which the file does not define"
+            ))
+        })
     }
 }
 

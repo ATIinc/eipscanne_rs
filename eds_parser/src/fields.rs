@@ -1,5 +1,6 @@
 //! Reading the fields of an entry (see `syntax` for entries and fields): `FromEntry` for a struct
-//! read from consecutive fields, and `FromField` for a value read from one field.
+//! read from consecutive fields, `FromField` for a value read from one field, and the values a
+//! field holds in more than one section: `NumberOrParam` and `Path`.
 
 use crate::error::{Error, Result};
 use crate::syntax::{Entry, quoted_strings};
@@ -31,7 +32,7 @@ impl<T: FromEntry> FromEntry for Vec<T> {
 
 /// A value read from the text of one field: `0x20` as a `u16`, `Param1` as a `NumberOrParam`,
 /// `"Input " "Assembly"` as a `String`. `#[derive(FromField)]` implements it for a `bilge`
-/// bitfield or enum, read as its backing integer: `0x04010002` as a `TriggerAndTransport`.
+/// bitfield or enum, read as its backing integer: `0x04010002` as a `TriggerAndTransportMask`.
 pub(crate) trait FromField: Sized {
     fn from_field(text: &str) -> Result<Self>;
 }
@@ -93,6 +94,65 @@ impl FromField for u32 {
         parse_int::parse(text)
             .map_err(|cause| Error::Entry(format!("expected a u32, found {text:?}: {cause}")))
     }
+}
+
+/// A number, or a `ParamN` that stands for its default: `32`, `0x20`, `Param3`
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum NumberOrParam {
+    Number(i64),
+    Param(u32),
+}
+
+/// `0x20` -> `Number(32)`, `Param3` -> `Param(3)`
+impl FromField for NumberOrParam {
+    fn from_field(text: &str) -> Result<NumberOrParam> {
+        if let Some(param) = numbered(text, "Param") {
+            return Ok(NumberOrParam::Param(param));
+        }
+        parse_int::parse(text)
+            .map(NumberOrParam::Number)
+            .map_err(|cause| {
+                Error::Entry(format!(
+                    "expected a number or a ParamN, found {text:?}: {cause}"
+                ))
+            })
+    }
+}
+
+/// A path string: hex bytes and `ParamN` references, written with or without brackets, each
+/// standing for the param's default: `"20 04 24 [Param2] 2C 96 2C 64"`
+#[derive(Debug, Clone, PartialEq)]
+pub struct Path(pub Vec<PathPart>);
+
+/// `"20 04 [Param2]"` -> `[Byte(0x20), Byte(0x04), Param(2)]`
+impl FromField for Path {
+    fn from_field(text: &str) -> Result<Path> {
+        let path = String::from_field(text)?;
+        path.split_whitespace()
+            .map(|token| {
+                let reference = token.trim_start_matches('[').trim_end_matches(']');
+                if let Some(param) = numbered(reference, "Param") {
+                    return Ok(PathPart::Param(param));
+                }
+                Some(token)
+                    .filter(|token| token.len() == 2)
+                    .and_then(|token| u8::from_str_radix(token, 16).ok())
+                    .map(PathPart::Byte)
+                    .ok_or_else(|| {
+                        Error::Entry(format!(
+                            "path {path:?}: {token} is neither a hex byte nor a ParamN"
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<PathPart>>>()
+            .map(Path)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum PathPart {
+    Byte(u8),
+    Param(u32),
 }
 
 /// The N of a keyword that is `prefix` followed by digits (`Param12` -> 12), case ignored

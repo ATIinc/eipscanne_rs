@@ -21,12 +21,6 @@ pub enum Error {
     Reference(String),
 }
 
-// The error must cross tasks and fit any application's error handling
-const _: () = {
-    const fn assert_send_sync<T: Send + Sync + 'static>() {}
-    assert_send_sync::<Error>();
-};
-
 // ======= Start of Error impl ========
 
 impl Error {
@@ -53,3 +47,9 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {}
 
 // ^^^^^^^^ End of Error impl ^^^^^^^^
+
+// The error must cross tasks and fit any application's error handling
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync + 'static>() {}
+    assert_send_sync::<Error>();
+};

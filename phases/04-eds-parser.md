@@ -72,39 +72,37 @@ short entry is empty, and a non-empty field past the last one `T` reads is an er
   written) and an empty field as `""`; `Unread` takes a field this crate does not use.
   `#[derive(FromField)]` implements it for a `bilge` bitfield or enum, read as its backing integer
   (`Bitsized::ArbitraryInt`).
-
-### Field values — `src/values.rs`
-
-The kinds of value a field holds beyond strings and integers, each a `FromField`:
-
-* `NumberOrParam`: `Number(i64)` or `Param(u32)`; `DataFormat`: `Assem`, `AssemExa` or `Param`;
-* `ParamValue`: `Integer`, `Real` or `Text`, a param's minimum, maximum or default;
-* `Path`: hex bytes and `[ParamN]` or `ParamN` references (`"20 04 24 [Param3] 2C 65"`);
-* `MemberReference`: `Param`, `Assem`, `Number` or `Path`.
+* The values of more than one section, each a `FromField`: `NumberOrParam`, `Number(i64)` or
+  `Param(u32)`; `Path`, hex bytes and `[ParamN]` or `ParamN` references
+  (`"20 04 24 [Param3] 2C 65"`).
 
 ### Entry structs — `src/params.rs`, `src/assembly.rs`, `src/connection_manager.rs`
 
-One module per section. `Param` (24 members), `Assembly` (6, then `members`, the remaining pairs
-as `AssemblyMember { size_bits, reference }`) and `Connection` (17) derive `FromEntry` and list
-every field of their entry in order, named after the field; the fields this crate does not use are
-private `Unread` members. Each struct's doc comment shows an example entry.
+One module per section. `ParamEntry` (24 members), `AssemblyEntry` (6, then `members`, the
+remaining pairs as `AssemblyMember { size_bits, reference }`) and `ConnectionEntry` (17) derive
+`FromEntry` and list every field of their entry in order, named after the field; the fields this
+crate does not use are private `Unread` members. Each struct's doc comment shows an example entry.
+A value only one section holds is a `FromField` in that section's module: `ParamValue` (`Integer`,
+`Real` or `Text`, a param's minimum, maximum or default), `MemberReference` (`Param`, `Assem`,
+`Number` or `Path`) and `DataFormat` (`Assem`, `AssemExa` or `Param`).
 
-`ParamDescriptor` (field 4 of a `Param`, 16 bits: `0x0004` supports scaling, `0x0010` read only)
-and `CipDataType` (field 5, the elementary data type codes `0xC1` BOOL to `0xDE` STRINGI, `0xC8`
-is `Udint`, any other code `Unknown(code)`) are `bilge` types deriving `FromField`. So are the two
-mask words of a `Connection`, `TriggerAndTransport` and `ConnectionParameters`, their bits grouped
-as the EDS comments group them (`TransportClasses`, `Triggers`, `ApplicationTypes`; per direction
-`SizeTypes`, `RealTimeTransferFormat`, `ConnectionTypes`, `Priorities`), so their `Debug` names
-every bit. `RealTimeTransferFormat` codes 2 and 5 to 7 are `Reserved(code)`.
+`ParamDescriptor` (field 4 of a `ParamEntry`, 16 bits: `0x0004` supports scaling, `0x0010` read
+only) and `CipDataType` (field 5, the elementary data type codes `0xC1` BOOL to `0xDE` STRINGI,
+`0xC8` is `Udint`, any other code `Unknown(code)`) are `bilge` types deriving `FromField`. So are
+the two mask words of a `ConnectionEntry`, `TriggerAndTransportMask` and
+`ConnectionParametersMask`, their bits grouped as the EDS comments group them (`TransportClasses`,
+`Triggers`, `ApplicationTypes`; per direction `SizeTypes`, `RealTimeTransferFormat`,
+`ConnectionTypes`, `Priorities`), so their `Debug` names every bit. `RealTimeTransferFormat` codes
+2 and 5 to 7 are `Reserved(code)`.
 
 ### The connection — `scanner/src/implicit/eds.rs`
 
-`forward_open_request(&eds, connection, large)` is the `ForwardOpenRequest` for a `Connection`
-with the fields the EDS decides: both requested packet intervals, both network connection
-parameters, the transport class and trigger, and the connection path. Every other field is zero,
-for the caller to set around `..forward_open_request(&eds, connection, large)?`: tick time and timeout ticks of the
-Forward_Open itself, timeout multiplier, connection IDs (`o2t_network_connection_id` 0: the target
-chooses it) and the connection triad. `large` is `Some(true)` for a Large_Forward_Open (32-bit
+`forward_open_request(&eds, connection, large)` is the `ForwardOpenRequest` for a
+`ConnectionEntry` with the fields the EDS decides: both requested packet intervals, both network
+connection parameters, the transport class and trigger, and the connection path. Every other field
+is zero, for the caller to set around `..forward_open_request(&eds, connection, large)?`: tick
+time and timeout ticks of the Forward_Open itself, timeout multiplier, connection IDs
+(`o2t_network_connection_id` 0: the target chooses it) and the connection triad. `large` is `Some(true)` for a Large_Forward_Open (32-bit
 connection parameters), `Some(false)` for a Forward_Open (16-bit), `None` for a Large_Forward_Open
 only when a direction's connection size is over 511 bytes.
 
@@ -113,7 +111,7 @@ formats `forward_open` takes, and `first_openable_connection(&eds, large)` the N
 connection this scanner can open. A caller finds `ConnectionN` in `eds.connections`, and its bytes
 of output data with `eds.data_size(connection.o2t_size, connection.o2t_format)`.
 
-Each value is picked from the `Connection`. An EDS reference that does not resolve is
+Each value is picked from the `ConnectionEntry`. An EDS reference that does not resolve is
 `scanner::error::Error::Eds`; a connection this scanner does not open is
 `Error::UnsupportedConnection`, and a refusal about a mask prints the mask with `Debug`, which
 shows what the connection offers:

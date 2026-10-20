@@ -38,7 +38,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::connection_manager::Connection;
+use eds_parser::connection_manager::ConnectionEntry;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|error| format!("reading {}: {error}", args.eds.display()))?;
     let eds = Eds::parse(&text)?;
     let number: u32 = first_openable_connection(&eds, None)?;
-    let connection: &Connection = &eds.connections[&number];
+    let connection: &ConnectionEntry = &eds.connections[&number];
 
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out

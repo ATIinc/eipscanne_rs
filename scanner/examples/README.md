@@ -147,7 +147,7 @@ connection triad) and takes the rest from `implicit::eds`:
 ```rust
 let eds = Eds::parse(&eds_text)?;
 let number: u32 = first_openable_connection(&eds, None)?; // or the N of any ConnectionN
-let connection: &Connection = &eds.connections[&number];
+let connection: &ConnectionEntry = &eds.connections[&number];
 let request = ForwardOpenRequest {
     // ... originator fields ...
     ..forward_open_request(&eds, connection, None)?
@@ -163,8 +163,8 @@ over 511 bytes on the wire.
 The masks say what the device *supports*; one value is picked from them, or the connection is
 refused (`Error::UnsupportedConnection`) with the mask's `Debug`, which shows what it offers
 (`this scanner opens class 1, cyclic, exclusive-owner connections; this one offers
-TriggerAndTransport { transport_classes: TransportClasses { class_0: false, class_1: true, ... },
-... }`):
+TriggerAndTransportMask { transport_classes: TransportClasses { class_0: false, class_1: true,
+... }, ... }`):
 
 | Value | Taken from the EDS | Refused when |
 |---|---|---|

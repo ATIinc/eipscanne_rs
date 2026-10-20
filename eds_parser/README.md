@@ -11,11 +11,10 @@ module of its section:
 | Module | What it holds |
 |---|---|
 | `syntax` | The text split into sections and entries by the grammar in `eds.pest`, and an entry's fields read in file order. `$` comments run to the end of the line, entries span any number of lines, and `,` `;` `$` inside quoted strings (and `,` inside `{ }`) do not split. |
-| `fields` | `FromEntry` (derived by `eds_parser_derive`) for a struct read from consecutive fields, and `FromField` (derived by `eds_parser_derive` for `bilge` bitfields and enums) for a value read from one field. An empty field is `None` (`""` for a `String`), a field past the end of a short entry is empty, a `Vec` member takes the rest of the fields, and a non-empty field past the last one read is an error. Numbers are decimal, `0x` or `0b`; adjacent quoted strings join, and escapes such as `\n` and `\x41` are read. |
-| `values` | The kinds of value a field holds beyond strings and integers: `NumberOrParam`, `DataFormat`, `ParamValue`, `Path` (`"20 04 24 [Param3] 2C 96 2C 64"`), `MemberReference`. |
-| `params` | `[Params]`: `Param`, its `ParamDescriptor` bits and `CipDataType` code (`0xC8` is `Udint`). |
-| `assembly` | `[Assembly]`: `Assembly` and its members. |
-| `connection_manager` | `[Connection Manager]`: `Connection` and its two mask words as `bilge` bitfields, whose `Debug` names every bit. |
+| `fields` | `FromEntry` (derived by `eds_parser_derive`) for a struct read from consecutive fields, and `FromField` (derived by `eds_parser_derive` for `bilge` bitfields and enums) for a value read from one field. An empty field is `None` (`""` for a `String`), a field past the end of a short entry is empty, a `Vec` member takes the rest of the fields, and a non-empty field past the last one read is an error. Numbers are decimal, `0x` or `0b`; adjacent quoted strings join, and escapes such as `\n` and `\x41` are read. The values of more than one section: `NumberOrParam` and `Path` (`"20 04 24 [Param3] 2C 96 2C 64"`). |
+| `params` | `[Params]`: `ParamEntry`, its `ParamDescriptor` bits, `CipDataType` code (`0xC8` is `Udint`) and `ParamValue`s. |
+| `assembly` | `[Assembly]`: `AssemblyEntry`, its members and their `MemberReference`s. |
+| `connection_manager` | `[Connection Manager]`: `ConnectionEntry`, its two mask words as `bilge` bitfields, whose `Debug` names every bit, and its `DataFormat`s. |
 | `error` | `Error`: `Syntax`, `Entry` or `Reference`, each with its message, and the `Result` alias. |
 
 `Eds::parse(&str)` reads every `ParamN`, `AssemN` and `ConnectionN` entry; `eds.connections`,

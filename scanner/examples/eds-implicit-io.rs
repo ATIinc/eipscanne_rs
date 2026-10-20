@@ -43,7 +43,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::connection_manager::Connection;
+use eds_parser::connection_manager::ConnectionEntry;
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Some(number) => number,
         None => first_openable_connection(&eds, args.large)?,
     };
-    let connection: &Connection = eds
+    let connection: &ConnectionEntry = eds
         .connections
         .get(&number)
         .ok_or_else(|| format!("Connection{number}: the EDS has no such connection"))?;
