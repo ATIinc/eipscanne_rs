@@ -54,9 +54,9 @@ pub(crate) fn request(
     let connection_parameters = connection.connection_parameters;
 
     // 0x04010002: class 1 (bit 1), cyclic (bit 16), exclusive owner (bit 26)
-    if !(trigger_and_transport.class_1()
-        && trigger_and_transport.cyclic()
-        && trigger_and_transport.exclusive_owner())
+    if !(trigger_and_transport.transport_classes().class_1()
+        && trigger_and_transport.triggers().cyclic()
+        && trigger_and_transport.application_types().exclusive_owner())
     {
         bail!(
             "this scanner opens class 1, cyclic, exclusive-owner connections; this one offers {trigger_and_transport:?}"
@@ -64,7 +64,13 @@ pub(crate) fn request(
     }
     // 0x44440405: point-to-point O->T (bit 18) and T->O (bit 22), scheduled priority O->T
     // (bit 26) and T->O (bit 30)
-    if !(connection_parameters.o2t_point_to_point() && connection_parameters.t2o_point_to_point()) {
+    if !(connection_parameters
+        .o2t_connection_types()
+        .point_to_point()
+        && connection_parameters
+            .t2o_connection_types()
+            .point_to_point())
+    {
         bail!(
             "this scanner opens point-to-point connections both ways; this one offers {connection_parameters:?}"
         );
@@ -102,7 +108,7 @@ pub(crate) fn request(
         .unwrap_or(o2t_connection_size.max(t2o_connection_size) > MAX_STANDARD_CONNECTION_SIZE);
     let o2t_network_connection_parameters = network_connection_parameters(
         o2t_connection_size,
-        connection_parameters.o2t_fixed_size(),
+        connection_parameters.o2t_size_types().fixed(),
         priority,
         large,
     )
@@ -113,7 +119,7 @@ pub(crate) fn request(
     })?;
     let t2o_network_connection_parameters = network_connection_parameters(
         t2o_connection_size,
-        connection_parameters.t2o_fixed_size(),
+        connection_parameters.t2o_size_types().fixed(),
         priority,
         large,
     )

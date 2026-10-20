@@ -4,7 +4,7 @@
 //! offers.
 
 use anyhow::{Context, Result, bail};
-use bilge::prelude::{DebugBits, FromBits, bitsize, u2, u3, u5, u9};
+use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, u5, u9};
 
 use eipscanne_rs::cip::connection_manager::parameters::{ConnectionPriority, RealTimeFormat};
 
@@ -74,14 +74,16 @@ impl Connection {
         Ok(connection)
     }
 
-    /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (format 4, bits 8-10)
+    /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (bits 8-10)
     pub fn o2t_real_time_format(&self) -> Result<RealTimeFormat> {
-        real_time_format(self.connection_parameters.o2t_real_time_format()).context("O->T")
+        RealTimeFormat::try_from(self.connection_parameters.o2t_real_time_transfer_format())
+            .context("O->T")
     }
 
-    /// How the inputs signal run/idle: `0x44440405` is `Modeless` (format 0, bits 12-14)
+    /// How the inputs signal run/idle: `0x44440405` is `Modeless` (bits 12-14)
     pub fn t2o_real_time_format(&self) -> Result<RealTimeFormat> {
-        real_time_format(self.connection_parameters.t2o_real_time_format()).context("T->O")
+        RealTimeFormat::try_from(self.connection_parameters.t2o_real_time_transfer_format())
+            .context("T->O")
     }
 }
 
@@ -91,26 +93,17 @@ impl Connection {
 /// classes, triggers and application types the connection supports. `0x04010002` is class 1
 /// (bit 1), cyclic (bit 16), exclusive owner (bit 26).
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, Copy, Clone)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
 pub struct TriggerAndTransport {
-    pub class_0: bool,
-    pub class_1: bool,
-    pub class_2: bool,
-    pub class_3: bool,
-    pub class_4: bool,
-    pub class_5: bool,
-    pub class_6: bool,
-    reserved_7_15: u9,
-    pub cyclic: bool,
-    pub change_of_state: bool,
-    pub application: bool,
-    reserved_19_23: u5,
-    pub listen_only: bool,
-    pub input_only: bool,
-    pub exclusive_owner: bool,
-    pub redundant_owner: bool,
-    reserved_28_30: u3,
-    /// Not read: vendors disagree on it, and a Forward_Open's originator is always the client
+    /// Bits 0-15
+    pub transport_classes: TransportClasses,
+    /// Bits 16-23
+    pub triggers: Triggers,
+    /// Bits 24-27
+    pub application_types: ApplicationTypes,
+    reserved: u3,
+    /// Bit 31, client 0 or server 1. Not read: vendors disagree on it, and a Forward_Open's
+    /// originator is always the client.
     server: bool,
 }
 
@@ -121,41 +114,68 @@ impl FromField for TriggerAndTransport {
     }
 }
 
-/// Field 2 of `Connection1 = 0x04010002, 0x44440405, Param1,32,Assem150, ...`: the sizes,
-/// real-time formats, connection types and priorities the connection supports, per direction.
-/// `0x44440405` is fixed sizes both ways (bits 0, 2), an O->T 32-bit header (format 4, bits
-/// 8-10), modeless T->O (format 0, bits 12-14), point-to-point both ways (bits 18, 22) and
-/// scheduled priority both ways (bits 26, 30).
+/// The transport classes a connection supports
+#[bitsize(16)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct TransportClasses {
+    pub class_0: bool,
+    pub class_1: bool,
+    pub class_2: bool,
+    pub class_3: bool,
+    pub class_4: bool,
+    pub class_5: bool,
+    pub class_6: bool,
+    reserved: u9,
+}
+
+/// The production triggers a connection supports
+#[bitsize(8)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct Triggers {
+    pub cyclic: bool,
+    pub change_of_state: bool,
+    pub application: bool,
+    reserved: u5,
+}
+
+/// The application types a connection supports
+#[bitsize(4)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct ApplicationTypes {
+    pub listen_only: bool,
+    pub input_only: bool,
+    pub exclusive_owner: bool,
+    pub redundant_owner: bool,
+}
+
+/// Field 2 of `Connection1 = 0x04010002, 0x44440405, Param1,32,Assem150, ...`: the size types,
+/// real-time transfer formats, connection types and priorities the connection supports, per
+/// direction. `0x44440405` is fixed sizes both ways (bits 0, 2), an O->T 32-bit header (bits
+/// 8-10), modeless T->O (bits 12-14), point-to-point both ways (bits 18, 22) and scheduled
+/// priority both ways (bits 26, 30).
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, Copy, Clone)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
 pub struct ConnectionParameters {
-    pub o2t_fixed_size: bool,
-    pub o2t_variable_size: bool,
-    pub t2o_fixed_size: bool,
-    pub t2o_variable_size: bool,
+    /// Bits 0-1
+    pub o2t_size_types: SizeTypes,
+    /// Bits 2-3
+    pub t2o_size_types: SizeTypes,
     obsolete_o2t_bytes_per_slot: u2,
     obsolete_t2o_bytes_per_slot: u2,
-    /// 0 modeless, 1 zero length, 2 (reserved), 3 heartbeat, 4 32-bit header, 5-7 others
-    pub o2t_real_time_format: u3,
-    reserved_11: bool,
-    pub t2o_real_time_format: u3,
-    reserved_15: bool,
-    pub o2t_null: bool,
-    pub o2t_multicast: bool,
-    pub o2t_point_to_point: bool,
-    reserved_19: bool,
-    pub t2o_null: bool,
-    pub t2o_multicast: bool,
-    pub t2o_point_to_point: bool,
-    reserved_23: bool,
-    pub o2t_low_priority: bool,
-    pub o2t_high_priority: bool,
-    pub o2t_scheduled_priority: bool,
-    reserved_27: bool,
-    pub t2o_low_priority: bool,
-    pub t2o_high_priority: bool,
-    pub t2o_scheduled_priority: bool,
-    reserved_31: bool,
+    /// Bits 8-10
+    pub o2t_real_time_transfer_format: RealTimeTransferFormat,
+    reserved: u1,
+    /// Bits 12-14
+    pub t2o_real_time_transfer_format: RealTimeTransferFormat,
+    reserved: u1,
+    /// Bits 16-19
+    pub o2t_connection_types: ConnectionTypes,
+    /// Bits 20-23
+    pub t2o_connection_types: ConnectionTypes,
+    /// Bits 24-27
+    pub o2t_priorities: Priorities,
+    /// Bits 28-31
+    pub t2o_priorities: Priorities,
 }
 
 /// `0x44440405`
@@ -171,11 +191,12 @@ impl ConnectionParameters {
     /// The best priority both directions support: scheduled, else high, else low. `0x44440405`
     /// (scheduled only, both ways) is `Scheduled`; `0x3775_0405` (T->O low and high) is `High`.
     pub fn shared_priority(&self) -> Option<ConnectionPriority> {
-        if self.o2t_scheduled_priority() && self.t2o_scheduled_priority() {
+        let (o2t, t2o) = (self.o2t_priorities(), self.t2o_priorities());
+        if o2t.scheduled() && t2o.scheduled() {
             Some(ConnectionPriority::Scheduled)
-        } else if self.o2t_high_priority() && self.t2o_high_priority() {
+        } else if o2t.high() && t2o.high() {
             Some(ConnectionPriority::High)
-        } else if self.o2t_low_priority() && self.t2o_low_priority() {
+        } else if o2t.low() && t2o.low() {
             Some(ConnectionPriority::Low)
         } else {
             None
@@ -185,14 +206,61 @@ impl ConnectionParameters {
 
 // ^^^^^^^^ End of ConnectionParameters impl ^^^^^^^^
 
-/// The real-time format a 3-bit code of `ConnectionParameters` stands for: 4 is `Header32Bit`,
-/// 0 `Modeless`. 2 (reserved) and 5 to 7 are not supported by this scanner.
-fn real_time_format(code: u3) -> Result<RealTimeFormat> {
-    match u8::from(code) {
-        0 => Ok(RealTimeFormat::Modeless),
-        1 => Ok(RealTimeFormat::ZeroLength),
-        3 => Ok(RealTimeFormat::Heartbeat),
-        4 => Ok(RealTimeFormat::Header32Bit),
-        _ => bail!("real-time format {code} is not supported"),
+/// The connection size types one direction supports
+#[bitsize(2)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct SizeTypes {
+    pub fixed: bool,
+    pub variable: bool,
+}
+
+/// How one direction's packets signal run/idle, by its 3-bit code
+#[bitsize(3)]
+#[derive(FromBits, Debug, PartialEq, Clone, Copy)]
+#[repr(u8)]
+pub enum RealTimeTransferFormat {
+    Modeless = 0,
+    ZeroLength = 1,
+    Heartbeat = 3,
+    Header32Bit = 4,
+    /// 2 (reserved) and 5 to 7
+    #[fallback]
+    Unsupported(u3),
+}
+
+/// The library's `RealTimeFormat` for a code this scanner supports
+impl TryFrom<RealTimeTransferFormat> for RealTimeFormat {
+    type Error = anyhow::Error;
+
+    fn try_from(format: RealTimeTransferFormat) -> Result<RealTimeFormat> {
+        match format {
+            RealTimeTransferFormat::Modeless => Ok(RealTimeFormat::Modeless),
+            RealTimeTransferFormat::ZeroLength => Ok(RealTimeFormat::ZeroLength),
+            RealTimeTransferFormat::Heartbeat => Ok(RealTimeFormat::Heartbeat),
+            RealTimeTransferFormat::Header32Bit => Ok(RealTimeFormat::Header32Bit),
+            RealTimeTransferFormat::Unsupported(code) => {
+                bail!("real-time transfer format {code} is not supported")
+            }
+        }
     }
+}
+
+/// The connection types one direction supports
+#[bitsize(4)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct ConnectionTypes {
+    pub null: bool,
+    pub multicast: bool,
+    pub point_to_point: bool,
+    reserved: u1,
+}
+
+/// The priorities one direction supports
+#[bitsize(4)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+pub struct Priorities {
+    pub low: bool,
+    pub high: bool,
+    pub scheduled: bool,
+    reserved: u1,
 }
