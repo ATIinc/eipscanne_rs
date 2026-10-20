@@ -5,70 +5,65 @@ connection into the values of the Forward_Open that opens it from the `scanner` 
 `eipscanne_rs` types.
 
 An EDS file is `[Section]` headers, each followed by `Keyword = field, field, ...;` entries. Each
-kind of entry read here is a struct whose fields are the entry's fields in file order:
+kind of entry read here is a struct whose fields are the entry's fields in file order, in the
+module of its section:
 
 | Module | What it holds |
 |---|---|
-| `file` | The text split into sections and entries, each field as its raw text. `$` comments run to the end of the line, entries span any number of lines, and `,` `;` `$` inside quoted strings (and `,` inside `{ }`) do not split. Also the `serde::Deserializer` of an entry, so `ConnectionEntry::deserialize(&entry)` reads one: an empty field is `None`, a missing trailing field is empty, a `Vec` takes the rest of the fields, an extra field is an error. |
-| `field_values` | The kinds of value a field holds, each read by its `FromStr`: `QuotedString` (adjacent quoted strings join), `NumberOrParam`, `DataFormat`, `ParamValue`, `PathTokens` (`"20 04 24 [Param3] 2C 96 2C 64"`), `MemberReference`. Numbers are decimal, `0x` or `0b`. |
-| `entries` | `ParamEntry`, `AssemblyEntry`, `ConnectionEntry`: every field of the entry, in order, as a `serde::Deserialize` struct. |
-| `masks` | The two mask words of a `ConnectionEntry` as `bilge` bitfields, whose `Debug` names every bit; a `ParamEntry`'s `ParamDescriptor` bits and `CipDataType` code (`0xC8` is `Udint`). |
-| `connection` | `Connection`: one `ConnectionEntry` as Forward_Open values, or why it is refused. |
-| `error` | `Error`: one enum for every failure; `InEntry` puts one in its entry and field, `InConnection` in its `ConnectionN`. |
+| `syntax` | The text split into sections and entries by the grammar in `eds.pest`, and an entry's fields read in file order. `$` comments run to the end of the line, entries span any number of lines, and `,` `;` `$` inside quoted strings (and `,` inside `{ }`) do not split. |
+| `fields` | `FromEntry` (derived by `eds_parser_derive`) for a struct read from consecutive fields, and `FromField` (derived by `eds_parser_derive` for `bilge` bitfields and enums) for a value read from one field. An empty field is `None` (`""` for a `String`), a field past the end of a short entry is empty, a `Vec` member takes the rest of the fields, and a non-empty field past the last one read is an error. Numbers are decimal, `0x` or `0b`; adjacent quoted strings join, and escapes such as `\n` and `\x41` are read. |
+| `values` | The kinds of value a field holds beyond strings and integers: `NumberOrParam`, `DataFormat`, `ParamValue`, `Path` (`"20 04 24 [Param3] 2C 96 2C 64"`), `MemberReference`. |
+| `params` | `[Params]`: `Param`, its `ParamDescriptor` bits and `CipDataType` code (`0xC8` is `Udint`). |
+| `assembly` | `[Assembly]`: `Assembly` and its members. |
+| `connection_manager` | `[Connection Manager]`: `Connection` and its two mask words as `bilge` bitfields, whose `Debug` names every bit. |
+| `forward_open` | A `Connection` as the fields of a `ForwardOpenRequest`, or why it is refused. |
 
 `Eds::parse(&str)` reads every `ParamN`, `AssemN` and `ConnectionN` entry; the params and
 assemblies a connection refers to are looked up when it is opened. Every failure is an
-`error::Error` that says where: the keyword and field of an entry being read
-(`Connection1: field 4: expected a number or a ParamN, found "x"`), else the keyword
-(`Connection1: refers to Param7, which the file does not define`).
+`anyhow::Error` that says where: the keyword, field and line of an entry being read
+(`Connection1: field 4: line 3: Param999,x,Assem101,: expected a number or a ParamN, found "x"`),
+else the connection (`Connection1: refers to Param7, which the file does not define`).
 
 ## Opening a connection
 
+`eds.connections` holds every `Connection` by its N. The caller writes the `ForwardOpenRequest`:
+what an EDS does not describe (tick time, timeouts, connection IDs, the connection triad) by
+hand, the rest from the connection:
+
 ```rust
 let eds = Eds::parse(&eds_text)?;
-let connections: BTreeMap<u32, Result<Connection>> = eds.all_connections(None); // every one, by N
-let (number, connection): (u32, Connection) = eds.first_connection(None)?; // the first one this scanner can open
-let connection: Connection = eds.connection(2, None)?;                       // Connection2
-```
-
-`eds.connections` holds every `ConnectionEntry` by its N. The last argument picks the service:
-`Some(true)` a Large_Forward_Open (32-bit connection parameters), `Some(false)` a Forward_Open,
-`None` a Large_Forward_Open only when a direction is over 511 bytes on the wire.
-
-The caller writes the `ForwardOpenRequest`: what an EDS does not describe (tick time, timeouts,
-connection IDs, the connection triad) by hand, the rest from the connection:
-
-```rust
+let number: u32 = eds.first_openable_connection(None)?; // or the N of any ConnectionN
+let connection: &Connection = eds.connection(number)?;
 let request = ForwardOpenRequest {
     // ... originator fields ...
-    o2t_requested_packet_interval: connection.o2t_requested_packet_interval,
-    o2t_network_connection_parameters: connection.o2t_network_connection_parameters,
-    t2o_requested_packet_interval: connection.t2o_requested_packet_interval,
-    t2o_network_connection_parameters: connection.t2o_network_connection_parameters,
-    transport_type_trigger: connection.transport_type_trigger,
-    connection_path: connection.connection_path.clone(),
+    ..eds.forward_open_request(number, None)?
 };
-// forward_open(&mut session, request, connection.o2t_real_time_format, connection.t2o_real_time_format)
+let outputs = vec![0u8; usize::from(eds.o2t_size(number)?)];
+// forward_open(&mut session, request, connection.o2t_real_time_format()?, connection.t2o_real_time_format()?)
 ```
+
+The last argument picks the service: `Some(true)` a Large_Forward_Open (32-bit connection
+parameters), `Some(false)` a Forward_Open, `None` a Large_Forward_Open only when a direction is
+over 511 bytes on the wire.
 
 The masks say what the device *supports*; one value is picked from them, or the connection is
 refused with the mask's `Debug`, which shows what it offers (`Connection2: this scanner opens
-class 1, cyclic, exclusive-owner connections; this one offers TriggerAndTransport { class_0:
-false, class_1: true, ..., input_only: true, exclusive_owner: false, ... }`):
+class 1, cyclic, exclusive-owner connections; this one offers TriggerAndTransport {
+transport_classes: TransportClasses { class_0: false, class_1: true, ... }, ... }`):
 
 | Value | Taken from the EDS | Refused when |
 |---|---|---|
 | `transport_type_trigger` | class 1, cyclic, client | class 1, cyclic or exclusive owner not supported |
 | `*_network_connection_parameters` | point-to-point; the size plus the 2-byte sequence count and, with a 32-bit header, 4 more (EDS sizes exclude both); fixed size if supported, else variable; scheduled, else high, else low priority, among those both directions support | not point-to-point, no shared priority, over 511 bytes with `Some(false)` |
 | `*_requested_packet_interval` | a number or a `ParamN`'s default, in microseconds | none in the EDS |
-| `*_size` | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
-| `*_real_time_format` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5, 6, 7 |
+| the size (`o2t_size`) | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
+| `*_real_time_format()` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5, 6, 7 |
 | `connection_path` | the path, `[ParamN]` replaced by the param's default | segments other than logical ones |
 
 The client/server bit of the trigger mask is ignored (vendors disagree on it; a Forward_Open's
 originator is always the client), and configuration data the EDS declares is not read.
 
-Not read: `{ }` groups (split as one field), `\xnn` and `\unnnn` escapes, `SYMBOL_ANSI` in a path.
+Not read: `{ }` groups (split as one field), `SYMBOL_ANSI` in a path.
 
 ## Running `eds-implicit-io`
 

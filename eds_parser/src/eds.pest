@@ -16,7 +16,11 @@ comma     = { "," }
 semicolon = { ";" }
 
 // Any mix of strings, { } groups and bare text, or nothing: `0x0401`, `"In" "put"`, `{1, 2}`, ``
-field  = { (string | group | bare)* }
-string = @{ "L"? ~ "\"" ~ ("\\" ~ ANY | !"\"" ~ ANY)* ~ "\"" }
-group  = { "{" ~ field ~ (comma ~ field)* ~ "}" }
-bare   = @{ (!("," | ";" | "=" | "[" | "]" | "\"" | "{" | "}" | "$" | WHITESPACE) ~ ANY)+ }
+field      = { (string | group | bare)* }
+string     = ${ "L"? ~ "\"" ~ characters ~ "\"" }
+characters = @{ ("\\" ~ ANY | !"\"" ~ ANY)* }
+group      = { "{" ~ field ~ (comma ~ field)* ~ "}" }
+bare       = @{ (!("," | ";" | "=" | "[" | "]" | "\"" | "{" | "}" | "$" | WHITESPACE) ~ ANY)+ }
+
+// The text of a field that is only quoted strings, or nothing: `"Input " L"Assembly"`, ``
+strings = { SOI ~ string* ~ EOI }

@@ -1,6 +1,6 @@
 //! `[Assembly]`: the `AssemN` entries, each the layout of the data an assembly instance holds.
 
-use eds_parser_derive::FromFields;
+use eds_parser_derive::FromEntry;
 
 use crate::fields::Unread;
 use crate::values::{MemberReference, NumberOrParam, Path};
@@ -19,9 +19,9 @@ use crate::values::{MemberReference, NumberOrParam, Path};
 ///     16,Param2,
 ///     8,;
 /// ```
-#[derive(Debug, Clone, PartialEq, FromFields)]
+#[derive(Debug, Clone, PartialEq, FromEntry)]
 pub struct Assembly {
-    pub name: Option<String>,
+    pub name: String,
     pub path: Option<Path>,
     /// Bytes of data
     pub size: Option<NumberOrParam>,
@@ -29,13 +29,18 @@ pub struct Assembly {
     reserved_5: Unread,
     reserved_6: Unread,
     /// `16,Param1, 16,Param2, 8,`
-    #[rest]
     pub members: Vec<AssemblyMember>,
 }
 
-/// One `member size, member reference` pair of an `AssemN` entry: `16,Param1,` (16 bits holding
-/// Param1), `8,` (8 bits of opaque data), or `,` (neither)
-#[derive(Debug, Clone, PartialEq, FromFields)]
+/// One `member size, member reference` pair of an `AssemN` entry, its fields in file order. Either
+/// field can be empty:
+///
+/// ```text
+/// Assem100 = "Input Assembly", "20 04 24 64 30 03", 3, 0x0000,,,
+///     16,Param1,                  $ 16 bits holding Param1
+///     8,;                         $ 8 bits of opaque data
+/// ```
+#[derive(Debug, Clone, PartialEq, FromEntry)]
 pub struct AssemblyMember {
     pub size_bits: Option<u16>,
     pub reference: Option<MemberReference>,

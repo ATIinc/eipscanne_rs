@@ -15,6 +15,7 @@ anyhow = "1"
 parse_int = "0.9.0"
 pest = "2.9.4"
 pest_derive = "2.9.4"
+unescaper = "0.2.0"
 
 [dev-dependencies]
 # Used by the examples, except hex-test-macros (tests)

@@ -8,7 +8,7 @@ use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, 
 
 use eipscanne_rs::cip::connection_manager::parameters::{ConnectionPriority, RealTimeFormat};
 
-use eds_parser_derive::FromFields;
+use eds_parser_derive::{FromEntry, FromField};
 
 use crate::fields::Unread;
 use crate::values::{DataFormat, NumberOrParam, Path};
@@ -27,7 +27,7 @@ use crate::values::{DataFormat, NumberOrParam, Path};
 ///     "",                         $ help
 ///     "20 04 24 [Param2] 2C 96 2C 64";    $ path
 /// ```
-#[derive(Debug, Clone, PartialEq, FromFields)]
+#[derive(Debug, Clone, PartialEq, FromEntry)]
 pub struct Connection {
     pub trigger_and_transport: TriggerAndTransport,
     pub connection_parameters: ConnectionParameters,
@@ -72,7 +72,7 @@ impl Connection {
 /// classes, triggers and application types the connection supports. `0x04010002` is class 1
 /// (bit 1), cyclic (bit 16), exclusive owner (bit 26).
 #[bitsize(32)]
-#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy, FromField)]
 pub struct TriggerAndTransport {
     /// Bits 0-15
     pub transport_classes: TransportClasses,
@@ -126,7 +126,7 @@ pub struct ApplicationTypes {
 /// 8-10), modeless T->O (bits 12-14), point-to-point both ways (bits 18, 22) and scheduled
 /// priority both ways (bits 26, 30).
 #[bitsize(32)]
-#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy)]
+#[derive(FromBits, DebugBits, BuilderBits, PartialEq, Clone, Copy, FromField)]
 pub struct ConnectionParameters {
     /// Bits 0-1
     pub o2t_size_types: SizeTypes,

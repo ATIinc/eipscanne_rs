@@ -2,7 +2,7 @@
 
 use bilge::prelude::{DebugBits, FromBits, bitsize, u2};
 
-use eds_parser_derive::FromFields;
+use eds_parser_derive::{FromEntry, FromField};
 
 use crate::fields::Unread;
 use crate::values::ParamValue;
@@ -24,7 +24,7 @@ use crate::values::ParamValue;
 ///     ,,,,                        $ scaling links
 ///     1;                          $ decimal precision
 /// ```
-#[derive(Debug, Clone, PartialEq, FromFields)]
+#[derive(Debug, Clone, PartialEq, FromEntry)]
 pub struct Param {
     reserved: Unread,
     link_path_size: Unread,
@@ -59,7 +59,7 @@ pub struct Param {
 /// supports and how a tool treats it. `0x0004` is supports_scaling (bit 2); `0x0010` is read-only
 /// (bit 4).
 #[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, Copy, Clone, FromField)]
 pub struct ParamDescriptor {
     pub supports_settable_path: bool,
     pub supports_enumerated_strings: bool,
@@ -82,7 +82,7 @@ pub struct ParamDescriptor {
 /// of the param's value. `0xC8` is UDINT. Each variant is the EDS spelling in Rust case
 /// (`TimeOfDay` is TIME_OF_DAY); an unlisted code is `Unknown(code)`.
 #[bitsize(8)]
-#[derive(FromBits, PartialEq, Debug, Copy, Clone)]
+#[derive(FromBits, PartialEq, Debug, Copy, Clone, FromField)]
 #[repr(u8)]
 pub enum CipDataType {
     Bool = 0xC1,

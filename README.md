@@ -11,7 +11,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 * `eipscanne_rs` (this directory): the packet library.
 * [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
 * [`eds_parser`](./eds_parser/README.md): reads a device's EDS file, and one of its connections into the values of the scanner's Forward_Open (`eds-implicit-io`, `io-hub-implicit` examples).
-* `eds_parser_derive`: `#[derive(FromFields)]`, which reads `eds_parser`'s entry structs field by field.
+* `eds_parser_derive`: `#[derive(FromEntry)]` and `#[derive(FromField)]` for `eds_parser`'s entry structs and bitfields.
 * `hex_test_macros`: hex assertions for the byte-exact tests.
 
 `cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.

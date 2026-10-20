@@ -8,9 +8,11 @@
 //! ```text
 //! Module              Holds
 //! ------------------  -----------------------------------------------------------------------
-//! syntax              the text split into sections and entries by the grammar in eds.pest
-//! fields              reading an entry's fields in file order: Fields, FromFields (derived by the
-//!                     eds_parser_derive crate) and FromField, with every field read as an integer
+//! syntax              the text split into sections and entries by the grammar in eds.pest, and an
+//!                     entry's fields read in file order
+//! fields              FromEntry (derived by the eds_parser_derive crate) for a struct read from
+//!                     consecutive fields, and FromField (derived there for bilge types) for the
+//!                     value of one field
 //! values              the kinds of value a field holds beyond strings and integers
 //!                     (NumberOrParam, DataFormat, Path, ...)
 //! params              [Params]: Param, its descriptor and data type
@@ -70,9 +72,10 @@ impl Eds {
     pub fn parse(text: &str) -> Result<Eds> {
         let mut eds = Eds::default();
         for section in syntax::sections(text)? {
+            let section_name = section.name.to_ascii_lowercase();
             for entry in section.entries {
                 let keyword = entry.keyword;
-                let defined_twice = match section.name.to_ascii_lowercase().as_str() {
+                let defined_twice = match section_name.as_str() {
                     "params" if let Some(number) = numbered(keyword, "Param") => {
                         eds.params.insert(number, entry.read()?).is_some()
                     }
@@ -152,17 +155,9 @@ impl Eds {
             .with_context(|| format!("Connection{number}: O->T"))
     }
 
-    /// Bytes of input data, without the sequence count and real-time header:
-    /// `Param1,,Assem100` is the size of Assem100
-    pub fn t2o_size(&self, number: u32) -> Result<u16> {
-        let connection = self.connection(number)?;
-        self.data_size(connection.t2o_size, connection.t2o_format)
-            .with_context(|| format!("Connection{number}: T->O"))
-    }
-
     /// A direction's RPI in microseconds: the number, or the default of the `ParamN` it names
     pub(crate) fn requested_packet_interval(&self, rpi: Option<NumberOrParam>) -> Result<u32> {
-        self.value(rpi.context("has no requested packet interval")?)
+        self.resolve(rpi.context("has no requested packet interval")?)
     }
 
     /// A direction's bytes of data: its size field, else the size of its `AssemN` format
@@ -172,7 +167,7 @@ impl Eds {
         format: Option<DataFormat>,
     ) -> Result<u16> {
         match (size, format) {
-            (Some(size), _) => self.value(size),
+            (Some(size), _) => self.resolve(size),
             (None, Some(DataFormat::Assem(number))) => self.assembly_size(number),
             (None, _) => bail!("has no size, and no AssemN format that gives one"),
         }
@@ -182,7 +177,7 @@ impl Eds {
     /// and `Param1` is 1000000 for `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`
     /// (field 12). A number `T` cannot hold is an error naming where it comes from and `T`:
     /// `70000 is out of range for u16`, `Param3's default 70000 is out of range for u16`
-    pub(crate) fn value<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
+    pub(crate) fn resolve<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
         let type_name = std::any::type_name::<T>();
         match value {
             NumberOrParam::Number(number) => {
@@ -200,7 +195,7 @@ impl Eds {
     /// The bytes of a path, each `ParamN` replaced by its default in as many little-endian bytes
     /// as its data size: `"20 04 24 [Param2] 2C 96"` is `20 04 24 97 2C 96` for a 1-byte `Param2`
     /// (field 6) defaulting to 0x97
-    pub(crate) fn path(&self, path: &Path) -> Result<Vec<u8>> {
+    pub(crate) fn path_bytes(&self, path: &Path) -> Result<Vec<u8>> {
         let mut bytes: Vec<u8> = Vec::new();
         for part in &path.0 {
             match *part {
@@ -230,7 +225,7 @@ impl Eds {
             .get(&number)
             .with_context(|| format!("refers to Assem{number}, which the file does not define"))?;
         if let Some(size) = assembly.size {
-            return self.value(size);
+            return self.resolve(size);
         }
 
         let bits: u32 = assembly

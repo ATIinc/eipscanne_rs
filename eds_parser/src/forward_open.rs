@@ -5,7 +5,7 @@
 use std::io::Cursor;
 
 use anyhow::{Context, Result, bail};
-use bilge::prelude::{u4, u9};
+use bilge::prelude::{Integer, u9};
 use binrw::BinRead;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
@@ -21,9 +21,6 @@ use eipscanne_rs::cip::types::CipUdint;
 
 use crate::Eds;
 use crate::connection_manager::Connection;
-
-/// The largest connection size the 16-bit parameters of a Forward_Open hold
-const MAX_STANDARD_CONNECTION_SIZE: u16 = 511;
 
 /// The Forward_Open fields a connection decides, every other field zero; `large` as for
 /// `Eds::forward_open_request`. For this entry, with `Param1` defaulting to 1000000, `Param2` to
@@ -104,41 +101,30 @@ pub(crate) fn request(
         connection_size(o2t_size, TransportClass::Class1, o2t_real_time_format);
     let t2o_connection_size: u16 =
         connection_size(t2o_size, TransportClass::Class1, t2o_real_time_format);
-    let large: bool = large
-        .unwrap_or(o2t_connection_size.max(t2o_connection_size) > MAX_STANDARD_CONNECTION_SIZE);
+    let large: bool =
+        large.unwrap_or(o2t_connection_size.max(t2o_connection_size) > u9::MAX.value());
     let o2t_network_connection_parameters = network_connection_parameters(
         o2t_connection_size,
         connection_parameters.o2t_size_types().fixed(),
         priority,
         large,
     )
-    .with_context(|| {
-        format!(
-            "the O->T connection size of {o2t_connection_size} bytes needs a Large_Forward_Open"
-        )
-    })?;
+    .context("O->T")?;
     let t2o_network_connection_parameters = network_connection_parameters(
         t2o_connection_size,
         connection_parameters.t2o_size_types().fixed(),
         priority,
         large,
     )
-    .with_context(|| {
-        format!(
-            "the T->O connection size of {t2o_connection_size} bytes needs a Large_Forward_Open"
-        )
-    })?;
+    .context("T->O")?;
 
     // "20 04 24 [Param2] 2C 96 2C 64": Param2's default in place of [Param2]
-    let path: Vec<u8> = eds.path(&connection.path)?;
+    let path: Vec<u8> = eds.path_bytes(&connection.path)?;
     let connection_path: CipPath = cip_path(&path)
         .with_context(|| format!("its path {path:02X?} is not made of logical segments only"))?;
 
     Ok(ForwardOpenRequest {
-        priority_time_tick: PriorityTimeTick::builder()
-            .tick_time(u4::new(0))
-            .priority(false)
-            .build(),
+        priority_time_tick: PriorityTimeTick::from(0u8),
         timeout_ticks: 0,
         o2t_network_connection_id: 0,
         t2o_network_connection_id: 0,
@@ -157,22 +143,22 @@ pub(crate) fn request(
     })
 }
 
-/// A point-to-point, exclusive-owner parameter word: 32-bit when `large`, else 16-bit, which
-/// `None` means `connection_size` does not fit. The size is fixed when the direction supports it,
-/// else variable. `(38, true, Scheduled, false)` is the 16-bit word for 38 bytes, fixed,
-/// scheduled, point-to-point, exclusive owner.
+/// A point-to-point, exclusive-owner parameter word: 32-bit when `large`, else 16-bit, which holds
+/// up to 511 bytes. The size is fixed when the direction supports it, else variable.
+/// `(38, true, Scheduled, false)` is the 16-bit word for 38 bytes, fixed, scheduled,
+/// point-to-point, exclusive owner.
 fn network_connection_parameters(
     connection_size: u16,
     fixed_size_supported: bool,
     priority: ConnectionPriority,
     large: bool,
-) -> Option<NetworkConnectionParameters> {
+) -> Result<NetworkConnectionParameters> {
     let connection_size_type = match fixed_size_supported {
         true => ConnectionSizeType::Fixed,
         false => ConnectionSizeType::Variable,
     };
     if large {
-        return Some(NetworkConnectionParameters::Large(
+        return Ok(NetworkConnectionParameters::Large(
             LargeNetworkConnectionParameters::builder()
                 .connection_size(connection_size)
                 .connection_size_type(connection_size_type)
@@ -182,9 +168,12 @@ fn network_connection_parameters(
                 .build(),
         ));
     }
-    Some(NetworkConnectionParameters::Standard(
+    let standard_connection_size = u9::try_new(connection_size).ok().with_context(|| {
+        format!("the connection size of {connection_size} bytes needs a Large_Forward_Open")
+    })?;
+    Ok(NetworkConnectionParameters::Standard(
         StandardNetworkConnectionParameters::builder()
-            .connection_size(u9::try_new(connection_size).ok()?)
+            .connection_size(standard_connection_size)
             .connection_size_type(connection_size_type)
             .priority(priority)
             .connection_type(ConnectionType::PointToPoint)
