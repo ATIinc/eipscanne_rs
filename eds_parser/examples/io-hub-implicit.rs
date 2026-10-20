@@ -36,7 +36,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::connection::Connection;
+use eds_parser::connection_manager::Connection;
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -86,19 +86,9 @@ async fn main() -> anyhow::Result<()> {
     // ========= Read the EDS and derive the connection ============
     let text = std::fs::read_to_string(&args.eds)
         .with_context(|| format!("reading {}", args.eds.display()))?;
-    let (number, connection): (u32, Connection) = Eds::parse(&text)?.first_connection(None)?;
-
-    // The connection must carry the assemblies the structs are written for: configuration
-    // instance 1, then the output and input connection points
-    let expected_path =
-        CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE, INPUT_ASSEMBLY_INSTANCE);
-    if connection.connection_path != expected_path {
-        bail!(
-            "Connection{number} ({}) has the path {:?}, not the one the structs are written for: {expected_path:?}",
-            connection.name,
-            connection.connection_path
-        );
-    }
+    let eds = Eds::parse(&text)?;
+    let number: u32 = eds.first_openable_connection(None)?;
+    let connection: &Connection = eds.connection(number)?;
 
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
@@ -116,15 +106,23 @@ async fn main() -> anyhow::Result<()> {
             originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-        o2t_requested_packet_interval: connection.o2t_requested_packet_interval,
-        o2t_network_connection_parameters: connection.o2t_network_connection_parameters,
-        t2o_requested_packet_interval: connection.t2o_requested_packet_interval,
-        t2o_network_connection_parameters: connection.t2o_network_connection_parameters,
-        transport_type_trigger: connection.transport_type_trigger,
-        connection_path: connection.connection_path.clone(),
+        // The RPIs, network connection parameters, transport class and trigger, and path
+        ..eds.forward_open_request(number, None)?
     };
-    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format;
-    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format;
+
+    // The connection must carry the assemblies the structs are written for: configuration
+    // instance 1, then the output and input connection points
+    let expected_path =
+        CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE, INPUT_ASSEMBLY_INSTANCE);
+    if request.connection_path != expected_path {
+        bail!(
+            "Connection{number} ({}) has the path {:?}, not the one the structs are written for: {expected_path:?}",
+            connection.name,
+            request.connection_path
+        );
+    }
+    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
+    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
     println!("Connection{number} ({})", connection.name);
 
     // ========= 1. Register the session ============

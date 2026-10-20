@@ -21,6 +21,7 @@
 
 use std::time::{Duration, Instant};
 
+use anyhow::bail;
 use bilge::prelude::u4;
 use clap::Parser;
 
@@ -40,7 +41,7 @@ use scanner::implicit::t2o::{
 use scanner::session::Session;
 
 use eds_parser::Eds;
-use eds_parser::connection::Connection;
+use eds_parser::connection_manager::Connection;
 
 /// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -85,16 +86,17 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     // ========= Read the EDS and pick the connection ============
     let text = std::fs::read_to_string(&args.eds)?;
     let eds = Eds::parse(&text)?;
-    let (number, connection): (u32, Connection) = match args.connection {
-        Some(number) => (number, eds.connection(number, args.large)?),
-        None => eds.first_connection(args.large)?,
+    let number: u32 = match args.connection {
+        Some(number) => number,
+        None => eds.first_openable_connection(args.large)?,
     };
+    let connection: &Connection = eds.connection(number)?;
 
     let request = ForwardOpenRequest {
         // 1024 ms per tick (1 ms shifted left by 10), 5 ticks until the request itself times out
@@ -112,28 +114,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
         connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
-        o2t_requested_packet_interval: connection.o2t_requested_packet_interval,
-        o2t_network_connection_parameters: connection.o2t_network_connection_parameters,
-        t2o_requested_packet_interval: connection.t2o_requested_packet_interval,
-        t2o_network_connection_parameters: connection.t2o_network_connection_parameters,
-        transport_type_trigger: connection.transport_type_trigger,
-        connection_path: connection.connection_path.clone(),
+        // The RPIs, network connection parameters, transport class and trigger, and path
+        ..eds.forward_open_request(number, args.large)?
     };
-    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format;
-    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format;
+    let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
+    let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
+    let outputs = vec![0u8; usize::from(eds.o2t_size(number)?)];
 
     println!(
         "Connection{number} ({}) from {}",
         connection.name,
         args.eds.display()
     );
-    println!("{connection:#?}");
+    println!("{request:#?}");
 
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
     if !args.run && o2t_real_time_format != RealTimeFormat::Header32Bit {
-        return Err(
+        bail!(
             "the O->T direction has no run/idle header, so idle cannot be signalled: pass --run to send the outputs as real"
-                .into(),
         );
     }
 
@@ -145,7 +143,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The socket first: the adapter starts sending as soon as it has replied
     let socket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let outputs = vec![0u8; usize::from(connection.o2t_size)];
     let connection = forward_open(
         &mut session,
         request,
