@@ -182,13 +182,14 @@ included through `#[path = "../assemblies"]` and errors returned as
 
 ### IO-HUB assemblies follow the EDS
 
-The hand-written IO-HUB structs use the EDS's integer types. The ClearPath-IP Software Reference
-linked at the top of each file is their source, but where it and the EDS disagree the EDS is
-followed and the doc comment says the documentation may be wrong:
+The hand-written IO-HUB structs use the EDS's integer types. They were written from the
+ClearPath-IP Software Reference linked at the top of each file; where the EDS declares another
+type, the original line is commented out above the one that follows the EDS, whose doc comment
+names the EDS param:
 
 | Field | EDS | Software Reference | Struct |
 |---|---|---|---|
-| Analog inputs I/O-0…12, analog output I/O-12 | UINT | INT (tags) | `CipUint`, with the callout |
+| Analog inputs I/O-0…12, analog output I/O-12 | UINT | INT (tags) | `CipUint` |
 | Read/Write Parameter ID | INT | INT | `CipInt` |
 | Read Parameter ID Echo, Move Number, Move Number Ack | INT | no type | `CipInt` |
 
