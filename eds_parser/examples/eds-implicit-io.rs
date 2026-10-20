@@ -21,7 +21,6 @@
 
 use std::time::{Duration, Instant};
 
-use anyhow::bail;
 use bilge::prelude::u4;
 use clap::Parser;
 
@@ -86,7 +85,7 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // ========= Read the EDS and pick the connection ============
@@ -130,8 +129,9 @@ async fn main() -> anyhow::Result<()> {
 
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
     if !args.run && o2t_real_time_format != RealTimeFormat::Header32Bit {
-        bail!(
+        return Err(
             "the O->T direction has no run/idle header, so idle cannot be signalled: pass --run to send the outputs as real"
+                .into(),
         );
     }
 

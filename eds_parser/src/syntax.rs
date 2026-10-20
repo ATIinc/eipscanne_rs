@@ -11,12 +11,12 @@
 //!                16;
 //! ```
 
-use anyhow::{Context, Result, anyhow};
 use pest::Parser;
 use pest::Position;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
+use crate::error::{Error, Result};
 use crate::fields::{FromEntry, FromField};
 
 #[derive(Parser)]
@@ -58,9 +58,10 @@ impl<'a> Entry<'a> {
     pub fn read<T: FromEntry>(mut self) -> Result<T> {
         let value = T::from_entry(&mut self)?;
         match self.next_non_empty() {
-            Some(index) => Err(anyhow!("is past the last field of this kind of entry"))
-                .with_context(|| self.field_location(index))
-                .with_context(|| self.field_label(index)),
+            Some(index) => Err(self.in_field(
+                index,
+                Error::Entry("is past the last field of this kind of entry".to_string()),
+            )),
             None => Ok(value),
         }
     }
@@ -70,9 +71,7 @@ impl<'a> Entry<'a> {
     pub fn next<T: FromField>(&mut self) -> Result<T> {
         let index = self.fields_read;
         self.fields_read += 1;
-        T::from_field(&self.field_text(index))
-            .with_context(|| self.field_location(index))
-            .with_context(|| self.field_label(index))
+        T::from_field(&self.field_text(index)).map_err(|error| self.in_field(index, error))
     }
 
     /// Whether a non-empty field is left to read
@@ -100,23 +99,21 @@ impl<'a> Entry<'a> {
         pieces.join(" ")
     }
 
-    /// The line a field is on, with its comment: `line 2389: Param999,x,Assem101,  $ O->T RPI`.
-    /// A field past the end of a short entry is on the line of the entry's `;`.
-    fn field_location(&self, index: usize) -> String {
+    /// `error` in field `index`, with the line the field is on: `Connection1: field 4: line 2389:
+    /// Param999,x,Assem101,  $ O->T RPI: ...`. A field past the end of a short entry is on the line
+    /// of the entry's `;`.
+    fn in_field(&self, index: usize, error: Error) -> Error {
         let position = match self.fields.get(index) {
             Some(field) => field.as_span().start_pos(),
             None => self.end,
         };
-        format!(
-            "line {}: {}",
+        error.context(format_args!(
+            "{}: field {}: line {}: {}",
+            self.keyword,
+            index + 1,
             position.line_col().0,
             position.line_of().trim()
-        )
-    }
-
-    /// `Connection1: field 4`
-    fn field_label(&self, index: usize) -> String {
-        format!("{}: field {}", self.keyword, index + 1)
+        ))
     }
 }
 
@@ -135,7 +132,7 @@ impl<'a> Entry<'a> {
 /// ```
 pub(crate) fn sections(text: &str) -> Result<Vec<Section<'_>>> {
     let file = EdsGrammar::parse(Rule::file, text)
-        .map_err(|error| error.renamed_rules(rule_description))?
+        .map_err(|error| Error::Syntax(error.renamed_rules(rule_description).to_string()))?
         .next()
         .expect("the grammar matches one file");
     Ok(file

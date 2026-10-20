@@ -19,6 +19,7 @@
 //! assembly            [Assembly]: Assembly and its members
 //! connection_manager  [Connection Manager]: Connection and its two mask words
 //! forward_open        a Connection as the fields of a ForwardOpenRequest, or why it is refused
+//! error               Error: Syntax, Entry, Reference, Refused or NoConnection, with its message
 //! ```
 //!
 //! Nothing here touches the network: the `eds-implicit-io` example writes the
@@ -26,6 +27,7 @@
 
 pub mod assembly;
 pub mod connection_manager;
+pub mod error;
 mod fields;
 mod forward_open;
 pub mod params;
@@ -34,12 +36,11 @@ pub mod values;
 
 use std::collections::BTreeMap;
 
-use anyhow::{Context, Result, anyhow, bail};
-
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 
 use assembly::Assembly;
 use connection_manager::Connection;
+use error::{Error, Result};
 use fields::numbered;
 use params::Param;
 use values::{DataFormat, NumberOrParam, ParamValue, Path, PathPart};
@@ -88,7 +89,7 @@ impl Eds {
                     _ => false,
                 };
                 if defined_twice {
-                    bail!("{keyword}: is defined twice");
+                    return Err(Error::Entry(format!("{keyword}: is defined twice")));
                 }
             }
         }
@@ -97,25 +98,31 @@ impl Eds {
 
     /// `ConnectionN`: `eds.connection(1)` is `Connection1`
     pub fn connection(&self, number: u32) -> Result<&Connection> {
-        self.connections
-            .get(&number)
-            .with_context(|| format!("Connection{number}: the EDS has no such connection"))
+        self.connections.get(&number).ok_or_else(|| {
+            Error::NoConnection(format!(
+                "Connection{number}: the EDS has no such connection"
+            ))
+        })
     }
 
     /// The N of the first `ConnectionN` this scanner can open, or why each one cannot be opened;
     /// `large` as for `forward_open_request`
     pub fn first_openable_connection(&self, large: Option<bool>) -> Result<u32> {
         if self.connections.is_empty() {
-            bail!("[Connection Manager]: the EDS has no ConnectionN entries");
+            return Err(Error::NoConnection(
+                "[Connection Manager]: the EDS has no ConnectionN entries".to_string(),
+            ));
         }
         let mut refusals = String::new();
         for &number in self.connections.keys() {
             match self.forward_open_request(number, large) {
                 Ok(_) => return Ok(number),
-                Err(refusal) => refusals.push_str(&format!("\n  {refusal:#}")),
+                Err(refusal) => refusals.push_str(&format!("\n  {refusal}")),
             }
         }
-        bail!("[Connection Manager]: no connection this scanner can open:{refusals}")
+        Err(Error::NoConnection(format!(
+            "[Connection Manager]: no connection this scanner can open:{refusals}"
+        )))
     }
 
     /// The Forward_Open fields `ConnectionN` decides: both RPIs, both network connection
@@ -144,7 +151,7 @@ impl Eds {
     ) -> Result<ForwardOpenRequest> {
         let connection = self.connection(number)?;
         forward_open::request(self, connection, large)
-            .with_context(|| format!("Connection{number}"))
+            .map_err(|error| error.context(format_args!("Connection{number}")))
     }
 
     /// Bytes of output data, without the sequence count and real-time header:
@@ -152,12 +159,14 @@ impl Eds {
     pub fn o2t_size(&self, number: u32) -> Result<u16> {
         let connection = self.connection(number)?;
         self.data_size(connection.o2t_size, connection.o2t_format)
-            .with_context(|| format!("Connection{number}: O->T"))
+            .map_err(|error| error.context(format_args!("Connection{number}: O->T")))
     }
 
     /// A direction's RPI in microseconds: the number, or the default of the `ParamN` it names
     pub(crate) fn requested_packet_interval(&self, rpi: Option<NumberOrParam>) -> Result<u32> {
-        self.resolve(rpi.context("has no requested packet interval")?)
+        self.resolve(
+            rpi.ok_or_else(|| Error::Reference("has no requested packet interval".to_string()))?,
+        )
     }
 
     /// A direction's bytes of data: its size field, else the size of its `AssemN` format
@@ -169,7 +178,9 @@ impl Eds {
         match (size, format) {
             (Some(size), _) => self.resolve(size),
             (None, Some(DataFormat::Assem(number))) => self.assembly_size(number),
-            (None, _) => bail!("has no size, and no AssemN format that gives one"),
+            (None, _) => Err(Error::Reference(
+                "has no size, and no AssemN format that gives one".to_string(),
+            )),
         }
     }
 
@@ -180,13 +191,14 @@ impl Eds {
     pub(crate) fn resolve<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
         let type_name = std::any::type_name::<T>();
         match value {
-            NumberOrParam::Number(number) => {
-                T::try_from(number).map_err(|_| anyhow!("{number} is out of range for {type_name}"))
-            }
+            NumberOrParam::Number(number) => T::try_from(number)
+                .map_err(|_| Error::Reference(format!("{number} is out of range for {type_name}"))),
             NumberOrParam::Param(param) => {
                 let default = self.param_default(param)?;
                 T::try_from(default).map_err(|_| {
-                    anyhow!("Param{param}'s default {default} is out of range for {type_name}")
+                    Error::Reference(format!(
+                        "Param{param}'s default {default} is out of range for {type_name}"
+                    ))
                 })
             }
         }
@@ -203,8 +215,10 @@ impl Eds {
                 PathPart::Param(number) => {
                     let data_size = usize::from(self.param(number)?.data_size);
                     let default = self.param_default(number)?.to_le_bytes();
-                    let value = default.get(..data_size).with_context(|| {
-                        format!("Param{number} is {data_size} bytes, too large for a path")
+                    let value = default.get(..data_size).ok_or_else(|| {
+                        Error::Reference(format!(
+                            "Param{number} is {data_size} bytes, too large for a path"
+                        ))
                     })?;
                     bytes.extend_from_slice(value);
                 }
@@ -220,10 +234,11 @@ impl Eds {
     /// Assem101 = "Out", "", , 0x0000,,, 16,Param2, 8,;        $ Assem101: 16 + 8 bits, 3 bytes
     /// ```
     pub(crate) fn assembly_size(&self, number: u32) -> Result<u16> {
-        let assembly = self
-            .assemblies
-            .get(&number)
-            .with_context(|| format!("refers to Assem{number}, which the file does not define"))?;
+        let assembly = self.assemblies.get(&number).ok_or_else(|| {
+            Error::Reference(format!(
+                "refers to Assem{number}, which the file does not define"
+            ))
+        })?;
         if let Some(size) = assembly.size {
             return self.resolve(size);
         }
@@ -237,21 +252,27 @@ impl Eds {
         u16::try_from(bits / 8)
             .ok()
             .filter(|&bytes| bytes > 0 && bits.is_multiple_of(8))
-            .with_context(|| {
-                format!("Assem{number} has no size, and its members add up to {bits} bits")
+            .ok_or_else(|| {
+                Error::Reference(format!(
+                    "Assem{number} has no size, and its members add up to {bits} bits"
+                ))
             })
     }
 
     fn param(&self, number: u32) -> Result<&Param> {
-        self.params
-            .get(&number)
-            .with_context(|| format!("refers to Param{number}, which the file does not define"))
+        self.params.get(&number).ok_or_else(|| {
+            Error::Reference(format!(
+                "refers to Param{number}, which the file does not define"
+            ))
+        })
     }
 
     fn param_default(&self, number: u32) -> Result<i64> {
         match self.param(number)?.default {
             Some(ParamValue::Integer(default)) => Ok(default),
-            _ => bail!("refers to Param{number}, which has no integer default"),
+            _ => Err(Error::Reference(format!(
+                "refers to Param{number}, which has no integer default"
+            ))),
         }
     }
 }

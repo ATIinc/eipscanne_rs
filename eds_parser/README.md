@@ -17,10 +17,11 @@ module of its section:
 | `assembly` | `[Assembly]`: `Assembly` and its members. |
 | `connection_manager` | `[Connection Manager]`: `Connection` and its two mask words as `bilge` bitfields, whose `Debug` names every bit. |
 | `forward_open` | A `Connection` as the fields of a `ForwardOpenRequest`, or why it is refused. |
+| `error` | `Error`: `Syntax`, `Entry`, `Reference`, `Refused` or `NoConnection`, each with its message, and the `Result` alias. |
 
 `Eds::parse(&str)` reads every `ParamN`, `AssemN` and `ConnectionN` entry; the params and
 assemblies a connection refers to are looked up when it is opened. Every failure is an
-`anyhow::Error` that says where: the keyword, field and line of an entry being read
+`error::Error` whose message says where: the keyword, field and line of an entry being read
 (`Connection1: field 4: line 3: Param999,x,Assem101,: expected a number or a ParamN, found "x"`),
 else the connection (`Connection1: refers to Param7, which the file does not define`).
 

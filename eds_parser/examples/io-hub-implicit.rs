@@ -11,7 +11,6 @@ use std::io::Cursor;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
-use anyhow::{Context, bail};
 use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
@@ -80,12 +79,12 @@ struct Args {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // ========= Read the EDS and derive the connection ============
     let text = std::fs::read_to_string(&args.eds)
-        .with_context(|| format!("reading {}", args.eds.display()))?;
+        .map_err(|error| format!("reading {}: {error}", args.eds.display()))?;
     let eds = Eds::parse(&text)?;
     let number: u32 = eds.first_openable_connection(None)?;
     let connection: &Connection = eds.connection(number)?;
@@ -115,11 +114,12 @@ async fn main() -> anyhow::Result<()> {
     let expected_path =
         CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE, INPUT_ASSEMBLY_INSTANCE);
     if request.connection_path != expected_path {
-        bail!(
+        return Err(format!(
             "Connection{number} ({}) has the path {:?}, not the one the structs are written for: {expected_path:?}",
             connection.name,
             request.connection_path
-        );
+        )
+        .into());
     }
     let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
     let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;

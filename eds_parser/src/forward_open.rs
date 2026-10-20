@@ -4,7 +4,6 @@
 
 use std::io::Cursor;
 
-use anyhow::{Context, Result, bail};
 use bilge::prelude::{Integer, u9};
 use binrw::BinRead;
 
@@ -21,6 +20,7 @@ use eipscanne_rs::cip::types::CipUdint;
 
 use crate::Eds;
 use crate::connection_manager::Connection;
+use crate::error::{Error, Result};
 
 /// The Forward_Open fields a connection decides, every other field zero; `large` as for
 /// `Eds::forward_open_request`. For this entry, with `Param1` defaulting to 1000000, `Param2` to
@@ -55,9 +55,9 @@ pub(crate) fn request(
         && trigger_and_transport.triggers().cyclic()
         && trigger_and_transport.application_types().exclusive_owner())
     {
-        bail!(
+        return Err(Error::Refused(format!(
             "this scanner opens class 1, cyclic, exclusive-owner connections; this one offers {trigger_and_transport:?}"
-        );
+        )));
     }
     // 0x44440405: point-to-point O->T (bit 18) and T->O (bit 22), scheduled priority O->T
     // (bit 26) and T->O (bit 30)
@@ -68,13 +68,15 @@ pub(crate) fn request(
             .t2o_connection_types()
             .point_to_point())
     {
-        bail!(
+        return Err(Error::Refused(format!(
             "this scanner opens point-to-point connections both ways; this one offers {connection_parameters:?}"
-        );
+        )));
     }
     let priority: ConnectionPriority =
-        connection_parameters.shared_priority().with_context(|| {
-            format!("no priority is supported both ways; this one offers {connection_parameters:?}")
+        connection_parameters.shared_priority().ok_or_else(|| {
+            Error::Refused(format!(
+                "no priority is supported both ways; this one offers {connection_parameters:?}"
+            ))
         })?;
     let o2t_real_time_format: RealTimeFormat = connection.o2t_real_time_format()?;
     let t2o_real_time_format: RealTimeFormat = connection.t2o_real_time_format()?;
@@ -82,18 +84,18 @@ pub(crate) fn request(
     // Param1,32,Assem150, (fields 3-5): O->T every Param1's default microseconds, 32 bytes
     let o2t_requested_packet_interval: CipUdint = eds
         .requested_packet_interval(connection.o2t_rpi)
-        .context("O->T")?;
+        .map_err(|error| error.context("O->T"))?;
     let o2t_size: u16 = eds
         .data_size(connection.o2t_size, connection.o2t_format)
-        .context("O->T")?;
+        .map_err(|error| error.context("O->T"))?;
     // Param1,,Assem100, (fields 6-8): T->O every Param1's default microseconds, as many bytes as
     // Assem100
     let t2o_requested_packet_interval: CipUdint = eds
         .requested_packet_interval(connection.t2o_rpi)
-        .context("T->O")?;
+        .map_err(|error| error.context("T->O"))?;
     let t2o_size: u16 = eds
         .data_size(connection.t2o_size, connection.t2o_format)
-        .context("T->O")?;
+        .map_err(|error| error.context("T->O"))?;
 
     // Sizes on the wire: the data plus the sequence count and the real-time header. O->T in the
     // example: 32 + 2 + 4 = 38; T->O: 32 + 2 = 34
@@ -109,19 +111,22 @@ pub(crate) fn request(
         priority,
         large,
     )
-    .context("O->T")?;
+    .map_err(|error| error.context("O->T"))?;
     let t2o_network_connection_parameters = network_connection_parameters(
         t2o_connection_size,
         connection_parameters.t2o_size_types().fixed(),
         priority,
         large,
     )
-    .context("T->O")?;
+    .map_err(|error| error.context("T->O"))?;
 
     // "20 04 24 [Param2] 2C 96 2C 64": Param2's default in place of [Param2]
     let path: Vec<u8> = eds.path_bytes(&connection.path)?;
-    let connection_path: CipPath = cip_path(&path)
-        .with_context(|| format!("its path {path:02X?} is not made of logical segments only"))?;
+    let Some(connection_path) = cip_path(&path) else {
+        return Err(Error::Refused(format!(
+            "its path {path:02X?} is not made of logical segments only"
+        )));
+    };
 
     Ok(ForwardOpenRequest {
         priority_time_tick: PriorityTimeTick::from(0u8),
@@ -168,8 +173,10 @@ fn network_connection_parameters(
                 .build(),
         ));
     }
-    let standard_connection_size = u9::try_new(connection_size).ok().with_context(|| {
-        format!("the connection size of {connection_size} bytes needs a Large_Forward_Open")
+    let standard_connection_size = u9::try_new(connection_size).map_err(|_| {
+        Error::Refused(format!(
+            "the connection size of {connection_size} bytes needs a Large_Forward_Open"
+        ))
     })?;
     Ok(NetworkConnectionParameters::Standard(
         StandardNetworkConnectionParameters::builder()

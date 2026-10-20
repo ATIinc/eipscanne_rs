@@ -1,8 +1,7 @@
 //! Reading the fields of an entry (see `syntax` for entries and fields): `FromEntry` for a struct
 //! read from consecutive fields, and `FromField` for a value read from one field.
 
-use anyhow::{Context, Result};
-
+use crate::error::{Error, Result};
 use crate::syntax::{Entry, quoted_strings};
 
 /// A struct read from consecutive fields of an entry, each member in the order the struct declares
@@ -64,7 +63,7 @@ impl FromField for Unread {
 impl FromField for String {
     fn from_field(text: &str) -> Result<String> {
         let strings = quoted_strings(text)
-            .with_context(|| format!("expected a quoted string, found {text:?}"))?;
+            .ok_or_else(|| Error::Entry(format!("expected a quoted string, found {text:?}")))?;
         Ok(strings
             .iter()
             .map(|characters| unescaper::unescape_lossy(characters))
@@ -75,21 +74,24 @@ impl FromField for String {
 /// `4`, `0x04`, `0b100`
 impl FromField for u8 {
     fn from_field(text: &str) -> Result<u8> {
-        parse_int::parse(text).with_context(|| format!("expected a u8, found {text:?}"))
+        parse_int::parse(text)
+            .map_err(|cause| Error::Entry(format!("expected a u8, found {text:?}: {cause}")))
     }
 }
 
 /// `4`, `0x0004`, `0b100`
 impl FromField for u16 {
     fn from_field(text: &str) -> Result<u16> {
-        parse_int::parse(text).with_context(|| format!("expected a u16, found {text:?}"))
+        parse_int::parse(text)
+            .map_err(|cause| Error::Entry(format!("expected a u16, found {text:?}: {cause}")))
     }
 }
 
 /// `4`, `0x00000004`, `0b100`
 impl FromField for u32 {
     fn from_field(text: &str) -> Result<u32> {
-        parse_int::parse(text).with_context(|| format!("expected a u32, found {text:?}"))
+        parse_int::parse(text)
+            .map_err(|cause| Error::Entry(format!("expected a u32, found {text:?}: {cause}")))
     }
 }
 

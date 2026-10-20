@@ -3,13 +3,13 @@
 //! connection. Their `Debug` names every bit, which is how a refusal shows what a connection
 //! offers.
 
-use anyhow::{Context, Result, bail};
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, u5, u9};
 
 use eipscanne_rs::cip::connection_manager::parameters::{ConnectionPriority, RealTimeFormat};
 
 use eds_parser_derive::{FromEntry, FromField};
 
+use crate::error::{Error, Result};
 use crate::fields::Unread;
 use crate::values::{DataFormat, NumberOrParam, Path};
 
@@ -56,13 +56,13 @@ impl Connection {
     /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (bits 8-10)
     pub fn o2t_real_time_format(&self) -> Result<RealTimeFormat> {
         RealTimeFormat::try_from(self.connection_parameters.o2t_real_time_transfer_format())
-            .context("O->T")
+            .map_err(|error| error.context("O->T"))
     }
 
     /// How the inputs signal run/idle: `0x44440405` is `Modeless` (bits 12-14)
     pub fn t2o_real_time_format(&self) -> Result<RealTimeFormat> {
         RealTimeFormat::try_from(self.connection_parameters.t2o_real_time_transfer_format())
-            .context("T->O")
+            .map_err(|error| error.context("T->O"))
     }
 }
 
@@ -195,7 +195,7 @@ pub enum RealTimeTransferFormat {
 
 /// The library's `RealTimeFormat` for a code this scanner supports
 impl TryFrom<RealTimeTransferFormat> for RealTimeFormat {
-    type Error = anyhow::Error;
+    type Error = Error;
 
     fn try_from(format: RealTimeTransferFormat) -> Result<RealTimeFormat> {
         match format {
@@ -203,9 +203,9 @@ impl TryFrom<RealTimeTransferFormat> for RealTimeFormat {
             RealTimeTransferFormat::ZeroLength => Ok(RealTimeFormat::ZeroLength),
             RealTimeTransferFormat::Heartbeat => Ok(RealTimeFormat::Heartbeat),
             RealTimeTransferFormat::Header32Bit => Ok(RealTimeFormat::Header32Bit),
-            RealTimeTransferFormat::Unsupported(code) => {
-                bail!("real-time transfer format {code} is not supported")
-            }
+            RealTimeTransferFormat::Unsupported(code) => Err(Error::Refused(format!(
+                "real-time transfer format {code} is not supported"
+            ))),
         }
     }
 }

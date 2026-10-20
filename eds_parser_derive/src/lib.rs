@@ -40,7 +40,7 @@ pub fn derive_from_entry(input: TokenStream) -> TokenStream {
 
     quote! {
         impl crate::fields::FromEntry for #name {
-            fn from_entry(entry: &mut crate::syntax::Entry) -> ::anyhow::Result<#name> {
+            fn from_entry(entry: &mut crate::syntax::Entry) -> crate::error::Result<#name> {
                 Ok(#name { #(#reads,)* })
             }
         }
@@ -64,7 +64,7 @@ pub fn derive_from_field(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     quote! {
         impl crate::fields::FromField for #name {
-            fn from_field(text: &str) -> ::anyhow::Result<#name> {
+            fn from_field(text: &str) -> crate::error::Result<#name> {
                 let integer: <#name as ::bilge::Bitsized>::ArbitraryInt =
                     crate::fields::FromField::from_field(text)?;
                 Ok(#name::from(integer))

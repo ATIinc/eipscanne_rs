@@ -1,8 +1,7 @@
 //! The kinds of value an EDS field holds beyond strings and integers, each read from the field's
 //! text with `FromField`.
 
-use anyhow::{Context, Result, anyhow, bail};
-
+use crate::error::{Error, Result};
 use crate::fields::{FromField, numbered};
 
 /// A number, or a `ParamN` that stands for its default: `32`, `0x20`, `Param3`
@@ -20,7 +19,11 @@ impl FromField for NumberOrParam {
         }
         parse_int::parse(text)
             .map(NumberOrParam::Number)
-            .with_context(|| format!("expected a number or a ParamN, found {text:?}"))
+            .map_err(|cause| {
+                Error::Entry(format!(
+                    "expected a number or a ParamN, found {text:?}: {cause}"
+                ))
+            })
     }
 }
 
@@ -42,7 +45,9 @@ impl FromField for DataFormat {
         } else if let Some(number) = numbered(text, "Param") {
             Ok(DataFormat::Param(number))
         } else {
-            bail!("expected an AssemN, AssemExaN or ParamN, found {text:?}")
+            Err(Error::Entry(format!(
+                "expected an AssemN, AssemExaN or ParamN, found {text:?}"
+            )))
         }
     }
 }
@@ -64,9 +69,11 @@ impl FromField for ParamValue {
         if let Ok(real) = text.parse::<f64>() {
             return Ok(ParamValue::Real(real));
         }
-        String::from_field(text)
-            .map(ParamValue::Text)
-            .map_err(|_| anyhow!("expected a number or a quoted string, found {text:?}"))
+        String::from_field(text).map(ParamValue::Text).map_err(|_| {
+            Error::Entry(format!(
+                "expected a number or a quoted string, found {text:?}"
+            ))
+        })
     }
 }
 
@@ -89,8 +96,10 @@ impl FromField for Path {
                     .filter(|token| token.len() == 2)
                     .and_then(|token| u8::from_str_radix(token, 16).ok())
                     .map(PathPart::Byte)
-                    .with_context(|| {
-                        format!("path {path:?}: {token} is neither a hex byte nor a ParamN")
+                    .ok_or_else(|| {
+                        Error::Entry(format!(
+                            "path {path:?}: {token} is neither a hex byte nor a ParamN"
+                        ))
                     })
             })
             .collect::<Result<Vec<PathPart>>>()
@@ -125,8 +134,10 @@ impl FromField for MemberReference {
         } else {
             parse_int::parse(text)
                 .map(MemberReference::Number)
-                .with_context(|| {
-                    format!("expected a ParamN, AssemN, number or path, found {text:?}")
+                .map_err(|cause| {
+                    Error::Entry(format!(
+                        "expected a ParamN, AssemN, number or path, found {text:?}: {cause}"
+                    ))
                 })
         }
     }

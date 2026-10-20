@@ -21,7 +21,7 @@ the integer types of the hub's EDS.
   `cargo run --example <name>` work from the root.
 * Crate `eds_parser_derive/` (proc-macro, in `members`): `#[derive(FromEntry)]` and
   `#[derive(FromField)]`, which Rust requires to live in a proc-macro crate of their own.
-* Dependencies: `anyhow`, `bilge`, `binrw`, `eds_parser_derive`, `eipscanne_rs`, `parse_int`,
+* Dependencies: `bilge`, `binrw`, `eds_parser_derive`, `eipscanne_rs`, `parse_int`,
   `pest`, `pest_derive`, `unescaper`. Dev-dependencies: `scanner`, `tokio`, `clap`, `rand` for the
   examples, and `hex-test-macros` for the tests.
 
@@ -37,7 +37,8 @@ number or the param's integer default, a path's `ParamN` to the default in as ma
 bytes as the param's data size, and an `AssemN` format to the assembly's size field or the sum of
 its member sizes. A reference that is missing or has no usable value fails that connection.
 
-Every error is an `anyhow::Error` that says where: the keyword, field and line while reading
+Every error is an `error::Error` of one of five kinds, `Syntax`, `Entry`, `Reference`, `Refused`
+or `NoConnection`, whose message says where: the keyword, field and line while reading
 (`Connection1: field 4: line 3: Param999,x,Assem101,: expected a number or a ParamN, found "x"`),
 the connection while opening (`Connection1: refers to Param7, which the file does not define`).
 
@@ -156,7 +157,8 @@ commands that start the adapter and what the run prints.
 ### Example — `eds_parser/examples/io-hub-implicit.rs`
 
 The implicit counterpart of `io-hub-explicit-homing`, one linear file, with the IO-HUB assemblies
-included through `#[path = "../../scanner/assemblies"]` and errors reported through `anyhow`:
+included through `#[path = "../../scanner/assemblies"]` and errors returned as
+`Box<dyn std::error::Error>`:
 
 1. Read the first connection this scanner can open from `--eds` (the local IO-HUB file), and
    check that its request's path is `CipPath::new_assembly_connection(1, OUTPUT_ASSEMBLY_INSTANCE,
