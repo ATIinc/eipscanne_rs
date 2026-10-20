@@ -6,7 +6,9 @@ a class 3 connection), `implicit` messaging (a class 1 I/O connection: `connecti
 submodule per direction) and the `connection_manager` both kinds of connection open and close
 through. `read-identity` and `clearlink-explicit-outputs` use `session` and `explicit`;
 `read-identity-connected` uses `connection_manager` and `explicit::connected`; `implicit-io` and
-`flexi-net-implicit` use `session` and `implicit`.
+`flexi-net-implicit` use `session` and `implicit`. `eds-implicit-io` and `io-hub-implicit` also
+use `implicit::eds`, which writes the Forward_Open of a connection read from an EDS file by the
+`eds_parser` crate.
 
 ## Run Examples
 
@@ -22,6 +24,8 @@ lists the scanner among the workspace's default members, so no `-p scanner` is n
 | `clearlink-explicit-outputs` | Teknic ClearLink | explicit | digital outputs |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E / ClearPath-IP | explicit (polling) | a motor |
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
+| `eds-implicit-io` | OpENer or any class 1 adapter, from its EDS file | implicit | outputs of the adapter, with `--run` |
+| `io-hub-implicit` | Teknic IO-HUB-4-E, from its EDS file | implicit | no (every output off) |
 | `flexi-net-implicit` | SICK flexi-net | implicit | inputs of the safety logic |
 
 Every example is a single file. The device assemblies they use live outside the library in
@@ -145,6 +149,71 @@ delay an output packet; the example keeps one loop to stay readable.
 Limits: one connection per host (only one socket can bind UDP 2222) and point-to-point in both
 directions (no multicast).
 
+### eds-implicit-io
+
+The stages of `implicit-io` with the connection settings read from an EDS file. Its defaults
+(`--eds` the `sample_adapter.eds` fixture of `scanner/tests/fixtures`, `--host 172.28.0.10`)
+describe the OpENer adapter of `tests/integration`, so with that adapter running
+(`tests/integration/start-opener.sh` on the host):
+
+```
+cargo run --example eds-implicit-io
+```
+
+Flags: `--eds <file>`, `--connection <N>` (default: the first connection this scanner can open),
+`--host`, `--cycles`, `--large <true|false>` (default: automatic), `--run`. The outputs are zeros
+and the scanner stays idle unless `--run` is given, because an output assembly may drive real
+outputs; with a modeless O->T direction idle cannot be signalled, so the example refuses to start
+without `--run`. Ctrl+C ends the exchange early; the connection is still closed and the session
+unregistered.
+
+The example writes what an EDS does not describe (tick time, timeouts, connection IDs, the
+connection triad) and takes the rest from `implicit::eds`:
+
+```rust
+let eds = Eds::parse(&eds_text)?;
+let number: u32 = first_openable_connection(&eds, None)?; // or the N of any ConnectionN
+let connection: &ConnectionEntry = &eds.connections[&number];
+let request = ForwardOpenRequest {
+    // ... originator fields ...
+    ..forward_open_request(&eds, connection, None)?
+};
+let outputs = vec![0u8; usize::from(eds.data_size(connection.o2t_size, connection.o2t_format)?)];
+// forward_open(&mut session, request, o2t_real_time_format(connection)?, t2o_real_time_format(connection)?)
+```
+
+The last argument picks the service: `Some(true)` a Large_Forward_Open (32-bit connection
+parameters), `Some(false)` a Forward_Open, `None` a Large_Forward_Open only when a direction is
+over 511 bytes on the wire.
+
+The masks say what the device *supports*; one value is picked from them, or the connection is
+refused (`Error::UnsupportedConnection`) with the mask's `Debug`, which shows what it offers
+(`this scanner opens class 1, cyclic, exclusive-owner connections; this one offers
+TriggerAndTransportMask { transport_classes: TransportClasses { class_0: false, class_1: true,
+... }, ... }`):
+
+| Value | Taken from the EDS | Refused when |
+|---|---|---|
+| `transport_type_trigger` | class 1, cyclic, client | class 1, cyclic or exclusive owner not supported |
+| `*_network_connection_parameters` | point-to-point; the size plus the 2-byte sequence count and, with a 32-bit header, 4 more (EDS sizes exclude both); fixed size if supported, else variable; scheduled, else high, else low priority, among those both directions support | not point-to-point, no shared priority, over 511 bytes with `Some(false)` |
+| `*_requested_packet_interval` | a number or a `ParamN`'s default, in microseconds | none in the EDS |
+| the size (`eds.data_size`) | a number or a `ParamN`'s default; when empty, the size of the format's `AssemN` | neither |
+| `*_real_time_format` | 0 modeless, 1 zero length, 3 heartbeat, 4 32-bit header | 2, 5, 6, 7 |
+| `connection_path` | the path, `[ParamN]` replaced by the param's default | segments other than logical ones, such as `SYMBOL_ANSI` |
+
+The client/server bit of the trigger mask is ignored (vendors disagree on it; a Forward_Open's
+originator is always the client), and configuration data the EDS declares is not read.
+
+### io-hub-implicit
+
+Opens the IO-HUB-4-E's connection from the hub's EDS, then decodes every input packet as an
+`InputAssemblyHub4E` and prints one motor's status when it changes. Outputs are
+`OutputAssemblyHub4E::default()` (nothing enabled), sent idle unless `--run`:
+
+```
+cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host <ip> --motor 0
+```
+
 ### flexi-net-implicit
 
 The stages of `implicit-io` against a SICK flexi-net, with the device's connection fixed in
@@ -163,3 +232,16 @@ connection closes. A longer test is a longer `--count-delay`.
 
 Flags: `--host` (`172.31.19.210` by default), `--rpi` (milliseconds, both directions, 20 by
 default), `--count-delay` (milliseconds, rounded up to whole RPIs, 1000 by default).
+
+### Writing a device's assemblies
+
+Assemblies are plain `binrw` structs written by hand in `scanner/assemblies/<device>/`, so they
+keep groups, named bits, enums and helpers. The same struct then decodes an explicit
+Get_Attribute_Single reply (`decode_reply`) and the data of an implicit input packet
+(`T::read_le` on the bytes `t2o::accept_t2o_packet` returns), and is sent as implicit outputs with
+`o2t::build_o2t_packet(.., CipDataOpt::Typed(Box::new(outputs)), ..)`.
+
+The members of an `AssemN` entry are `bits, ParamN` pairs, and each `ParamN` gives the member's
+type, name and units (`eds.assemblies` and `eds.params` hold both, read). Write the structs from
+them, or hand the EDS to Claude to write them; give reserved bytes a named `_reserved` field so
+every byte shows up in the struct, and add a test against a capture of the real device.

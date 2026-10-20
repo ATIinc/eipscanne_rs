@@ -1,4 +1,4 @@
-$ Sample EDS written for the eds_parser tests. It describes an adapter offering the connection the
+$ Sample EDS written for the scanner's tests. It describes an adapter offering the connection the
 $ OpENer sample application accepts (configuration assembly 151, 32 output bytes to assembly 150
 $ with a 32-bit run/idle header, 32 input bytes from assembly 100 without one, 1 s packet interval)
 $ and an input-only connection. Not a real device's file.

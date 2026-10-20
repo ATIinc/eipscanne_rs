@@ -11,9 +11,11 @@
 //! ```
 //!
 //! The Forward_Open and Forward_Close are unconnected messages sent through `connection_manager`;
-//! `connection::forward_open` adds what the I/O exchange needs to the reply. Stage 3 keeps no
-//! state: the caller owns the sequence numbers and the deadline (see the `implicit-io` example).
+//! `connection::forward_open` adds what the I/O exchange needs to the reply. `eds` writes the
+//! Forward_Open of a connection a device's EDS file describes. Stage 3 keeps no state: the caller
+//! owns the sequence numbers and the deadline (see the `implicit-io` example).
 
 pub mod connection;
+pub mod eds;
 pub mod o2t;
 pub mod t2o;
