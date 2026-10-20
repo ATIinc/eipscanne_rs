@@ -8,9 +8,11 @@ description = "Reads an EtherNet/IP device's EDS file and one of its connections
 
 [dependencies]
 eipscanne_rs = { path = ".." }
+eds_parser_derive = { path = "../eds_parser_derive" }
 bilge = "0.5.0"
 binrw = "0.15.2"
 anyhow = "1"
+parse_int = "0.9.0"
 pest = "2.9.4"
 pest_derive = "2.9.4"
 

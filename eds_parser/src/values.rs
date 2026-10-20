@@ -1,90 +1,9 @@
-//! The kinds of value an EDS field holds, each read from the field's text with `FromField`.
+//! The kinds of value an EDS field holds beyond strings and integers, each read from the field's
+//! text with `FromField`.
 
 use anyhow::{Context, Result, anyhow, bail};
 
-/// A value one field holds, read from the field's text: `0x20` as a `u16`, `Param1` as a
-/// `NumberOrParam`, `"Input " "Assembly"` as a `String`. `Option<T>` is `None` for an empty field.
-pub(crate) trait FromField: Sized {
-    fn from_field(text: &str) -> Result<Self>;
-}
-
-/// `,,` is `None`, anything else a `T`
-impl<T: FromField> FromField for Option<T> {
-    fn from_field(text: &str) -> Result<Option<T>> {
-        match text.is_empty() {
-            true => Ok(None),
-            false => T::from_field(text).map(Some),
-        }
-    }
-}
-
-/// A quoted string, or adjacent quoted strings joined: `"Input " "Assembly"` is `Input Assembly`.
-/// `\n`, `\t` and `\r` are read as such, and a backslash before any other character keeps only that
-/// character (`"a \"b\""` is `a "b"`). `L"..."`, a 16-bit character string, is read the same way.
-impl FromField for String {
-    fn from_field(text: &str) -> Result<String> {
-        let quoted = text.strip_prefix('L').unwrap_or(text);
-        if !quoted.starts_with('"') {
-            bail!("expected a quoted string, found {text:?}");
-        }
-
-        let mut string = String::new();
-        let mut in_string = false;
-        let mut chars = quoted.chars();
-        while let Some(c) = chars.next() {
-            match (in_string, c) {
-                (false, '"') => in_string = true,
-                (false, c) if c.is_whitespace() => {}
-                (false, _) => bail!("expected a quoted string, found {text:?}"),
-                (true, '"') => in_string = false,
-                (true, '\\') => string.push(match chars.next() {
-                    Some('n') => '\n',
-                    Some('t') => '\t',
-                    Some('r') => '\r',
-                    Some(other) => other,
-                    None => '\\',
-                }),
-                (true, c) => string.push(c),
-            }
-        }
-        if in_string {
-            bail!("{text} has no closing quote");
-        }
-        Ok(string)
-    }
-}
-
-/// `4`
-impl FromField for u8 {
-    fn from_field(text: &str) -> Result<u8> {
-        integer(text)
-    }
-}
-
-/// `0x0004`
-impl FromField for u16 {
-    fn from_field(text: &str) -> Result<u16> {
-        integer(text)
-    }
-}
-
-/// `0x04010002`
-impl FromField for u32 {
-    fn from_field(text: &str) -> Result<u32> {
-        integer(text)
-    }
-}
-
-/// A field this crate does not read: the link path of a `ParamN`, the configuration of a
-/// `ConnectionN`
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Unread;
-
-impl FromField for Unread {
-    fn from_field(_text: &str) -> Result<Unread> {
-        Ok(Unread)
-    }
-}
+use crate::fields::{FromField, numbered};
 
 /// A number, or a `ParamN` that stands for its default: `32`, `0x20`, `Param3`
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -99,8 +18,7 @@ impl FromField for NumberOrParam {
         if let Some(param) = numbered(text, "Param") {
             return Ok(NumberOrParam::Param(param));
         }
-        number(text)
-            .and_then(|value| i64::try_from(value).ok())
+        parse_int::parse(text)
             .map(NumberOrParam::Number)
             .with_context(|| format!("expected a number or a ParamN, found {text:?}"))
     }
@@ -140,7 +58,7 @@ pub enum ParamValue {
 /// `0x97` -> `Integer(151)`, `2.5` -> `Real(2.5)`, `"on"` -> `Text("on")`
 impl FromField for ParamValue {
     fn from_field(text: &str) -> Result<ParamValue> {
-        if let Some(integer) = number(text).and_then(|value| i64::try_from(value).ok()) {
+        if let Ok(integer) = parse_int::parse(text) {
             return Ok(ParamValue::Integer(integer));
         }
         if let Ok(real) = text.parse::<f64>() {
@@ -205,39 +123,11 @@ impl FromField for MemberReference {
         } else if text.contains('"') {
             Path::from_field(text).map(MemberReference::Path)
         } else {
-            number(text)
-                .and_then(|value| i64::try_from(value).ok())
+            parse_int::parse(text)
                 .map(MemberReference::Number)
                 .with_context(|| {
                     format!("expected a ParamN, AssemN, number or path, found {text:?}")
                 })
         }
     }
-}
-
-/// An integer field as a `T`: `32`, `0x20`, `0b100000`
-fn integer<T: TryFrom<i128>>(text: &str) -> Result<T> {
-    let value = number(text).with_context(|| format!("expected a number, found {text:?}"))?;
-    T::try_from(value)
-        .map_err(|_| anyhow!("{value} is out of range for {}", std::any::type_name::<T>()))
-}
-
-/// A decimal (`-12`), `0x` hexadecimal (`0x0C`) or `0b` binary (`0b1100`) number
-pub(crate) fn number(text: &str) -> Option<i128> {
-    if let Some(hex) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        i128::from_str_radix(hex, 16).ok()
-    } else if let Some(binary) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
-        i128::from_str_radix(binary, 2).ok()
-    } else {
-        text.parse().ok()
-    }
-}
-
-/// The N of a keyword that is `prefix` followed by digits (`Param12` -> 12), case ignored
-pub(crate) fn numbered(keyword: &str, prefix: &str) -> Option<u32> {
-    let (head, digits) = keyword.split_at_checked(prefix.len())?;
-    if !head.eq_ignore_ascii_case(prefix) || !digits.bytes().all(|byte| byte.is_ascii_digit()) {
-        return None;
-    }
-    digits.parse().ok()
 }

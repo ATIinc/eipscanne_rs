@@ -8,11 +8,26 @@ use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u3, u4, 
 
 use eipscanne_rs::cip::connection_manager::parameters::{ConnectionPriority, RealTimeFormat};
 
-use crate::syntax::Fields;
-use crate::values::{DataFormat, FromField, NumberOrParam, Path, Unread};
+use eds_parser_derive::FromFields;
 
-/// `ConnectionN` of `[Connection Manager]`
-#[derive(Debug, Clone, PartialEq)]
+use crate::fields::Unread;
+use crate::values::{DataFormat, NumberOrParam, Path};
+
+/// `ConnectionN` of `[Connection Manager]`, its fields in file order:
+///
+/// ```text
+/// Connection1 =
+///     0x04010002,                 $ trigger and transport
+///     0x44440405,                 $ connection parameters
+///     Param1,32,Assem150,         $ O->T RPI, size, format
+///     Param1,,Assem100,           $ T->O RPI, size (empty: from Assem100), format
+///     ,,                          $ proxy config size, format
+///     0,Assem151,                 $ target config size, format
+///     "Exclusive Owner",          $ name
+///     "",                         $ help
+///     "20 04 24 [Param2] 2C 96 2C 64";    $ path
+/// ```
+#[derive(Debug, Clone, PartialEq, FromFields)]
 pub struct Connection {
     pub trigger_and_transport: TriggerAndTransport,
     pub connection_parameters: ConnectionParameters,
@@ -38,42 +53,6 @@ pub struct Connection {
 // ======= Start of Connection impl ========
 
 impl Connection {
-    /// ```text
-    /// Connection1 =
-    ///     0x04010002,                 $ trigger and transport
-    ///     0x44440405,                 $ connection parameters
-    ///     Param1,32,Assem150,         $ O->T RPI, size, format
-    ///     Param1,,Assem100,           $ T->O RPI, size (empty: from Assem100), format
-    ///     ,,                          $ proxy config size, format
-    ///     0,Assem151,                 $ target config size, format
-    ///     "Exclusive Owner",          $ name
-    ///     "",                         $ help
-    ///     "20 04 24 [Param2] 2C 96 2C 64";    $ path
-    /// ```
-    pub(crate) fn read(mut fields: Fields) -> Result<Connection> {
-        let connection = Connection {
-            trigger_and_transport: fields.next()?,
-            connection_parameters: fields.next()?,
-            o2t_rpi: fields.next()?,
-            o2t_size: fields.next()?,
-            o2t_format: fields.next()?,
-            t2o_rpi: fields.next()?,
-            t2o_size: fields.next()?,
-            t2o_format: fields.next()?,
-            proxy_config_size: fields.next()?,
-            proxy_config_format: fields.next()?,
-            target_config_size: fields.next()?,
-            target_config_format: fields.next()?,
-            name: fields.next()?,
-            help: fields.next()?,
-            path: fields.next()?,
-            safety_async: fields.next()?,
-            safety_max_consumer_number: fields.next()?,
-        };
-        fields.finish()?;
-        Ok(connection)
-    }
-
     /// How the outputs signal run/idle: `0x44440405` is `Header32Bit` (bits 8-10)
     pub fn o2t_real_time_format(&self) -> Result<RealTimeFormat> {
         RealTimeFormat::try_from(self.connection_parameters.o2t_real_time_transfer_format())
@@ -105,13 +84,6 @@ pub struct TriggerAndTransport {
     /// Bit 31, client 0 or server 1. Not read: vendors disagree on it, and a Forward_Open's
     /// originator is always the client.
     server: bool,
-}
-
-/// `0x04010002`
-impl FromField for TriggerAndTransport {
-    fn from_field(text: &str) -> Result<TriggerAndTransport> {
-        u32::from_field(text).map(TriggerAndTransport::from)
-    }
 }
 
 /// The transport classes a connection supports
@@ -176,13 +148,6 @@ pub struct ConnectionParameters {
     pub o2t_priorities: Priorities,
     /// Bits 28-31
     pub t2o_priorities: Priorities,
-}
-
-/// `0x44440405`
-impl FromField for ConnectionParameters {
-    fn from_field(text: &str) -> Result<ConnectionParameters> {
-        u32::from_field(text).map(ConnectionParameters::from)
-    }
 }
 
 // ======= Start of ConnectionParameters impl ========

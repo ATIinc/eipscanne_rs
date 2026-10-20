@@ -1,13 +1,30 @@
 //! `[Params]`: the `ParamN` entries, each a value of the device a field elsewhere can refer to.
 
-use anyhow::Result;
 use bilge::prelude::{DebugBits, FromBits, bitsize, u2};
 
-use crate::syntax::Fields;
-use crate::values::{FromField, ParamValue, Unread};
+use eds_parser_derive::FromFields;
 
-/// `ParamN` of `[Params]`
-#[derive(Debug, Clone, PartialEq)]
+use crate::fields::Unread;
+use crate::values::ParamValue;
+
+/// `ParamN` of `[Params]`, its fields in file order:
+///
+/// ```text
+/// Param1 =
+///     0,                          $ reserved
+///     ,,                          $ link path size, link path
+///     0x0004,                     $ descriptor
+///     0xC8,                       $ data type: UDINT
+///     4,                          $ data size in bytes
+///     "RPI Range",                $ name
+///     "us",                       $ units
+///     "Requested packet interval",    $ help
+///     1000,1000000,1000000,       $ minimum, maximum, default
+///     1,1000,1,0,                 $ scaling: multiplier, divider, base, offset
+///     ,,,,                        $ scaling links
+///     1;                          $ decimal precision
+/// ```
+#[derive(Debug, Clone, PartialEq, FromFields)]
 pub struct Param {
     reserved: Unread,
     link_path_size: Unread,
@@ -38,58 +55,6 @@ pub struct Param {
     international_help: Unread,
 }
 
-// ======= Start of Param impl ========
-
-impl Param {
-    /// ```text
-    /// Param1 =
-    ///     0,                          $ reserved
-    ///     ,,                          $ link path size, link path
-    ///     0x0004,                     $ descriptor
-    ///     0xC8,                       $ data type: UDINT
-    ///     4,                          $ data size in bytes
-    ///     "RPI Range",                $ name
-    ///     "us",                       $ units
-    ///     "Requested packet interval",    $ help
-    ///     1000,1000000,1000000,       $ minimum, maximum, default
-    ///     1,1000,1,0,                 $ scaling: multiplier, divider, base, offset
-    ///     ,,,,                        $ scaling links
-    ///     1;                          $ decimal precision
-    /// ```
-    pub(crate) fn read(mut fields: Fields) -> Result<Param> {
-        let param = Param {
-            reserved: fields.next()?,
-            link_path_size: fields.next()?,
-            link_path: fields.next()?,
-            descriptor: fields.next()?,
-            data_type: fields.next()?,
-            data_size: fields.next()?,
-            name: fields.next()?,
-            units: fields.next()?,
-            help: fields.next()?,
-            minimum: fields.next()?,
-            maximum: fields.next()?,
-            default: fields.next()?,
-            scaling_multiplier: fields.next()?,
-            scaling_divider: fields.next()?,
-            scaling_base: fields.next()?,
-            scaling_offset: fields.next()?,
-            multiplier_link: fields.next()?,
-            divisor_link: fields.next()?,
-            base_link: fields.next()?,
-            offset_link: fields.next()?,
-            decimal_precision: fields.next()?,
-            international_name: fields.next()?,
-            international_units: fields.next()?,
-            international_help: fields.next()?,
-        };
-        fields.finish()?;
-        Ok(param)
-    }
-}
-
-// ^^^^^^^^ End of Param impl ^^^^^^^^
-
 /// Field 4 of `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`: what the param
 /// supports and how a tool treats it. `0x0004` is supports_scaling (bit 2); `0x0010` is read-only
 /// (bit 4).
@@ -111,13 +76,6 @@ pub struct ParamDescriptor {
     pub apply_supported: bool,
     pub write_only: bool,
     reserved_15: bool,
-}
-
-/// `0x0004`
-impl FromField for ParamDescriptor {
-    fn from_field(text: &str) -> Result<ParamDescriptor> {
-        u16::from_field(text).map(ParamDescriptor::from)
-    }
 }
 
 /// Field 5 of `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`: the CIP data type
@@ -160,11 +118,4 @@ pub enum CipDataType {
 
     #[fallback]
     Unknown(u8),
-}
-
-/// `0xC8`
-impl FromField for CipDataType {
-    fn from_field(text: &str) -> Result<CipDataType> {
-        u8::from_field(text).map(CipDataType::from)
-    }
 }

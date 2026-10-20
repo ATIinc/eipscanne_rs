@@ -8,9 +8,11 @@
 //! ```text
 //! Module              Holds
 //! ------------------  -----------------------------------------------------------------------
-//! syntax              the text split into sections and entries by the grammar in eds.pest, and
-//!                     Fields, which reads an entry's fields in file order
-//! values              the kinds of value a field holds (NumberOrParam, DataFormat, Path, ...)
+//! syntax              the text split into sections and entries by the grammar in eds.pest
+//! fields              reading an entry's fields in file order: Fields, FromFields (derived by the
+//!                     eds_parser_derive crate) and FromField, with every field read as an integer
+//! values              the kinds of value a field holds beyond strings and integers
+//!                     (NumberOrParam, DataFormat, Path, ...)
 //! params              [Params]: Param, its descriptor and data type
 //! assembly            [Assembly]: Assembly and its members
 //! connection_manager  [Connection Manager]: Connection and its two mask words
@@ -22,6 +24,7 @@
 
 pub mod assembly;
 pub mod connection_manager;
+mod fields;
 mod forward_open;
 pub mod params;
 mod syntax;
@@ -35,8 +38,9 @@ use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 
 use assembly::Assembly;
 use connection_manager::Connection;
+use fields::numbered;
 use params::Param;
-use values::{DataFormat, NumberOrParam, ParamValue, Path, PathPart, numbered};
+use values::{DataFormat, NumberOrParam, ParamValue, Path, PathPart};
 
 /// The params, assemblies and connections of an EDS file, by their N. In this file, `params` holds
 /// `Param1`, `assemblies` holds `Assem100` and `connections` holds `Connection1`:
@@ -69,18 +73,14 @@ impl Eds {
             for entry in section.entries {
                 let keyword = entry.keyword;
                 let defined_twice = match section.name.to_ascii_lowercase().as_str() {
-                    "params" if let Some(number) = numbered(keyword, "Param") => eds
-                        .params
-                        .insert(number, Param::read(entry.fields())?)
-                        .is_some(),
-                    "assembly" if let Some(number) = numbered(keyword, "Assem") => eds
-                        .assemblies
-                        .insert(number, Assembly::read(entry.fields())?)
-                        .is_some(),
+                    "params" if let Some(number) = numbered(keyword, "Param") => {
+                        eds.params.insert(number, entry.read()?).is_some()
+                    }
+                    "assembly" if let Some(number) = numbered(keyword, "Assem") => {
+                        eds.assemblies.insert(number, entry.read()?).is_some()
+                    }
                     "connection manager" if let Some(number) = numbered(keyword, "Connection") => {
-                        eds.connections
-                            .insert(number, Connection::read(entry.fields())?)
-                            .is_some()
+                        eds.connections.insert(number, entry.read()?).is_some()
                     }
                     _ => false,
                 };

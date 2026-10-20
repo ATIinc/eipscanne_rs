@@ -1,5 +1,4 @@
-//! The text of an EDS file as sections and entries, by the grammar in `eds.pest`, and `Fields`,
-//! which reads the fields of one entry in file order:
+//! The text of an EDS file as sections and entries, by the grammar in `eds.pest`:
 //!
 //! ```text
 //! $ a comment, up to the end of the line
@@ -8,13 +7,13 @@
 //!               field on the next line;
 //! ```
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::Result;
 use pest::Parser;
 use pest::Position;
 use pest::iterators::Pair;
 use pest_derive::Parser;
 
-use crate::values::FromField;
+use crate::fields::{Fields, FromFields};
 
 #[derive(Parser)]
 #[grammar = "eds.pest"]
@@ -37,73 +36,26 @@ pub(crate) struct Entry<'a> {
 
 // ======= Start of Entry impl ========
 
-impl<'a> Entry<'a> {
-    /// The entry's fields, to read one after another
-    pub fn fields(self) -> Fields<'a> {
-        Fields {
-            entry: self,
-            read: 0,
-        }
-    }
-}
-
-// ^^^^^^^^ End of Entry impl ^^^^^^^^
-
-/// The fields of one entry, read one after another in file order. A field that does not read as
-/// its type is an error naming the entry, the field and the line it is on:
-///
-/// ```text
-/// Connection1: field 4
-///
-/// Caused by:
-///     0: line 2389: Param999,x,Assem101,  $ O->T RPI, size, format
-///     1: expected a number or a ParamN, found "x"
-/// ```
-pub(crate) struct Fields<'a> {
-    entry: Entry<'a>,
-    /// How many fields are read; the next one is field `read + 1`
-    read: usize,
-}
-
-// ======= Start of Fields impl ========
-
-impl Fields<'_> {
-    /// The next field, as the type it is assigned to: `0x20` as a `u16`, `Param1` as a
-    /// `NumberOrParam`. A field past the end of a short entry is empty.
-    pub fn next<T: FromField>(&mut self) -> Result<T> {
-        let index = self.read;
-        self.read += 1;
-        T::from_field(&self.text(index))
-            .with_context(|| self.line(index))
-            .with_context(|| self.name(index))
+impl Entry<'_> {
+    /// The entry as a `T`, its fields read in file order. A non-empty field after the last one
+    /// `T` reads is an error.
+    pub fn read<T: FromFields>(self) -> Result<T> {
+        let mut fields = Fields::new(self);
+        let value = T::from_fields(&mut fields)?;
+        fields.finish()?;
+        Ok(value)
     }
 
-    /// Whether a non-empty field is left: the members of an `AssemN`
-    pub fn any_left(&self) -> bool {
-        (self.read..self.entry.fields.len()).any(|index| !self.text(index).is_empty())
-    }
-
-    /// Fails on a non-empty field past the last one read
-    pub fn finish(self) -> Result<()> {
-        let extra =
-            (self.read..self.entry.fields.len()).find(|&index| !self.text(index).is_empty());
-        match extra {
-            Some(index) => Err(anyhow!("is past the last field of this kind of entry"))
-                .with_context(|| self.line(index))
-                .with_context(|| self.name(index)),
-            None => Ok(()),
-        }
-    }
-
-    /// `Connection1: field 4`
-    fn name(&self, index: usize) -> String {
-        format!("{}: field {}", self.entry.keyword, index + 1)
+    /// How many fields the entry has, empty ones included
+    pub fn field_count(&self) -> usize {
+        self.fields.len()
     }
 
     /// The text of a field: its strings, groups and bare text, without the comments between
-    /// them. `"Input " $ note` and `"Assembly"` on the next line is `"Input " "Assembly"`.
-    fn text(&self, index: usize) -> String {
-        let Some(field) = self.entry.fields.get(index) else {
+    /// them. `"Input " $ note` and `"Assembly"` on the next line is `"Input " "Assembly"`. A field
+    /// past the end of a short entry is empty.
+    pub fn text(&self, index: usize) -> String {
+        let Some(field) = self.fields.get(index) else {
             return String::new();
         };
         let pieces: Vec<&str> = field
@@ -116,10 +68,10 @@ impl Fields<'_> {
 
     /// The line a field is on, with its comment: `line 2389: Param999,x,Assem101,  $ O->T RPI`.
     /// A field past the end of a short entry is on the line of the entry's `;`.
-    fn line(&self, index: usize) -> String {
-        let position = match self.entry.fields.get(index) {
+    pub fn line(&self, index: usize) -> String {
+        let position = match self.fields.get(index) {
             Some(field) => field.as_span().start_pos(),
-            None => self.entry.end,
+            None => self.end,
         };
         format!(
             "line {}: {}",
@@ -129,7 +81,7 @@ impl Fields<'_> {
     }
 }
 
-// ^^^^^^^^ End of Fields impl ^^^^^^^^
+// ^^^^^^^^ End of Entry impl ^^^^^^^^
 
 /// Splits the text of an EDS file into its sections and entries. A syntax error names where it
 /// is:
