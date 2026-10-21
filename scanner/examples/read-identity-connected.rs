@@ -9,9 +9,7 @@ use std::time::Duration;
 use bilge::prelude::{u4, u9};
 use clap::Parser;
 
-use eipscanne_rs::cip::connection_manager::forward_open::{
-    ForwardOpenRequest, ForwardOpenResponse,
-};
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RedundantOwner,
@@ -26,9 +24,9 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use scanner::connection_manager::{forward_close, forward_open};
-use scanner::explicit::connected::send_request;
+use scanner::explicit::connected::{ExplicitConnection, forward_open_explicit, send_request};
 use scanner::explicit::decode_reply;
+use scanner::implicit::connection::forward_close;
 use scanner::session::Session;
 
 /// Who this scanner is in the Forward_Open; the Forward_Close repeats it
@@ -114,15 +112,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Open the connection ============
     println!("OPENING the connection");
-    // The request names the connection again in the Forward_Close
-    let forward_open_request: ForwardOpenRequest = args.forward_open_request();
-    let (forward_open_response, _): (ForwardOpenResponse, EnIpPacket) =
-        forward_open(&mut session, &forward_open_request).await?;
+    let connection: ExplicitConnection =
+        forward_open_explicit(&mut session, args.forward_open_request()).await?;
     println!(
         "  O->T connection {:#010x}, T->O connection {:#010x}, every {} us",
-        forward_open_response.o2t_network_connection_id,
-        forward_open_response.t2o_network_connection_id,
-        forward_open_response.o2t_actual_packet_interval
+        connection.response.o2t_network_connection_id,
+        connection.response.t2o_network_connection_id,
+        connection.response.o2t_actual_packet_interval
     );
 
     // ========= Read the identity over the connection ============
@@ -144,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         cip_sequence_count = cip_sequence_count.wrapping_add(1);
         let reply: EnIpPacket = send_request(
             &mut session,
-            &forward_open_response,
+            &connection,
             cip_sequence_count,
             CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
             ServiceCode::GetAttributeAll,
@@ -161,7 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Close the connection ============
     println!("CLOSING the connection");
-    forward_close(&mut session, &forward_open_request).await?;
+    forward_close(&mut session, &connection.request).await?;
 
     // ========= End the session ============
     println!("UNREGISTERING the session");

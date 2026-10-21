@@ -39,8 +39,7 @@ use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use scanner::connection_manager::forward_close;
-use scanner::implicit::connection::forward_open;
+use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
 use scanner::session::Session;
@@ -296,7 +295,7 @@ async fn one_connection_against_a_fake_adapter() {
     assert_eq!(session.peer_ip(), LOCALHOST);
 
     // 2. Open
-    let connection = forward_open(
+    let connection = forward_open_implicit(
         &mut session,
         request(),
         RealTimeFormat::Header32Bit,
