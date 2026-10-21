@@ -1,7 +1,7 @@
 # Tests
 
 `cargo test` from the repository root runs the byte-exact packet tests here, one file per packet
-type. [integration](./integration/README.md) runs the examples against an OpENer adapter.
+type. [integration](./integration/) runs the examples against an OpENer adapter.
 
 ## Packet tests
 

@@ -2,7 +2,7 @@
 
 Reads an EtherNet/IP device's EDS file into its params, assemblies and connections, and resolves
 what a connection refers to. The `scanner` crate's `implicit::eds` turns a connection into the
-Forward_Open that opens it (see its [examples](../scanner/examples/README.md)).
+Forward_Open that opens it (see its [examples](../scanner/examples/)).
 
 An EDS file is `[Section]` headers, each followed by `Keyword = field, field, ...;` entries. Each
 kind of entry read here is a struct whose fields are the entry's fields in file order, in the
