@@ -16,7 +16,7 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 
 use crate::error::{Error, Result};
-use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
+use crate::implicit::connection::{ImplicitConnection, data_len_matches_connection, data_size};
 
 /// The O->T packet of `connection` carrying `assembly_data` (raw bytes or a `binrw` struct). `run`
 /// sets the run/idle flag when the O->T real-time format is `Header32Bit`; other formats ignore it.
@@ -24,7 +24,7 @@ use crate::implicit::connection::{OpenConnection, data_len_matches_connection, d
 /// `encapsulation_sequence_number` advances every packet (start it at random, so a restarted
 /// scanner does not repeat old numbers); `cip_sequence_count` only when the assembly data changes.
 pub fn build_o2t_packet(
-    connection: &OpenConnection,
+    connection: &ImplicitConnection,
     encapsulation_sequence_number: CipUdint,
     cip_sequence_count: CipUint,
     assembly_data: CipDataOpt,
@@ -108,7 +108,7 @@ mod tests {
     use super::*;
 
     /// The bytes of the packet `build_o2t_packet` builds as the first one of `connection`
-    fn build(connection: &OpenConnection, outputs: CipDataOpt, run: bool) -> Result<Vec<u8>> {
+    fn build(connection: &ImplicitConnection, outputs: CipDataOpt, run: bool) -> Result<Vec<u8>> {
         let packet = build_o2t_packet(connection, 1, 1, outputs, run)?;
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes).unwrap();

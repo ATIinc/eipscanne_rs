@@ -254,14 +254,6 @@ impl CommandSpecificData {
             _ => None,
         }
     }
-
-    /// The data of a Send Unit Data command, `None` for any other command
-    pub fn as_send_unit_data(&self) -> Option<&UnitPacketData> {
-        match self {
-            Self::SendUnitData(unit_data) => Some(unit_data),
-            _ => None,
-        }
-    }
 }
 
 // ^^^^^^^^ End of CommandSpecificData impl ^^^^^^^^

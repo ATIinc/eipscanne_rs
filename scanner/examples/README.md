@@ -2,10 +2,9 @@
 
 The examples live in the `scanner` crate, which also holds what they are built on: the
 encapsulation `session` (shared), `explicit` messaging (one request, one reply; `connected` for
-a class 3 connection), `implicit` messaging (a class 1 I/O connection: `connection` plus one
-submodule per direction) and the `connection_manager` both kinds of connection open and close
-through. `read-identity` and `clearlink-explicit-outputs` use `session` and `explicit`;
-`read-identity-connected` uses `connection_manager` and `explicit::connected`; `implicit-io` and
+a class 3 connection) and `implicit` messaging (a class 1 I/O connection: `connection` plus one
+submodule per direction). `read-identity` and `clearlink-explicit-outputs` use `session` and
+`explicit`; `read-identity-connected` uses `session` and `explicit::connected`; `implicit-io` and
 `flexi-net-implicit` use `session` and `implicit`. `eds-implicit-io` and `io-hub-implicit` also
 use `implicit::eds`, which writes the Forward_Open of a connection read from an EDS file by the
 `eds_parser` crate.
@@ -61,12 +60,12 @@ interval, so the adapter drops the connection after four missed reads).
 
 1. Registers a session
 1. Opens the connection: a Forward_Open to the Message Router with transport class 3, application
-   trigger, 504 bytes each way (`connection_manager::forward_open`)
+   trigger, 504 bytes each way (`connected::forward_open_explicit`)
 1. Every `--interval`: advances the CIP sequence count and sends Get_Attributes_All on the
    Identity object over the connection (`connected::send_request`, Send Unit Data on the O->T
-   connection ID); the reply must come back on the T->O connection ID with the same sequence
-   count, and is decoded as `IdentityResponse` (`explicit::decode_reply`). Ctrl+C ends early
-1. Closes the connection (`connection_manager::forward_close`) and unregisters the session
+   connection ID), and decodes the reply as `IdentityResponse` (`explicit::decode_reply`). Ctrl+C
+   ends early
+1. Closes the connection (`connection::forward_close`) and unregisters the session
 
 ### clearlink-explicit-outputs
 
@@ -125,8 +124,8 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
 1. **Session**: registers a session over TCP 44818 (`Session::register`)
 1. **Open**: binds the UDP I/O socket on port 2222 first, because the adapter starts sending as
    soon as it has replied; then sends the Forward_Open, built field by field from the flags,
-   together with the real-time format of each direction (`connection::forward_open`), and
-   keeps request, reply and formats as an `OpenConnection`
+   together with the real-time format of each direction (`connection::forward_open_implicit`), and
+   keeps request, reply and formats as an `ImplicitConnection`
 1. **Exchange**: one `tokio::select!` loop over four events
     * the send timer fires every O->T actual packet interval: `o2t::build_o2t_packet` frames the
       outputs with the loop's encapsulation sequence number and CIP sequence count, and
@@ -139,8 +138,7 @@ Flags: `--host`, `--configuration-instance`, `--output-instance`, `--input-insta
     * the deadline passes: no input packet arrived within timeout multiplier × packet interval
       (`t2o::input_timeout`), the connection is considered timed out and the loop ends
     * Ctrl+C: the loop ends early; the connection is still closed and the session unregistered
-1. **Close**: sends the Forward_Close matching the Forward_Open
-   (`connection_manager::forward_close`)
+1. **Close**: sends the Forward_Close matching the Forward_Open (`connection::forward_close`)
 1. **End session**: unregisters the session
 
 Production code may send the outputs on a task of its own so a slow input handler can never
@@ -179,7 +177,7 @@ let request = ForwardOpenRequest {
     ..forward_open_request(&eds, connection, None)?
 };
 let outputs = vec![0u8; usize::from(eds.data_size(connection.o2t_size, connection.o2t_format)?)];
-// forward_open(&mut session, request, o2t_real_time_format(connection)?, t2o_real_time_format(connection)?)
+// forward_open_implicit(&mut session, request, o2t_real_time_format(connection)?, t2o_real_time_format(connection)?)
 ```
 
 The last argument picks the service: `Some(true)` a Large_Forward_Open (32-bit connection

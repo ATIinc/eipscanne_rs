@@ -14,7 +14,7 @@
 //!     ..forward_open_request(&eds, connection, None)?
 //! };
 //! let (o2t, t2o) = (o2t_real_time_format(connection)?, t2o_real_time_format(connection)?);
-//! forward_open(&mut session, request, o2t, t2o)
+//! forward_open_implicit(&mut session, request, o2t, t2o)
 //! ```
 
 use std::io::Cursor;
