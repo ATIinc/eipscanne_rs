@@ -1,12 +1,7 @@
-use binrw::{
-    BinRead,  // trait for reading
-    BinWrite, // trait for writing
-    binrw,    // #[binrw] attribute
-};
-
-use crate::cip::types::{CipUdint, CipUint};
+use binrw::{BinRead, BinWrite, binrw};
 
 use crate::cip::message::CipMessage;
+use crate::cip::types::{CipUdint, CipUint};
 
 use super::constants as eip_constants;
 use super::description::{CommonPacketDescriptor, CommonPacketItemId, serialized_length};

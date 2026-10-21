@@ -1,9 +1,12 @@
 use crate::cip::connection_manager::forward_close::ForwardCloseRequest;
 use crate::cip::connection_manager::forward_open::ForwardOpenRequest;
 use crate::cip::message::data::CipData;
-use crate::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
-use crate::cip::object_ids::{CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID};
-use crate::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
+use crate::cip::message::request::MessageRouterRequest;
+use crate::cip::message::shared::ServiceCode;
+use crate::cip::object_ids::{
+    CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID, IDENTITY_CLASS_ID,
+    IDENTITY_INSTANCE_ID,
+};
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
 use crate::eip::constants::NO_ENCAPSULATION_TIMEOUT;

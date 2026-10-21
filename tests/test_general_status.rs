@@ -1,10 +1,13 @@
+use std::io::{BufReader, Cursor};
+
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::message::response::ResponseData;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::CipByte;
 
@@ -13,8 +16,8 @@ fn test_deserialize_response_with_additional_status_and_data() {
     // General status 0x1E (embedded service error), two additional status words, two data bytes
     let raw_bytes: Vec<CipByte> = vec![0x8e, 0x00, 0x1e, 0x02, 0x09, 0x01, 0x34, 0x12, 0xaa, 0xbb];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response =
         MessageRouterResponse::read_args(&mut buf_reader, (raw_bytes.len() as u16,)).unwrap();
 
@@ -40,8 +43,8 @@ fn test_deserialize_response_with_additional_status_and_data() {
 fn test_unknown_general_status_is_preserved() {
     let raw_bytes: Vec<CipByte> = vec![0x8e, 0x00, 0xd0, 0x00];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response =
         MessageRouterResponse::read_args(&mut buf_reader, (raw_bytes.len() as u16,)).unwrap();
 
@@ -51,7 +54,7 @@ fn test_unknown_general_status_is_preserved() {
     );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     response.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
@@ -99,8 +102,8 @@ fn test_deserialize_response_with_additional_status() {
         0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response =
         MessageRouterResponse::read_args(&mut buf_reader, (raw_bytes.len() as u16,)).unwrap();
 
@@ -120,7 +123,7 @@ fn test_deserialize_response_with_additional_status() {
     assert!(!response.is_success());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     response.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
@@ -151,8 +154,8 @@ fn test_deserialize_rejected_forward_open_with_two_status_words() {
         0x00, 0x00, 0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response =
         MessageRouterResponse::read_args(&mut buf_reader, (raw_bytes.len() as u16,)).unwrap();
 
@@ -176,7 +179,7 @@ fn test_deserialize_rejected_forward_open_with_two_status_words() {
     );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     response.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);

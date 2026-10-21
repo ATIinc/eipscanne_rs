@@ -1,15 +1,17 @@
 mod common;
 
+use std::io::{BufReader, Cursor};
+
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
+use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
-use eipscanne_rs::cip::message::shared::ServiceContainer;
-use eipscanne_rs::cip::message::{request::MessageRouterRequest, shared::ServiceCode};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipByte, CipUint};
@@ -58,7 +60,7 @@ fn test_serialize_encaps_command() {
     let command = EnIpCommand::RegisterSession;
 
     let mut command_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut command_byte_array);
+    let mut writer = Cursor::new(&mut command_byte_array);
 
     command.write(&mut writer).unwrap();
 
@@ -126,7 +128,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
     };
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+    let mut writer = Cursor::new(&mut identity_byte_array);
 
     // The lengths of the header and of the Unconnected Data Item are calculated while writing
     identity_request_packet.write(&mut writer).unwrap();
@@ -155,7 +157,7 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
     );
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+    let mut writer = Cursor::new(&mut identity_byte_array);
 
     cip_request_packet.write(&mut writer).unwrap();
 
@@ -203,8 +205,8 @@ fn test_deserialize_identity_object_response_encapsulated_packet() {
         0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
@@ -278,8 +280,8 @@ fn test_deserialize_identity_object_response() {
         0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let packet_description = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 

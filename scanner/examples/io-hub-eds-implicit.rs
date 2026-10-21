@@ -1,12 +1,14 @@
 //! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection, with the same assembly structs the
-//! explicit examples read and write. The connection comes from the hub's EDS file, and every input
-//! packet is decoded as an `InputAssemblyHub4E`. One motor's status is printed whenever it changes.
+//! explicit examples read and write. The connection comes from the hub's EDS file in
+//! `scanner/assemblies/io_hub`, and every input packet is decoded as an `InputAssemblyHub4E`. One
+//! motor's status is printed whenever it changes.
 //!
 //! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
 //! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
 //!
-//! `cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host 172.31.19.18 --motor 0`
+//! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
 
+use std::fs::read_to_string;
 use std::io::Cursor;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
@@ -15,6 +17,11 @@ use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
 use tokio::net::UdpSocket;
+use tokio::signal::ctrl_c;
+use tokio::time::{interval, sleep_until};
+
+use eds_parser::Eds;
+use eds_parser::connection_manager::ConnectionEntry;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -37,9 +44,6 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-use eds_parser::Eds;
-use eds_parser::connection_manager::ConnectionEntry;
-
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
 #[path = "../assemblies"]
@@ -50,20 +54,22 @@ mod assemblies {
 use assemblies::io_hub::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E};
 use assemblies::io_hub::output::{OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyHub4E};
 
-/// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
+/// Who this scanner says it is in the Forward_Open (the same values as `opener-implicit`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
 const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
 const CONNECTION_SERIAL_NUMBER: u16 = 1;
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
 
+/// Teknic's EDS file of the IO-HUB-4-E
+const IO_HUB_EDS: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assemblies/io_hub/IO-HUB-4-E_EDS_File.eds"
+);
+
 /// Watches a Teknic IO-HUB-4-E over a class 1 I/O connection
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    /// The hub's EDS file
-    #[arg(long)]
-    eds: std::path::PathBuf,
-
     /// IP address of the IO-HUB-4-E
     #[arg(long)]
     host: String,
@@ -86,8 +92,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // ========= Read the EDS and derive the connection ============
-    let text = std::fs::read_to_string(&args.eds)
-        .map_err(|error| format!("reading {}: {error}", args.eds.display()))?;
+    let text = read_to_string(IO_HUB_EDS)?;
     let eds = Eds::parse(&text)?;
     let number: u32 = first_openable_connection(&eds, None)?;
     let connection: &ConnectionEntry = &eds.connections[&number];
@@ -154,7 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The outputs never change, so the CIP sequence count stays put after the first packet;
     // every packet gets the next encapsulation sequence number, starting at a random one so a
     // restarted scanner does not repeat what the adapter last saw
-    let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
+    let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
@@ -168,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
     // Ctrl+C ends the exchange and the connection is still closed below
-    let ctrl_c = tokio::signal::ctrl_c();
+    let ctrl_c = ctrl_c();
     tokio::pin!(ctrl_c);
     loop {
         tokio::select! {
@@ -238,7 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
+            _ = sleep_until(tokio::time::Instant::from_std(deadline)) => {
                 eprintln!("the connection timed out: no input packet in time");
                 break;
             }

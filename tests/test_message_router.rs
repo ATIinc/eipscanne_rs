@@ -1,16 +1,17 @@
 mod common;
 
+use std::io::{BufReader, Cursor};
+
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
+use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
-
-use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::object_ids::{
     ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
 };
@@ -24,10 +25,10 @@ fn test_serialize_service_container() {
     let expected_byte_array: Vec<CipByte> = vec![0x01];
 
     let service_container_bits = ServiceContainer::new_request(ServiceCode::GetAttributeAll);
-    let service_container = ServiceContainer::from(service_container_bits);
+    let service_container = service_container_bits;
 
     let mut service_container_bytes: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut service_container_bytes);
+    let mut writer = Cursor::new(&mut service_container_bytes);
 
     service_container.write(&mut writer).unwrap();
 
@@ -40,8 +41,8 @@ fn test_deserialize_request_service_container() {
 
     let raw_byte_array: Vec<CipByte> = vec![0x1];
 
-    let byte_cursor = std::io::Cursor::new(raw_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
@@ -55,8 +56,8 @@ fn test_deserialize_response_service_container() {
 
     let raw_byte_array: Vec<CipByte> = vec![0b10000101];
 
-    let byte_cursor = std::io::Cursor::new(raw_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let deserialized_service_container = ServiceContainer::read(&mut buf_reader).unwrap();
@@ -101,7 +102,7 @@ fn test_serialize_get_attributes_all_request() {
     );
 
     let mut message_router_bytes: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut message_router_bytes);
+    let mut writer = Cursor::new(&mut message_router_bytes);
 
     message_router_request.write(&mut writer).unwrap();
 
@@ -113,8 +114,8 @@ fn test_serialize_get_attributes_all_request() {
 fn test_deserialize_empty_response() {
     let raw_byte_array: Vec<CipByte> = vec![0x81, 0x00, 0x00, 0x00, 0x04];
 
-    let byte_cursor = std::io::Cursor::new(raw_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let message_router_response_length: u16 = 4;
 
@@ -123,9 +124,7 @@ fn test_deserialize_empty_response() {
             .unwrap();
 
     let expected_message_router_response = MessageRouterResponse {
-        service_container: ServiceContainer::from(ServiceContainer::new_response(
-            ServiceCode::GetAttributeAll,
-        )),
+        service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
         response_data: ResponseData {
             status: ResponseStatusCode::Success,
             additional_status_size: 0x0,
@@ -141,9 +140,7 @@ fn test_deserialize_empty_response() {
 #[test]
 fn test_message_cip_path_byte_size() {
     let message_router_request = MessageRouterRequest {
-        service_container: ServiceContainer::from(ServiceContainer::new_request(
-            ServiceCode::GetAttributeAll,
-        )),
+        service_container: ServiceContainer::new_request(ServiceCode::GetAttributeAll),
         request_data: RequestData::new(
             None,
             CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
@@ -152,7 +149,7 @@ fn test_message_cip_path_byte_size() {
     };
 
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
-    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let mut temp_writer = Cursor::new(&mut tmp_output_buffer);
     let _ = message_router_request.write(&mut temp_writer);
 
     // Assert equality
@@ -168,7 +165,7 @@ fn test_message_cip_path_request_byte_size() {
 
     // Assert equality
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
-    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let mut temp_writer = Cursor::new(&mut tmp_output_buffer);
     let _ = message_router_request.write(&mut temp_writer);
 
     assert_eq!(10, tmp_output_buffer.len());
@@ -220,7 +217,7 @@ fn test_message_cip_full_path_request_bytes() {
 
     // Assert equality
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
-    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let mut temp_writer = Cursor::new(&mut tmp_output_buffer);
     let _ = message_router_request.write(&mut temp_writer);
 
     assert_eq!(expected_byte_array, tmp_output_buffer);
@@ -235,7 +232,7 @@ fn test_message_cip_full_path_request_byte_size() {
 
     // Assert equality
     let mut tmp_output_buffer: Vec<u8> = Vec::new();
-    let mut temp_writer = std::io::Cursor::new(&mut tmp_output_buffer);
+    let mut temp_writer = Cursor::new(&mut tmp_output_buffer);
     let _ = message_router_request.write(&mut temp_writer);
 
     assert_eq!(8, tmp_output_buffer.len());

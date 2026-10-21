@@ -1,6 +1,6 @@
 [package]
 name = "scanner"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
@@ -19,5 +19,5 @@ tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "
 # Used by the examples only
 clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"
-hex-test-macros = { version = "0.1.0", path = "../hex_test_macros" }
+hex-assert = { version = "0.2.0", path = "../hex_assert" }
 pretty_assertions = "1.4.1"

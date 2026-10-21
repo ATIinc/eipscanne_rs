@@ -1,10 +1,11 @@
 mod common;
 
-use binrw::{BinRead, BinWrite};
+use std::io::{BufReader, Cursor};
 
 use bilge::prelude::u4;
+use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
@@ -37,7 +38,7 @@ use common::{
     ORIGINATOR_VENDOR_ID, TICK_TIME, TIMEOUT_TICKS,
 };
 
-/// Connection serial number and originator identity of the captures
+/// Connection serial number and originator identity of the test packets
 fn sample_connection_triad() -> ConnectionTriad {
     ConnectionTriad {
         connection_serial_number: CONNECTION_SERIAL_NUMBER,
@@ -84,7 +85,7 @@ fn forward_close_request_of(packet: &RequestObjectAssembly) -> ForwardCloseReque
             message.request_data.additional_data
         );
     };
-    ForwardCloseRequest::read(&mut std::io::Cursor::new(data)).unwrap()
+    ForwardCloseRequest::read(&mut Cursor::new(data)).unwrap()
 }
 
 #[test]
@@ -202,7 +203,7 @@ fn test_serialize_forward_close_request() {
     };
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     expected_request_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
@@ -212,13 +213,13 @@ fn test_serialize_forward_close_request() {
         RequestObjectAssembly::new_forward_close(CLEARLINK_IO_SESSION_HANDLE, request.clone());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     request_object.write(&mut writer).unwrap();
 
     assert_eq!(expected_byte_array, byte_array_buffer);
 
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = RequestObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert_eq!(forward_close_request_of(&deserialized), request);
@@ -318,8 +319,8 @@ fn test_deserialize_forward_close_success_response() {
         )),
     };
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // The reply data as the typed reply
@@ -328,13 +329,13 @@ fn test_deserialize_forward_close_success_response() {
         panic!("a reply read from the wire holds its data raw");
     };
     assert_eq!(
-        ForwardCloseResponse::read_le(&mut std::io::Cursor::new(reply_data)).unwrap(),
+        ForwardCloseResponse::read_le(&mut Cursor::new(reply_data)).unwrap(),
         expected_response
     );
 
     // Writing the typed reply (what an adapter does) reproduces the packet, reserved byte included
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     expected_response_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);

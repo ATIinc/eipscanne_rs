@@ -1,13 +1,12 @@
 //! The output assembly of a Teknic IO-HUB-4-E (instance 101, 148 bytes): what the scanner
 //! commands. ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E O2T Output Assembly:
-//! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=62
+//! <https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=62>
 //!
 //! Written from that table. Where the hub's EDS declares another type, the original line is
 //! commented out above the one that follows the EDS.
 
-use binrw::{BinRead, BinWrite, binrw};
-
 use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u4, u23};
+use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 
@@ -15,7 +14,7 @@ use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 pub const OUTPUT_ASSEMBLY_INSTANCE: u8 = 0x65;
 
 /// The kind of move a `move_type` byte asks for
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=54)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=54>)
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum MoveType {
@@ -29,7 +28,7 @@ pub enum MoveType {
 }
 
 /// Motor Controlword: enables the servo and controls its features
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=52)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=52>)
 #[bitsize(32)]
 #[derive(
     FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,

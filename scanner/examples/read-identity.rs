@@ -1,7 +1,13 @@
 //! Registers a session with an adapter, reads its Identity object and unregisters again.
 //!
-//! `cargo run --example read-identity` reads the OpENer adapter at 172.28.0.10 (see
-//! tests/integration/README.md); `-- --host <adapter IP>` reads another adapter
+//! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
+//!
+//! ```text
+//! tests/integration/start-opener.sh
+//! cargo run --example read-identity
+//! ```
+//!
+//! `-- --host <adapter IP>` reads another adapter.
 
 use clap::Parser;
 

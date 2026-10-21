@@ -1,8 +1,7 @@
 use std::mem;
 
-use binrw::{BinRead, BinWrite};
-
 use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u7};
+use binrw::{BinRead, BinWrite};
 
 use crate::cip::types::CipUsint;
 

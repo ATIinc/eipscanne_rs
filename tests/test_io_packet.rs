@@ -1,10 +1,11 @@
 mod common;
 
-use binrw::{BinRead, BinWrite};
+use std::io::{BufReader, Cursor};
 
 use bilge::prelude::u2;
+use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::parameters::{RealTimeFormat, TransportClass};
 use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
@@ -78,14 +79,14 @@ fn test_o2t_io_packet_with_32bit_header() {
     );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     packet.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // Read back, the Connected Data Item keeps its bytes raw; they compare equal to the typed data
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = EnIpIoPacket::read(&mut buf_reader).unwrap();
 
     assert_eq!(
@@ -105,7 +106,7 @@ fn test_o2t_io_packet_with_32bit_header() {
         );
     };
     let io_data = CipIoData::read_le_args(
-        &mut std::io::Cursor::new(raw_data),
+        &mut Cursor::new(raw_data),
         (
             O2T_CONNECTION_SIZE,
             TransportClass::Class1,
@@ -152,14 +153,14 @@ fn test_t2o_io_packet_modeless() {
     );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     packet.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // Read back, the Connected Data Item keeps its bytes raw; they compare equal to the typed data
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = EnIpIoPacket::read(&mut buf_reader).unwrap();
 
     assert_eq!(
@@ -179,7 +180,7 @@ fn test_t2o_io_packet_modeless() {
         );
     };
     let io_data = CipIoData::read_le_args(
-        &mut std::io::Cursor::new(raw_data),
+        &mut Cursor::new(raw_data),
         (
             T2O_CONNECTION_SIZE,
             TransportClass::Class1,

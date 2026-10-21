@@ -1,9 +1,8 @@
 //! The ClearLink input assembly (instance 0x64): what the device reports back.
-//! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30
-
-use binrw::{BinRead, BinWrite, binrw};
+//! <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30>
 
 use bilge::prelude::{DebugBits, FromBits, bitsize, u3, u10, u12, u20};
+use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipInt, CipReal, CipUdint, CipUlint, CipUsint};
 
@@ -146,7 +145,7 @@ pub struct MotorShutdowns {
 }
 
 /// Based on the ClearLink Ethernet/IP Object Reference:
-/// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=53
+/// <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=53>
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]
@@ -175,7 +174,7 @@ pub struct SerialAsciiInputData {
 }
 
 /// Based on the ClearLink Ethernet/IP Object Reference:
-/// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30
+/// <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30>
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]

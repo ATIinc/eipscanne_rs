@@ -1,40 +1,40 @@
-//! Byte-exact tests of the ClearLink output assembly against captured packets
+//! Byte-exact tests of the ClearLink output assembly against known packet bytes
+
+use std::io::{BufReader, Cursor};
 
 use binrw::{BinRead, BinWrite};
-
-use eipscanne_rs::cip::message::request::RequestData;
 use pretty_assertions::assert_eq;
 
-use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::message::response::{ResponseData, ResponseStatusCode};
+use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
-use eipscanne_rs::cip::message::{request::MessageRouterRequest, response::MessageRouterResponse};
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::cip::types::CipByte;
+use eipscanne_rs::cip::types::{CipByte, CipUdint};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
-use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
-use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
-
-use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
-use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     NO_ENCAPSULATION_TIMEOUT,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
+use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use crate::assemblies::clearlink::output::{
     DigitalOutputs, IOOutputData, MotorOutputData, OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyObject,
     SerialAsciiOutputData,
 };
 
-/// Session handle of the captures below
-const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;
+/// Session handle of the packets below
+const PACKET_SESSION_HANDLE: CipUdint = 0x03;
 
 #[test]
 fn test_write_output_assembly_cip() {
@@ -89,7 +89,7 @@ fn test_write_output_assembly_cip() {
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
 
     set_digital_output_message.write(&mut writer).unwrap();
 
@@ -197,7 +197,7 @@ fn test_write_output_assembly_object_request() {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let provided_session_handle = CAPTURE_SESSION_HANDLE;
+    let provided_session_handle = PACKET_SESSION_HANDLE;
 
     let set_digital_output_message = MessageRouterRequest::new_data(
         ServiceCode::SetAttributeSingle,
@@ -225,16 +225,15 @@ fn test_write_output_assembly_object_request() {
         })),
     );
 
-    let set_digital_output_object =
-        eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
-            provided_session_handle,
-            NO_ENCAPSULATION_TIMEOUT,
-            set_digital_output_message,
-        );
+    let set_digital_output_object = RequestObjectAssembly::new_send_rr_data(
+        provided_session_handle,
+        NO_ENCAPSULATION_TIMEOUT,
+        set_digital_output_message,
+    );
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
 
     set_digital_output_object.write(&mut writer).unwrap();
 
@@ -342,7 +341,7 @@ fn test_read_output_assembly_object_response() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(300),
-            session_handle: CAPTURE_SESSION_HANDLE,
+            session_handle: PACKET_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
@@ -384,8 +383,8 @@ fn test_read_output_assembly_object_response() {
         }),
     };
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
@@ -422,8 +421,8 @@ fn test_read_output_assembly_object_raw_request() {
     ];
 
     // Read the object_assembly binary data from the buffer
-    let byte_cursor = std::io::Cursor::new(raw_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let request_object = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
@@ -433,7 +432,7 @@ fn test_read_output_assembly_object_raw_request() {
             // NOTE: For some reason the serialized length is 300... But the Wireshark data said 300
             //  Could be an internal subtraction?
             length: Some(304),
-            session_handle: CAPTURE_SESSION_HANDLE,
+            session_handle: PACKET_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,

@@ -1,8 +1,10 @@
 mod common;
 
+use std::io::Cursor;
+
 use binrw::BinWrite;
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -95,7 +97,7 @@ fn test_write_output_assembly_object_request() {
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
 
     set_digital_output_object.write(&mut writer).unwrap();
 

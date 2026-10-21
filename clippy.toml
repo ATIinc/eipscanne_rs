@@ -1,0 +1,6 @@
+# Names in the docs that are not code: CIP services and commands, and products
+doc-valid-idents = [
+    "..",
+    "Forward_Open", "Large_Forward_Open", "Forward_Close", "Get_Attributes_All", "SendRRData",
+    "ClearLink", "OpENer",
+]

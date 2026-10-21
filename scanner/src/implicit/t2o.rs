@@ -146,6 +146,8 @@ pub fn input_timeout(connection: &ImplicitConnection) -> Duration {
 
 #[cfg(test)]
 mod tests {
+    use bilge::prelude::u2;
+
     use eipscanne_rs::cip::connection_manager::parameters::{
         ConnectionSizeType, ConnectionTimeoutMultiplier, RealTimeFormat,
     };
@@ -248,7 +250,7 @@ mod tests {
         let idle_header = RunIdleHeader::builder()
             .run_idle(false)
             .claim_output_ownership(false)
-            .ready_for_ownership_of_outputs(bilge::prelude::u2::new(0))
+            .ready_for_ownership_of_outputs(u2::new(0))
             .build();
         let mut bytes = u32::from(idle_header).to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 32]);

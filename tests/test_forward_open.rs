@@ -1,10 +1,11 @@
 mod common;
 
-use binrw::{BinRead, BinWrite};
+use std::io::{BufReader, Cursor};
 
 use bilge::prelude::{u4, u9};
+use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -62,7 +63,7 @@ fn sample_transport_type_trigger() -> TransportTypeTrigger {
         .build()
 }
 
-/// Connection serial number and originator identity of the captures
+/// Connection serial number and originator identity of the test packets
 fn sample_connection_triad() -> ConnectionTriad {
     ConnectionTriad {
         connection_serial_number: CONNECTION_SERIAL_NUMBER,
@@ -94,7 +95,7 @@ fn sample_large_parameters(connection_size: u16) -> LargeNetworkConnectionParame
 }
 
 /// The parameter word of one direction in the width of the service: sized for the 32-byte
-/// assemblies of the captures over class 1, with the real-time header of the direction
+/// assemblies of the test packets over class 1, with the real-time header of the direction
 fn sample_network_connection_parameters(
     large: bool,
     real_time_format: RealTimeFormat,
@@ -157,7 +158,7 @@ fn forward_open_request_of(packet: &RequestObjectAssembly, large: bool) -> Forwa
             message.request_data.additional_data
         );
     };
-    ForwardOpenRequest::read_le_args(&mut std::io::Cursor::new(data), (large,)).unwrap()
+    ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (large,)).unwrap()
 }
 
 #[test]
@@ -309,7 +310,7 @@ fn test_serialize_forward_open_request() {
     };
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     expected_request_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
@@ -319,13 +320,13 @@ fn test_serialize_forward_open_request() {
         RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     request_object.write(&mut writer).unwrap();
 
     assert_eq!(expected_byte_array, byte_array_buffer);
 
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = RequestObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert_eq!(forward_open_request_of(&deserialized, false), request);
@@ -480,7 +481,7 @@ fn test_serialize_large_forward_open_request() {
     };
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     expected_request_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
@@ -490,13 +491,13 @@ fn test_serialize_large_forward_open_request() {
         RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     request_object.write(&mut writer).unwrap();
 
     assert_eq!(expected_byte_array, byte_array_buffer);
 
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = RequestObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert_eq!(forward_open_request_of(&deserialized, true), request);
@@ -629,8 +630,8 @@ fn test_deserialize_forward_open_success_response() {
         )),
     };
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // The reply data as the typed reply
@@ -639,13 +640,13 @@ fn test_deserialize_forward_open_success_response() {
         panic!("a reply read from the wire holds its data raw");
     };
     assert_eq!(
-        ForwardOpenResponse::read_le(&mut std::io::Cursor::new(reply_data)).unwrap(),
+        ForwardOpenResponse::read_le(&mut Cursor::new(reply_data)).unwrap(),
         expected_response
     );
 
     // Writing the typed reply (what an adapter does) reproduces the packet, reserved byte included
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     expected_response_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
@@ -748,12 +749,12 @@ fn test_deserialize_forward_open_rejected_response() {
     // its reserved byte
     let mut reply_data = Vec::new();
     sample_connection_triad()
-        .write(&mut std::io::Cursor::new(&mut reply_data))
+        .write(&mut Cursor::new(&mut reply_data))
         .unwrap();
     reply_data.extend([0x00, 0x00]);
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     // A rejection, not reply data to interpret
@@ -833,8 +834,8 @@ fn test_deserialize_forward_open_path_segment_error_response() {
         0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0xb2, 0x00, 0x04, 0x00, 0xd4, 0x00, 0x04, 0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
     let response = response_object.response().unwrap();
 

@@ -1,17 +1,19 @@
+use std::fmt::Debug;
+use std::io::{Cursor, Read, Seek, Write};
+
 use binrw::{BinRead, BinResult, BinWrite, Endian};
-use std::io::{Read, Seek, Write};
 
 pub trait WriteSeekTrait: Write + Seek {}
 impl<T: Write + Seek> WriteSeekTrait for T {}
 
 // `Send + Sync` so packets carrying typed data can be held across `.await` points
-pub trait CipData: std::fmt::Debug + Send + Sync {
+pub trait CipData: Debug + Send + Sync {
     fn write_to(&self, w: &mut dyn WriteSeekTrait, endian: Endian) -> BinResult<()>;
 }
 
 impl<T> CipData for T
 where
-    T: for<'a> BinWrite<Args<'a> = ()> + Sized + std::fmt::Debug + Send + Sync,
+    T: for<'a> BinWrite<Args<'a> = ()> + Sized + Debug + Send + Sync,
 {
     fn write_to(&self, mut w: &mut dyn WriteSeekTrait, endian: Endian) -> BinResult<()> {
         match endian {
@@ -33,15 +35,14 @@ impl BinWrite for CipDataOpt {
     fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        _endian: binrw::Endian,
+        _endian: Endian,
         _args: Self::Args<'_>,
     ) -> BinResult<()> {
-        use CipDataOpt::*;
         match self {
-            Raw(data) => {
+            Self::Raw(data) => {
                 writer.write_all(data)?;
             }
-            Typed(parsed) => {
+            Self::Typed(parsed) => {
                 parsed.write_to(writer, _endian)?;
             }
         }
@@ -54,43 +55,42 @@ impl BinRead for CipDataOpt {
 
     fn read_options<R: Read + Seek>(
         reader: &mut R,
-        _endian: binrw::Endian,
+        _endian: Endian,
         args: Self::Args<'_>,
     ) -> BinResult<Self> {
         // ALWAYS read a RequestDataOpt as a Raw Type
         let (len,) = args;
         let mut buf = vec![0u8; len as usize];
         reader.read_exact(&mut buf)?;
-        Ok(CipDataOpt::Raw(buf))
+        Ok(Self::Raw(buf))
     }
 }
 
 impl PartialEq for CipDataOpt {
     fn eq(&self, other: &Self) -> bool {
-        use CipDataOpt::*;
         match (self, other) {
-            (Raw(a), Raw(b)) => a == b,
-            (Typed(a), Typed(b)) => {
+            (Self::Raw(a), Self::Raw(b)) => a == b,
+            (Self::Typed(a), Self::Typed(b)) => {
                 // HACK: Compare the underlying binary data for equality
 
                 // Compare by serializing both to bytes and checking equality
                 let mut buf_a = Vec::new();
                 let mut buf_b = Vec::new();
-                let mut writer_a = std::io::Cursor::new(&mut buf_a);
-                let mut writer_b = std::io::Cursor::new(&mut buf_b);
+                let mut writer_a = Cursor::new(&mut buf_a);
+                let mut writer_b = Cursor::new(&mut buf_b);
 
-                let _ = a.write_to(&mut writer_a, binrw::Endian::Little);
-                let _ = b.write_to(&mut writer_b, binrw::Endian::Little);
+                let _ = a.write_to(&mut writer_a, Endian::Little);
+                let _ = b.write_to(&mut writer_b, Endian::Little);
 
                 buf_a == buf_b
             }
-            (Raw(raw), Typed(parsed)) | (Typed(parsed), Raw(raw)) => {
+            (Self::Raw(raw), Self::Typed(parsed)) | (Self::Typed(parsed), Self::Raw(raw)) => {
                 // PSEUDO_HACK: Compare the underlying binary data for equality
                 let mut buf = Vec::new();
-                let mut writer = std::io::Cursor::new(&mut buf);
+                let mut writer = Cursor::new(&mut buf);
 
                 // Use write_options with correct arguments
-                let _ = parsed.write_to(&mut writer, binrw::Endian::Little);
+                let _ = parsed.write_to(&mut writer, Endian::Little);
 
                 buf == *raw
             }

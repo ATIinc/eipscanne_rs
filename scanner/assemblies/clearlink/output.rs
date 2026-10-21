@@ -1,9 +1,8 @@
 //! The ClearLink output assembly (instance 0x70):
-//! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20
-
-use binrw::{BinRead, BinWrite, binrw};
+//! <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=20>
 
 use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u10, u24};
+use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipDint, CipDword, CipInt, CipUdint, CipUlint, CipUsint};
 
@@ -113,7 +112,7 @@ pub struct OutputRegister {
 }
 
 /// Based on the ClearLink Ethernet/IP Object Reference:
-/// https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=58
+/// <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=58>
 #[binrw]
 #[brw(little)]
 #[derive(Debug, PartialEq, Clone)]

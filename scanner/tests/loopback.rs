@@ -4,16 +4,15 @@
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
+use bilge::prelude::{u4, u9};
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 
-use bilge::prelude::{u4, u9};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
-
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RealTimeFormat,
@@ -21,7 +20,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::CipMessage;
-use eipscanne_rs::cip::message::data::CipDataOpt;
+use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
@@ -38,7 +37,6 @@ use eipscanne_rs::eip::constants::{
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
-
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
@@ -123,7 +121,7 @@ fn header(command: EnIpCommand) -> EncapsulationHeader {
 /// A successful Connection Manager reply carrying `data` and `socket_addr_info_items`
 fn connection_manager_reply(
     service: ServiceCode,
-    data: impl eipscanne_rs::cip::message::data::CipData + 'static,
+    data: impl CipData + 'static,
     socket_addr_info_items: SocketAddrInfoItems,
 ) -> EnIpPacket {
     let mut rr_data = RRPacketData::new_unconnected(

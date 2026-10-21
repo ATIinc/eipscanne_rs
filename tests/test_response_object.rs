@@ -1,8 +1,10 @@
 mod common;
 
+use std::io::Cursor;
+
 use binrw::BinWrite;
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
@@ -48,7 +50,7 @@ fn test_serialize_rr_data() {
     ));
 
     let mut rr_data_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut rr_data_byte_array);
+    let mut writer = Cursor::new(&mut rr_data_byte_array);
 
     rr_data.write(&mut writer).unwrap();
 
@@ -159,8 +161,7 @@ fn test_serialize_generic_response() {
             CIP_INTERFACE_HANDLE,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterResponse {
-                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll)
-                    .into(),
+                service_container: ServiceContainer::new_response(ServiceCode::GetAttributeAll),
                 response_data: ResponseData {
                     status: ResponseStatusCode::Success,
                     additional_status_size: 0x0,
@@ -183,7 +184,7 @@ fn test_serialize_generic_response() {
     };
 
     let mut identity_response_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut identity_response_byte_array);
+    let mut writer = Cursor::new(&mut identity_response_byte_array);
 
     identity_response.write(&mut writer).unwrap();
 

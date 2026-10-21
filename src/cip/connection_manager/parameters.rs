@@ -151,7 +151,7 @@ pub struct TransportTypeTrigger {
     pub direction: Direction,
 }
 
-/// Priority/Time_tick byte: the length of one tick of the request timeout
+/// `Priority/Time_tick` byte: the length of one tick of the request timeout
 /// (1 ms shifted left by `tick_time`) and the priority of the unconnected request
 #[bitsize(8, new = pub)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits)]

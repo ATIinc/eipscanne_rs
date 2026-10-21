@@ -1,12 +1,8 @@
 use binrw::binrw;
 
-use crate::cip::{
-    message::{
-        data::CipDataOpt,
-        shared::{BYTES_IN_A_WORD, SIZE_OF_CIP_USINT},
-    },
-    types::{CipUint, CipUsint},
-};
+use crate::cip::message::data::CipDataOpt;
+use crate::cip::message::shared::{BYTES_IN_A_WORD, SIZE_OF_CIP_USINT};
+use crate::cip::types::{CipUint, CipUsint};
 
 use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 

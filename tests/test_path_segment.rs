@@ -1,10 +1,11 @@
 mod common;
 
+use std::io::{BufReader, Cursor};
 use std::vec;
 
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::object_ids::{
     ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
@@ -24,10 +25,10 @@ fn test_serialize_path_segment() {
 
     let expected_bytes = vec![0x21, 0x0, 0x01, 0x0];
 
-    let logical_path_segment = LogicalPathSegment::from(sample_path_segment_bits);
+    let logical_path_segment = sample_path_segment_bits;
 
     let mut sample_path_bytes: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut sample_path_bytes);
+    let mut writer = Cursor::new(&mut sample_path_bytes);
 
     logical_path_segment.write(&mut writer).unwrap();
 
@@ -38,8 +39,8 @@ fn test_serialize_path_segment() {
 fn test_deserialize_path_segment() {
     let raw_bytes = vec![0x21, 0x00, 0x04, 0x00];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let deserialized_path = LogicalPathSegment::read(&mut buf_reader).unwrap();
@@ -88,7 +89,7 @@ fn test_serialize_cip_path() {
     let cip_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
 
     let mut cip_path_bytes: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut cip_path_bytes);
+    let mut writer = Cursor::new(&mut cip_path_bytes);
 
     cip_path.write(&mut writer).unwrap();
 
@@ -131,7 +132,7 @@ fn test_serialize_cip_full_path() {
     );
 
     let mut cip_full_path_bytes: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut cip_full_path_bytes);
+    let mut writer = Cursor::new(&mut cip_full_path_bytes);
 
     cip_full_path.write(&mut writer).unwrap();
 
@@ -162,8 +163,8 @@ fn test_deserialize_cip_path() {
     */
     let raw_bytes: Vec<CipByte> = vec![0x21, 0x00, 0x01, 0x00, 0x25, 0x00, 0x01, 0x00];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let cip_path = CipPath::read_args(&mut buf_reader, (4,)).unwrap();
@@ -224,8 +225,8 @@ fn test_deserialize_unknown_cip_path() {
         LogicalSegmentFormat::FormatAsU16
     );
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     assert!(CipPath::read_args(&mut buf_reader, (4,)).is_err());
@@ -236,7 +237,7 @@ fn test_path_byte_size() {
     let cip_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
 
     let mut cip_path_buffer = Vec::new();
-    let mut cip_path_writer = std::io::Cursor::new(&mut cip_path_buffer);
+    let mut cip_path_writer = Cursor::new(&mut cip_path_buffer);
 
     let _ = cip_path.write(&mut cip_path_writer);
 
@@ -249,7 +250,7 @@ fn test_full_path_byte_size() {
     let full_cip_path = CipPath::new_full(0x1, 0x1, 0x5);
 
     let mut full_cip_path_buffer = Vec::new();
-    let mut full_cip_path_writer = std::io::Cursor::new(&mut full_cip_path_buffer);
+    let mut full_cip_path_writer = Cursor::new(&mut full_cip_path_buffer);
 
     let _ = full_cip_path.write(&mut full_cip_path_writer);
 

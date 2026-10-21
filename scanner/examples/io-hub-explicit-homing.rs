@@ -10,6 +10,8 @@
 use std::time::{Duration, Instant};
 
 use clap::Parser;
+use tokio::signal::ctrl_c;
+use tokio::time::sleep;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
@@ -97,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(Box::new(outputs.clone())),
         )
         .await?;
-        tokio::time::sleep(SHUTDOWN_RESET_TIME).await;
+        sleep(SHUTDOWN_RESET_TIME).await;
 
         // Lowered again so the next reset has a rising edge
         let motor = outputs.motor_output_mut(args.motor);
@@ -176,13 +178,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("NOT HOMED within {} s of the command", args.timeout_s);
                 break;
             }
-            tokio::time::sleep(POLL_INTERVAL).await;
+            sleep(POLL_INTERVAL).await;
         }
         Ok::<(), Box<dyn std::error::Error>>(())
     };
     let outcome = tokio::select! {
         result = homing => result,
-        _ = tokio::signal::ctrl_c() => {
+        _ = ctrl_c() => {
             println!("Ctrl+C: stopping");
             Ok(())
         }
