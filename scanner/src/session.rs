@@ -21,8 +21,7 @@ use eipscanne_rs::object_assembly::RequestObjectAssembly;
 use crate::error::{Error, Result};
 
 /// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet is printed to stderr as hex
-/// for `scripts/dissect.sh`, since the devcontainer cannot capture packets:
-/// `EIP_DUMP=1 cargo run --example opener-implicit -- ...`
+/// for `scripts/dissect.sh`: `EIP_DUMP=1 cargo run --example opener-implicit -- ...`
 const DUMP_VARIABLE: &str = "EIP_DUMP";
 
 /// Size of the encapsulation header on the wire
