@@ -1,13 +1,12 @@
-//! Exchanges cyclic I/O with a SICK flexi-net over a class 1 connection, in the five stages of
-//! `implicit-io`. The connection is the device's: configuration assembly 1278 with no
-//! configuration data, outputs to connection point 151 and inputs from connection point 152, 4
-//! data bytes each way. The connection path starts with the device's electronic key.
+//! Exchanges cyclic I/O with a SICK flexi-net over a class 1 connection; `main` is the five
+//! stages of `implicit-io` in order. The connection path is the device's electronic key, then
+//! configuration assembly 1278 (no configuration data), outputs to connection point 151 and
+//! inputs from connection point 152, 4 data bytes each way.
 //!
-//! The outputs count slowly so each value can be watched on the device: one byte at a time,
-//! byte `i` counts from `10 * i` to `10 * i + 10` and then holds it while the next byte counts,
-//! one step every `--count-delay`, while packets keep going out every RPI. Once the last count
-//! has been held for one delay, or on Ctrl+C, one packet sets every byte back to 0 and the
-//! connection closes. A longer test is a longer `--count-delay`.
+//! The outputs count slowly so each value can be watched on the device: byte `i` counts from
+//! `10 * i` to `10 * i + 10`, one step every `--count-delay`, then holds while the next byte
+//! counts; packets keep going out every RPI. Once the last count has been held for one delay, or
+//! on Ctrl+C, one packet sets every byte back to 0 and the connection closes.
 //!
 //! The FLX3-GEPR100's standard assemblies, from SICK's "Flexi Gateway GEPR1" operating
 //! instructions (8026788, chapter 14.4.2). The EDS file is "EDS (FLX3-GEPR)" at
@@ -22,11 +21,9 @@
 //! 151 and 152 are of the last kind: they exist only once the Safety Designer configuration
 //! defining them is on the device, with the sizes it gives them.
 //!
-//! The electronic key (vendor 808, device type 100, product code 11584, revision 1.1) is the
-//! device's Identity object; a different device refuses the connection.
-//!
 //! `cargo run --example flexi-net-implicit -- --host 172.31.19.210`
 
+use std::cmp::Ordering;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
@@ -58,17 +55,18 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-/// Who this scanner is in the Forward_Open (the same values as `implicit-io`). The three form
-/// the connection triad: the adapter tells connections apart by it, so it only has to differ
-/// from other connections to the device, and the Forward_Close repeats it to close this one.
+/// Who this scanner is in the Forward_Open (the same as `implicit-io`). Together they are the
+/// connection triad, which only has to differ from other connections to the device; the
+/// Forward_Close repeats it.
 const ORIGINATOR_VENDOR_ID: u16 = 342;
 const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
 const CONNECTION_SERIAL_NUMBER: u16 = 1;
-/// The connection ID the adapter puts on every input packet. On a point-to-point T->O
-/// connection the scanner picks it; any value works, and this one is easy to spot in a capture.
+/// The connection ID on every input packet: the scanner picks it for a point-to-point T->O
+/// connection, and this one is easy to spot in a capture
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
 
-/// The flexi-net's Identity object, which the electronic key must match exactly
+/// The flexi-net's Identity object: the electronic key must match it exactly, or the device
+/// refuses the connection
 const VENDOR_ID: CipUint = 808;
 const DEVICE_TYPE: CipUint = 100;
 const PRODUCT_CODE: CipUint = 11584;
@@ -81,21 +79,18 @@ const OUTPUT_CONNECTION_POINT: u8 = 151;
 const INPUT_CONNECTION_POINT: u8 = 152;
 const OUTPUT_SIZE: u16 = 4;
 const INPUT_SIZE: u16 = 4;
-/// The device's run/idle signalling. The outputs carry a 32-bit header whose run flag tells the
-/// device to apply them or go idle; the inputs carry data only, as the device has no run/idle
-/// to report. The Forward_Open has no field for the format: it shows only in the connection
-/// sizes, 10 bytes out (4 data, 2 sequence count, 4 header) and 6 in, which the device checks
-/// exactly (they are fixed), so a wrong format makes it refuse the connection.
+/// How each direction signals run/idle: the outputs carry a 32-bit header whose run flag tells
+/// the device to apply them or go idle; the inputs carry data only. The format shows only in the
+/// fixed connection sizes (10 bytes out, 6 in), which the device checks exactly, so a wrong
+/// format makes it refuse the connection.
 const O2T_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Header32Bit;
 const T2O_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Modeless;
 
-/// How far each output byte counts: 10 steps, enough to see it move; the test's length comes
-/// from the delay between steps, not from more steps
+/// How far each output byte counts, which is also where the next byte starts: byte `i` covers
+/// `10 * i ..= 10 * i + 10`
 const COUNT_STEPS: u8 = 10;
-/// Distance between the start values of neighbouring bytes. Equal to the count, so byte `i`
-/// covers `10 * i ..= 10 * i + 10`: each byte starts where the one before it ended, and byte 3
-/// ends at 40, well inside a byte.
-const BYTE_SPACING: u8 = 10;
+/// The step of the count that shows every byte at its end
+const LAST_STEP: u8 = OUTPUT_SIZE as u8 * (COUNT_STEPS + 1) - 1;
 
 /// Exchanges cyclic I/O with a SICK flexi-net over a class 1 connection
 #[derive(Parser)]
@@ -143,9 +138,9 @@ impl Args {
             // link is noticed within four RPIs
             connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
             o2t_requested_packet_interval: requested_packet_interval,
-            o2t_network_connection_parameters: network_connection_parameters(o2t_size),
+            o2t_network_connection_parameters: Self::network_connection_parameters(o2t_size),
             t2o_requested_packet_interval: requested_packet_interval,
-            t2o_network_connection_parameters: network_connection_parameters(t2o_size),
+            t2o_network_connection_parameters: Self::network_connection_parameters(t2o_size),
             transport_type_trigger: TransportTypeTrigger::builder()
                 .transport_class(TransportClass::Class1)
                 .production_trigger(ProductionTrigger::Cyclic)
@@ -177,63 +172,20 @@ impl Args {
             ]),
         }
     }
-}
 
-/// One direction's 16-bit parameter word: a fixed size, as the device's assemblies never
-/// change length, and a scheduled, exclusive point-to-point connection
-fn network_connection_parameters(size: u16) -> NetworkConnectionParameters {
-    NetworkConnectionParameters::Standard(
-        StandardNetworkConnectionParameters::builder()
-            .connection_size(u9::new(size))
-            .connection_size_type(ConnectionSizeType::Fixed)
-            .priority(ConnectionPriority::Scheduled)
-            .connection_type(ConnectionType::PointToPoint)
-            .redundant_owner(RedundantOwner::Exclusive)
-            .build(),
-    )
-}
-
-/// The value byte `index` starts counting from
-fn start_value(index: usize) -> u8 {
-    BYTE_SPACING * index as u8
-}
-
-/// The value byte `index` counts up to and then keeps
-fn end_value(index: usize) -> u8 {
-    start_value(index) + COUNT_STEPS
-}
-
-/// The outputs one count later: the first byte short of its end value jumps to its start value
-/// if it has not started, or else goes up by one. `None` once every byte is at its end.
-fn next_count(outputs: &[u8]) -> Option<Vec<u8>> {
-    let index = (0..outputs.len()).find(|&index| outputs[index] < end_value(index))?;
-    let mut next = outputs.to_vec();
-    next[index] = if next[index] < start_value(index) {
-        start_value(index)
-    } else {
-        next[index] + 1
-    };
-    Some(next)
-}
-
-/// Sends the outputs in one packet with the run flag set, so the device applies them instead of
-/// idling; the encapsulation sequence number advances every packet
-async fn send_outputs(
-    socket: &UdpSocket,
-    connection: &ImplicitConnection,
-    encapsulation_sequence_number: &mut u32,
-    cip_sequence_count: u16,
-    outputs: &[u8],
-) -> Result<(), Error> {
-    let packet: EnIpIoPacket = build_o2t_packet(
-        connection,
-        *encapsulation_sequence_number,
-        cip_sequence_count,
-        CipDataOpt::Raw(outputs.to_vec()),
-        true,
-    )?;
-    *encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
-    send_io_packet(socket, &packet, connection.o2t_endpoint).await
+    /// One direction's 16-bit parameter word: a fixed size, as the device's assemblies never
+    /// change length, and a scheduled, exclusive point-to-point connection
+    fn network_connection_parameters(size: u16) -> NetworkConnectionParameters {
+        NetworkConnectionParameters::Standard(
+            StandardNetworkConnectionParameters::builder()
+                .connection_size(u9::new(size))
+                .connection_size_type(ConnectionSizeType::Fixed)
+                .priority(ConnectionPriority::Scheduled)
+                .connection_type(ConnectionType::PointToPoint)
+                .redundant_owner(RedundantOwner::Exclusive)
+                .build(),
+        )
+    }
 }
 
 #[tokio::main]
@@ -283,7 +235,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The count: checked on every tick, so a count lands on the first packet after it is due
     let count_delay = Duration::from_millis(args.count_delay);
     let mut next_count_at = Instant::now() + count_delay;
-    let mut outputs: Vec<u8> = vec![0; usize::from(OUTPUT_SIZE)];
+    let mut step: u8 = 0;
 
     // The inputs: the last accepted numbers, and the deadline every accepted packet moves
     let timeout: Duration = input_timeout(&connection);
@@ -302,16 +254,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 cycle += 1;
                 if Instant::now() >= next_count_at {
                     // The last count has been held for one delay
-                    let Some(next) = next_count(&outputs) else {
+                    if step == LAST_STEP {
                         break;
-                    };
-                    outputs = next;
+                    }
+                    step += 1;
                     // New outputs are new data
                     cip_sequence_count = cip_sequence_count.wrapping_add(1);
-                    println!("[{cycle:>5}] COUNT    {}", hex(&outputs));
+                    println!("[{cycle:>5}] COUNT    {}", hex(&count(step)));
                     // From the schedule, not from now, so late ticks do not add up
                     next_count_at += count_delay;
                 }
+                let outputs = count(step);
                 send_outputs(
                     &socket,
                     &connection,
@@ -367,7 +320,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Every byte back to 0 before closing, so the device is not left at the last count
-    outputs.fill(0);
+    let outputs = [0; OUTPUT_SIZE as usize];
     cip_sequence_count = cip_sequence_count.wrapping_add(1);
     send_outputs(
         &socket,
@@ -388,6 +341,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     session.unregister().await?;
 
     Ok(())
+}
+
+/// The outputs at `step` of the count (0 is all zeros): byte `i` steps from `10 * i` to
+/// `10 * i + 10`, the bytes before it hold their end and the bytes after it are still 0
+fn count(step: u8) -> [u8; OUTPUT_SIZE as usize] {
+    let counting = step / (COUNT_STEPS + 1);
+    let offset = step % (COUNT_STEPS + 1);
+    std::array::from_fn(|index| {
+        let start = COUNT_STEPS * index as u8;
+        match (index as u8).cmp(&counting) {
+            Ordering::Less => start + COUNT_STEPS,
+            Ordering::Equal => start + offset,
+            Ordering::Greater => 0,
+        }
+    })
+}
+
+/// Sends the outputs in one packet with the run flag set, so the device applies them instead of
+/// idling; the encapsulation sequence number advances every packet
+async fn send_outputs(
+    socket: &UdpSocket,
+    connection: &ImplicitConnection,
+    encapsulation_sequence_number: &mut u32,
+    cip_sequence_count: u16,
+    outputs: &[u8],
+) -> Result<(), Error> {
+    let packet: EnIpIoPacket = build_o2t_packet(
+        connection,
+        *encapsulation_sequence_number,
+        cip_sequence_count,
+        CipDataOpt::Raw(outputs.to_vec()),
+        true,
+    )?;
+    *encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
+    send_io_packet(socket, &packet, connection.o2t_endpoint).await
 }
 
 /// The bytes as one hex string, two digits each, in wire order
