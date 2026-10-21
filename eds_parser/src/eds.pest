@@ -1,0 +1,26 @@
+// The syntax of an EDS file: sections, entries and the raw text of each field. What a field means
+// is read later, by the entry it is in.
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+COMMENT    = _{ "$" ~ (!NEWLINE ~ ANY)* }
+
+file    = { SOI ~ section* ~ EOI }
+section = { header ~ entry* }
+header  = ${ "[" ~ name ~ "]" }
+name    = @{ (!("]" | NEWLINE) ~ ANY)+ }
+entry   = { keyword ~ "=" ~ field ~ (comma ~ field)* ~ semicolon }
+keyword = @{ (ASCII_ALPHANUMERIC | "_")+ }
+
+// Rules of their own, so a syntax error can say it expected one
+comma     = { "," }
+semicolon = { ";" }
+
+// Any mix of strings, { } groups and bare text, or nothing: `0x0401`, `"In" "put"`, `{1, 2}`, ``
+field      = { (string | group | bare)* }
+string     = ${ "L"? ~ "\"" ~ characters ~ "\"" }
+characters = @{ ("\\" ~ ANY | !"\"" ~ ANY)* }
+group      = { "{" ~ field ~ (comma ~ field)* ~ "}" }
+bare       = @{ (!("," | ";" | "=" | "[" | "]" | "\"" | "{" | "}" | "$" | WHITESPACE) ~ ANY)+ }
+
+// The text of a field that is only quoted strings, or nothing: `"Input " L"Assembly"`, ``
+strings = { SOI ~ string* ~ EOI }

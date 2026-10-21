@@ -1,8 +1,5 @@
-use bilge::prelude::{bitsize, u4, Bitsized, DebugBits, FromBits, Number};
-
-use binrw::{
-    binrw, // #[binrw] attribute
-};
+use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u4};
+use binrw::binrw;
 
 use crate::cip::types::{CipByte, CipShortString, CipUint};
 
@@ -61,7 +58,7 @@ pub struct Revision {
 }
 
 #[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits)]
+#[derive(FromBits, PartialEq, DebugBits, BuilderBits, DefaultBits)]
 pub struct IdentityStatusBits {
     pub owned: bool,
     pub unused1: bool,

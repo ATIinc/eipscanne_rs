@@ -4,7 +4,12 @@
 1. Install wireshark: https://www.wireshark.org/
 
 
-## Capturing Network Traffic (on macOS in adevcontainer)
+## Capturing on macOS
 
-1. Install tcpdump: `sudo apt-get update && apt-get install -y tcpdump`
-1. Take a recording on the eth0 interface: `sudo tcpdump -i lo port 44818 -w ./captures/test.pcap`
+1. Install `tshark`: `brew install wireshark`
+1. Run it: `sudo tshark -i en0 -f "port 44818 or port 2222" -w ./captures/test.pcap`
+
+## Capturing in the devcontainer
+
+1. Install `tshark`: already installed by the devcontainer
+1. Run it: `sudo tshark -i any -f "port 44818 or port 2222" -w ./captures/test.pcap`

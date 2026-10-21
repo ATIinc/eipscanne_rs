@@ -1,0 +1,2479 @@
+$ Teknic's EDS file of the IO-HUB-4-E, unmodified below this comment. From "ClearPath-IP
+$ EDS_examples.zip" on https://teknic.com/downloads/ (EDS files for all versions of the I/O Hub).
+
+$ EZ-EDS Version 3.36.1.20241010 Generated Electronic Data Sheet
+
+[File]
+        DescText = "IO-HUB-4-E EDS File";
+        CreateDate = 08-11-2025;
+        CreateTime = 12:10:26;
+        ModDate = 07-28-2026;
+        ModTime = 18:59:27;
+        Revision = 1.6;
+
+[Device]
+        VendCode = 424;
+        VendName = "Teknic, Incorporated";
+        ProdType = 43;
+        ProdTypeStr = "Generic Device";
+        ProdCode = 10;
+        MajRev = 1;
+        MinRev = 2;
+        ProdName = "IO-HUB-4-E";
+        Icon = "teknic_logo.ico";
+        IconContents =
+                "AAABAAMAEBAAAAEAIABoBAAANgAAACAgAAABACAAqBAAAJ4EAAAwMAAAAQAg"
+                "AKglAABGFQAAKAAAABAAAAAgAAAAAQAgAAAAAAAABAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCX"
+                "Wj4Al1o+F5daPqWXWj5gl1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAJdaPgCXWj4Al1o+EpdaPp6XWj7+l1o+5ZdaPlGXWj4AAAAA"
+                "AJdaPgCXWj4Al1o+AZdaPgAAAAAAAAAAAAAAAACXWj4Al1o+EpdaPp+XWj79"
+                "l1o+/5daPv+XWj7ll1o+YJdaPgCXWj4Al1o+PJdaPmqXWj4Jl1o+AAAAAACX"
+                "Wj4Al1o+EpdaPp+XWj79l1o+/5daPv+XWj7/l1o+/ZdaPqeXWj4Al1o+Opda"
+                "PteXWj74l1o+fpdaPgiXWj4Al1o+EpdaPp+XWj79l1o+/5daPv+XWj7/l1o+"
+                "/pdaPqOXWj4Yl1o+RZdaPtSXWj7/l1o+/5daPveXWj6Al1o+GpdaPp6XWj79"
+                "l1o+/5daPv+XWj7/l1o+/pdaPqSXWj4Vl1o+AJdaPraXWj7/l1o+/5daPv+X"
+                "Wj7/l1o+9ZdaPtGXWj77l1o+/5daPv+XWj7/l1o+/pdaPqSXWj4Vl1o+AJda"
+                "PgCXWj4tl1o+wZdaPvqXWj7Vl1o+4pdaPuWXWj7nl1o+5ZdaPuSXWj7Nl1o+"
+                "ypdaPpiXWj4Wl1o+AJdaPgAAAAAAl1o+AJdaPieXWj6+l1o+4ZdaPtuXWj61"
+                "l1o+x5daPsKXWj67l1o+r5daPk6XWj4Fl1o+AJdaPgAAAAAAAAAAAJdaPgCX"
+                "Wj4Al1o+J5daPsWXWj7Ul1o+vJdaPsqXWj61l1o+p5daPrSXWj4gl1o+AJda"
+                "PgAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4nl1o+tpdaPvWXWj7zl1o+"
+                "s5daPsiXWj7Il1o+ZJdaPgeXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4A"
+                "l1o+AJdaPiiXWj7Cl1o+/5daPv6XWj77l1o+/JdaPvWXWj57l1o+B5daPgAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+KJdaPsSXWj7/l1o+/5da"
+                "Pv+XWj7/l1o++JdaPmqXWj4Al1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+"
+                "AJdaPgCXWj4pl1o+xJdaPv+XWj7/l1o+/5daPtuXWj5Al1o+AJdaPgAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPimXWj7Dl1o+/5daPtiX"
+                "Wj4/l1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJda"
+                "PgCXWj4Al1o+MJdaPruXWj5Jl1o+AJdaPgAAAAAAAAAAAAAAAAD/4wAA/8EA"
+                "AO+AAADHAAAAggAAAAABAAAAAwAAAAcAAIAPAADAHwAA4A8AAPAHAAD4BwAA"
+                "/AcAAP4PAAD/HwAAKAAAACAAAABAAAAAAQAgAAAAAAAAEAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAACXWj4Al1o+AJdaPi6XWj6ql1o+NpdaPgCXWj4AAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJda"
+                "PgCXWj4kl1o+v5daPv+XWj7Hl1o+LZdaPgCXWj4AAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+I5daPryX"
+                "Wj7/l1o+/5daPv+XWj7Jl1o+LZdaPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPiOXWj68l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7Il1o+LZdaPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAl1o+AJdaPgCXWj4jl1o+vJdaPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7Jl1o+LZdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCX"
+                "Wj4Al1o+I5daPryXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7Hl1o+NQAAAAAAAAAAAAAAAAAAAACXWj4Al1o+E5daPkmXWj4Kl1o+"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPiOXWj68"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj6tAAAAAAAAAAAAAAAAl1o+AJdaPg+XWj6Yl1o+9JdaPn2XWj4Hl1o+AAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4jl1o+vJdaPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+xJdaPjEAAAAA"
+                "AAAAAJdaPgCXWj4Ql1o+mJdaPvyXWj7/l1o+9pdaPn2XWj4Hl1o+AAAAAAAA"
+                "AAAAAAAAAJdaPgCXWj4Al1o+I5daPryXWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPsWXWj4ql1o+AAAAAACXWj4Al1o+"
+                "D5daPpiXWj78l1o+/5daPv+XWj7/l1o+9pdaPn2XWj4Il1o+AAAAAACXWj4A"
+                "l1o+AJdaPiOXWj68l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7Fl1o+KpdaPgCXWj4Al1o+AJdaPg+XWj6Yl1o+/Jda"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+95daPoKXWj4Jl1o+AJdaPgCXWj4jl1o+"
+                "vJdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+xZdaPiqXWj4Al1o+AAAAAACXWj4Sl1o+l5daPvyXWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o++JdaPoKXWj4Hl1o+IpdaPryXWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPsWXWj4ql1o+"
+                "AJdaPgAAAAAAAAAAAJdaPqCXWj78l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+95daPpOXWj67l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7Fl1o+KpdaPgCXWj4AAAAAAAAA"
+                "AAAAAAAAl1o+b5daPuyXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/pdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+xZdaPiqXWj4Al1o+AAAAAAAAAAAAAAAAAAAAAACX"
+                "Wj4Cl1o+YZdaPu2XWj7/l1o+/5daPv+XWj7+l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPsWXWj4ql1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4C"
+                "l1o+YZdaPu2XWj7/l1o++pdaPo+XWj6ol1o+w5daPsKXWj7Dl1o+wpdaPsKX"
+                "Wj7Cl1o+wpdaPsKXWj7Cl1o+wZdaPq+XWj6nl1o+qJdaPqqXWj6cl1o+K5da"
+                "PgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+"
+                "YZdaPu2XWj79l1o+s5daPsaXWj7al1o+1ZdaPsWXWj7Ul1o+1ZdaPtWXWj7V"
+                "l1o+1pdaPtmXWj7al1o+fZdaPjmXWj49l1o+GpdaPgGXWj4Al1o+AAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZda"
+                "Pu2XWj7/l1o+/5daPv+XWj7fl1o+ZJdaPqeXWj6xl1o+sJdaPrGXWj6nl1o+"
+                "fpdaPuOXWj78l1o+9ZdaPriXWj4hl1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPu2X"
+                "Wj7/l1o+/JdaPtaXWj7Nl1o+6ZdaPuyXWj7sl1o+75daPvCXWj5il1o+aZda"
+                "PueXWj69l1o+KpdaPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPu6XWj7w"
+                "l1o+Z5daPpyXWj6vl1o+rpdaPqyXWj5ul1o+tZdaPuWXWj6ll1o+wJdaPnyX"
+                "Wj4Gl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPuyXWj7ul1o+"
+                "+JdaPvyXWj77l1o+/ZdaPqSXWj4+l1o+yZdaPt+XWj7dl1o+0JdaPlWXWj4A"
+                "l1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPu6XWj7/l1o+/5da"
+                "Pv+XWj7/l1o++JdaPrmXWj66l1o+wZdaPsCXWj7Cl1o+vZdaPmuXWj4Gl1o+"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPu2XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+9ZdaPneXWj4Gl1o+AAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAJdaPgCXWj4Cl1o+YZdaPu2XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+9ZdaPneXWj4Gl1o+AAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAJdaPgCXWj4Cl1o+Y5daPu+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+9ZdaPneXWj4Gl1o+AJdaPgAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAJdaPgCXWj4Dl1o+Z5daPu+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+8ZdaPkyXWj4Al1o+AAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAJdaPgCXWj4Dl1o+Z5daPu+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv6XWj6kl1o+FpdaPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AJdaPgCXWj4Dl1o+Z5daPu+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7+"
+                "l1o+o5daPhSXWj4Al1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJda"
+                "PgCXWj4Dl1o+Z5daPu+XWj7/l1o+/5daPv+XWj7/l1o+/pdaPqOXWj4Ul1o+"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCX"
+                "Wj4Dl1o+Z5daPu+XWj7/l1o+/5daPv2XWj6jl1o+FJdaPgCXWj4AAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4D"
+                "l1o+ZpdaPu+XWj79l1o+nZdaPhOXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Dl1o+"
+                "dpdaPqeXWj4Vl1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAD///8f///+D////Af///gD///wAf//4AD4/8AA8H+AAOA/AAHA"
+                "HgADgAwABwAAAA8AAAAfAAAAPwAAAH+AAAD/wAAB/+AAA//wAAf/+AAH//wA"
+                "B//+AAH//wAA//+AAH//wAA//+AAP//wAD//+AB///wA///+Af///wP///+H"
+                "/ygAAAAwAAAAYAAAAAEAIAAAAAAAACQAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AJdaPgCXWj4Al1o+S5daPpqXWj4Yl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAl1o+AJdaPgCXWj4/l1o+2ZdaPv6XWj6fl1o+E5daPgAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPjyXWj7Zl1o+/5daPv+XWj79"
+                "l1o+oJdaPhOXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+OZdaPtSXWj7/"
+                "l1o+/5daPv+XWj7/l1o+/ZdaPqCXWj4Tl1o+AAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj45"
+                "l1o+1JdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv2XWj6gl1o+E5daPgAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4A"
+                "l1o+AJdaPjmXWj7Ul1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj79l1o+oJdaPhOXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAJdaPgCXWj4Al1o+OZdaPtSXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/ZdaPqCXWj4Tl1o+AAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAl1o+AJdaPgCXWj45l1o+1JdaPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv2XWj6gl1o+E5da"
+                "PgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPjmXWj7Ul1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj79l1o+n5daPhYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+"
+                "AJdaPgOXWj4kl1o+CZdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+OZdaPtSX"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/ZdaPp0AAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAACXWj4Al1o+AJdaPlGXWj7al1o+fJdaPgeXWj4AAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCX"
+                "Wj45l1o+1JdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+3ZdaPlMAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+UJdaPuSXWj7/l1o+9pdaPnuXWj4H"
+                "l1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACX"
+                "Wj4Al1o+AJdaPjmXWj7Ul1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7fl1o+"
+                "R5daPgAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj5Ql1o+5JdaPv+XWj7/"
+                "l1o+/5daPvaXWj57l1o+B5daPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAJdaPgCXWj4Al1o+OZdaPtSXWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPt+XWj5Hl1o+AJdaPgAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPlCXWj7k"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj72l1o+e5daPgeXWj4AAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj45l1o+1JdaPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+35daPkeXWj4Al1o+AAAAAAAAAAAAAAAAAJdaPgCXWj4A"
+                "l1o+UJdaPuSXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+9pdaPnuX"
+                "Wj4Il1o+AAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+AJdaPjmXWj7Ul1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7fl1o+R5daPgCXWj4AAAAAAAAAAAAAAAAA"
+                "l1o+AJdaPgCXWj5Ql1o+5JdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPveXWj6Dl1o+CZdaPgAAAAAAAAAAAJdaPgCXWj4Al1o+OZda"
+                "PtSXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPt+XWj5Hl1o+AJdaPgAAAAAA"
+                "AAAAAAAAAACXWj4Al1o+AJdaPlCXWj7kl1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj74l1o+hJdaPgmXWj4Al1o+AJda"
+                "PgCXWj45l1o+1JdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+35daPkeXWj4A"
+                "l1o+AAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+T5daPuSXWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o++Jda"
+                "PoSXWj4Jl1o+AJdaPjmXWj7Ul1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7f"
+                "l1o+R5daPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAACXWj5dl1o+45daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPviXWj6Cl1o+QZdaPtOXWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPt+XWj5Hl1o+AJdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACX"
+                "Wj6ol1o+/ZdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj72l1o+6pdaPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+35daPkeXWj4Al1o+AAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAACXWj4al1o+ppdaPv6XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7fl1o+R5daPgCXWj4AAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+FpdaPqeXWj7+l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPt+XWj5Hl1o+AJdaPgAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJda"
+                "PhaXWj6nl1o+/pdaPv+XWj7/l1o+/5daPv+XWj7xl1o+65daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+35daPkeX"
+                "Wj4Al1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAJdaPgCXWj4Wl1o+p5daPv6XWj7/l1o+/5daPv2XWj5vl1o+"
+                "PZdaPpmXWj6el1o+nZdaPp2XWj6dl1o+nZdaPp2XWj6dl1o+nZdaPp2XWj6d"
+                "l1o+nZdaPp2XWj6dl1o+nZdaPp2XWj6Pl1o+iZdaPoqXWj6Kl1o+ipdaPoqX"
+                "Wj6Jl1o+QJdaPgCXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+FpdaPqeXWj7+l1o+"
+                "/5daPv+XWj6gl1o+f5daPsuXWj7Ol1o+zpdaPs6XWj7Rl1o+0JdaPs+XWj7P"
+                "l1o+z5daPs+XWj7Pl1o+z5daPs+XWj7Pl1o+zpdaPs+XWj5xl1o+BJdaPgOX"
+                "Wj4Dl1o+BJdaPgKXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+"
+                "AJdaPhaXWj6nl1o+/pdaPv+XWj7/l1o+/pdaPv+XWj7/l1o+/5daPu+XWj6a"
+                "l1o+yZdaPuiXWj7ml1o+5pdaPuaXWj7ml1o+5pdaPueXWj7rl1o++JdaPv+X"
+                "Wj7tl1o+t5daPrOXWj62l1o+k5daPhiXWj4AAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAJdaPgCXWj4Wl1o+p5daPv6XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPtGXWj4gl1o+XpdaPo+XWj6Nl1o+jZdaPo2XWj6Nl1o+jpdaPn+X"
+                "Wj4yl1o+gJdaPvuXWj7/l1o+/5daPv+XWj7hl1o+S5daPgCXWj4AAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+FpdaPqeXWj7+"
+                "l1o+/5daPv+XWj7/l1o+/5daPvmXWj7Tl1o+8JdaPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPveXWj5nl1o+EJdaPrSXWj7/l1o+/5daPt+XWj5Hl1o+AJda"
+                "PgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "l1o+AJdaPhaXWj6nl1o+/pdaPv+XWj7/l1o+xZdaPmiXWj6+l1o+zpdaPsyX"
+                "Wj7Ml1o+zJdaPsyXWj7Ml1o+3ZdaPv+XWj7fl1o+OJdaPkOXWj6kl1o+pZda"
+                "PkSXWj4Al1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Wl1o+p5daPv6XWj7/l1o+q5daPi+X"
+                "Wj6Kl1o+n5daPp6XWj6el1o+npdaPp6XWj5Ol1o+KpdaPs+XWj7/l1o+45da"
+                "PtCXWj7Ql1o+z5daPm6XWj4Fl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACXWj4Al1o+FpdaPqeX"
+                "Wj7+l1o++ZdaPuqXWj79l1o+/5daPv+XWj7/l1o+/5daPv+XWj7Jl1o+G5da"
+                "PlCXWj7wl1o+/5daPv+XWj7/l1o+/5daPvOXWj5xl1o+BZdaPgAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACX"
+                "Wj4Al1o+AJdaPhaXWj6nl1o+/pdaPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+lZdaPiuXWj54l1o+kpdaPpCXWj6Ql1o+kJdaPpKXWj6Fl1o+"
+                "MpdaPgWXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4Wl1o+p5daPv6XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o++ZdaPuWXWj7gl1o+35daPt+XWj7fl1o+"
+                "35daPt+XWj7hl1o+35daPnKXWj4Fl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+Fpda"
+                "PqeXWj7+l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPvOXWj5yl1o+BZdaPgAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AACXWj4Al1o+AJdaPhaXWj6nl1o+/pdaPv+XWj7/l1o+/5daPv+XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7z"
+                "l1o+cpdaPgWXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4Wl1o+p5daPv6XWj7/l1o+"
+                "/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+85daPnKXWj4Fl1o+AAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4Al1o+"
+                "FpdaPqiXWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPvOXWj5yl1o+BZdaPgAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAACXWj4Al1o+AJdaPhmXWj6ul1o+/5daPv+XWj7/l1o+/5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7zl1o+c5daPgaXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4bl1o+r5daPv+XWj7/"
+                "l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+3pdaPiuXWj4AAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4A"
+                "l1o+G5daPq+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7sl1o+YZdaPgOXWj4AAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAACXWj4Al1o+AJdaPhuXWj6vl1o+/5daPv+XWj7/l1o+/5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPuyXWj5gl1o+Apda"
+                "PgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPgCXWj4bl1o+r5daPv+X"
+                "Wj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+7Jda"
+                "PmCXWj4Cl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCX"
+                "Wj4Al1o+G5daPq+XWj7/l1o+/5daPv+XWj7/l1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7sl1o+YJdaPgKXWj4AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAACXWj4Al1o+AJdaPhuXWj6vl1o+/5daPv+XWj7/l1o+/5da"
+                "Pv+XWj7/l1o+/5daPuyXWj5gl1o+ApdaPgAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4bl1o+r5da"
+                "Pv+XWj7/l1o+/5daPv+XWj7/l1o+7JdaPmCXWj4Cl1o+AAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AACXWj4Al1o+G5daPq+XWj7/l1o+/5daPv+XWj7ol1o+WpdaPgKXWj4AAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAl1o+AJdaPhqXWj6ul1o+/5daPuiXWj5Xl1o+"
+                "AZdaPgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJdaPgCXWj4fl1o+"
+                "tJdaPmaXWj4Bl1o+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD/////+P8AAP/////w"
+                "fwAA/////+A/AAD/////wB8AAP////+ADwAA/////wAHAAD////+AAMAAP//"
+                "//wAAQAA////+AAAAAD/H//wAAAAAP8P/+AAAAAA/gf/wAABAAD8A/+AAAMA"
+                "APgB/wAABwAA8AD+AAAPAADgAHwAAB8AAMAAOAAAPwAAgAAQAAB/AAAAAAAA"
+                "AP8AAAAAAAAB/wAAAAAAAAP/AACAAAAAB/8AAMAAAAAP/wAA4AAAAB//AADw"
+                "AAAAf/8AAPgAAAB//wAA/AAAAP//AAD+AAAB//8AAP8AAAP//wAA/4AAAf//"
+                "AAD/wAAA//8AAP/gAAB//wAA//AAAD//AAD/+AAAH/8AAP/8AAAP/wAA//4A"
+                "AAf/AAD//wAAA/8AAP//gAAB/wAA///AAAH/AAD//+AAAf8AAP//8AAD/wAA"
+                "///4AAf/AAD///wAD/8AAP///gAf/wAA////AD//AAD///+Af/8AAP///8D/"
+                "/wAA////4f//AAA=";
+
+[Device Classification]
+        Class1 = EtherNetIP;
+
+[Params]
+        Param1 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD2,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Digital Inputs",       $ name
+                "",                     $ units
+                "I/O 0-12 = Bits 0-12", $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param2 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC2,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "I/O Configuration",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param4 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Statusword",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum4 =
+                0,"Enabled",
+                1,"Ready for Command",
+                2,"Motor Shutdown Present",
+                3,"Motor Warning Present",
+                4,"In Range",
+                5,"Command Complete",
+                6,"Settled",
+                7,"At Speed",
+                8,"Homing",
+                9,"Has Homed",
+                10,"Brake Released",
+                11,"Reserved",
+                12,"Reserved",
+                13,"Reserved",
+                14,"Reserved",
+                15,"At Target Position",
+                16,"Following Configured",
+                17,"Actively Following",
+                18,"Is Followed",
+                19,"Move Cancelled",
+                20,"Shutdown Reset Ack",
+                21,"In Home Sensor",
+                22,"All Motion Blocked",
+                23,"In Pos Limit Switch",
+                24,"In Neg Limit Switch",
+                25,"In Pos Soft Limit",
+                26,"In Neg Soft Limit",
+                27,"Write Param Ack",
+                28,"Position Capture Sensor State",
+                29,"Motor Model Type",
+                30,"Reserved",
+                31,"Motor Connected";
+        Param5 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Shutdown Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param6 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Warning Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param7 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Measured Position",    $ name
+                "",                     $ units
+                "Units: encoder counts (cnts)",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param8 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Measured Velocity",    $ name
+                "",                     $ units
+                "Units: cnts/s",        $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param9 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Measured Torque",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param10 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Position Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param11 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Velocity Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param12 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Read Param ID Echo",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param13 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Read Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param14 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor0 Move Type Ack", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param15 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Move Number Ack",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param16 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Statusword",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum16 =
+                0,"Enabled",
+                1,"Ready for Command",
+                2,"Motor Shutdown Present",
+                3,"Motor Warning Present",
+                4,"In Range",
+                5,"Command Complete",
+                6,"Settled",
+                7,"At Speed",
+                8,"Homing",
+                9,"Has Homed",
+                10,"Brake Released",
+                11,"Reserved",
+                12,"Reserved",
+                13,"Reserved",
+                14,"Reserved",
+                15,"At Target Position",
+                16,"Following Configured",
+                17,"Actively Following",
+                18,"Is Followed",
+                19,"Move Cancelled",
+                20,"Shutdown Reset Ack",
+                21,"In Home Sensor",
+                22,"All Motion Blocked",
+                23,"In Pos Limit Switch",
+                24,"In Neg Limit Switch",
+                25,"In Pos Soft Limit",
+                26,"In Neg Soft Limit",
+                27,"Write Param Ack",
+                28,"Position Capture Sensor State",
+                29,"Motor Model Type",
+                30,"Reserved",
+                31,"Motor Connected";
+        Param17 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Shutdown Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param18 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Warning Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param19 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Measured Position",    $ name
+                "",                     $ units
+                "Units: encoder counts (cnts)",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param20 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Measured Velocity",    $ name
+                "",                     $ units
+                "Units: cnts/s",        $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param21 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Measured Torque",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param22 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Position Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param23 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Velocity Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param24 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Read Param ID Echo",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param25 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Read Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param26 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor1 Move Type Ack", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param27 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Move Number Ack",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param28 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Statusword",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum28 =
+                0,"Enabled",
+                1,"Ready for Command",
+                2,"Motor Shutdown Present",
+                3,"Motor Warning Present",
+                4,"In Range",
+                5,"Command Complete",
+                6,"Settled",
+                7,"At Speed",
+                8,"Homing",
+                9,"Has Homed",
+                10,"Brake Released",
+                11,"Reserved",
+                12,"Reserved",
+                13,"Reserved",
+                14,"Reserved",
+                15,"At Target Position",
+                16,"Following Configured",
+                17,"Actively Following",
+                18,"Is Followed",
+                19,"Move Cancelled",
+                20,"Shutdown Reset Ack",
+                21,"In Home Sensor",
+                22,"All Motion Blocked",
+                23,"In Pos Limit Switch",
+                24,"In Neg Limit Switch",
+                25,"In Pos Soft Limit",
+                26,"In Neg Soft Limit",
+                27,"Write Param Ack",
+                28,"Position Capture Sensor State",
+                29,"Motor Model Type",
+                30,"Reserved",
+                31,"Motor Connected";
+        Param29 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Shutdown Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param30 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Warning Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param31 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Measured Position",    $ name
+                "",                     $ units
+                "Units: encoder counts (cnts)",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param32 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Measured Velocity",    $ name
+                "",                     $ units
+                "Units: cnts/s",        $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param33 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Measured Torque",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param34 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Position Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param35 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Velocity Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param36 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Read Param ID Echo",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param37 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Read Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param38 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor2 Move Type Ack", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param39 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Move Number Ack",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param40 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Statusword",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum40 =
+                0,"Enabled",
+                1,"Ready for Command",
+                2,"Motor Shutdown Present",
+                3,"Motor Warning Present",
+                4,"In Range",
+                5,"Command Complete",
+                6,"Settled",
+                7,"At Speed",
+                8,"Homing",
+                9,"Has Homed",
+                10,"Brake Released",
+                11,"Reserved",
+                12,"Reserved",
+                13,"Reserved",
+                14,"Reserved",
+                15,"At Target Position",
+                16,"Following Configured",
+                17,"Actively Following",
+                18,"Is Followed",
+                19,"Move Cancelled",
+                20,"Shutdown Reset Ack",
+                21,"In Home Sensor",
+                22,"All Motion Blocked",
+                23,"In Pos Limit Switch",
+                24,"In Neg Limit Switch",
+                25,"In Pos Soft Limit",
+                26,"In Neg Soft Limit",
+                27,"Write Param Ack",
+                28,"Position Capture Sensor State",
+                29,"Motor Model Type",
+                30,"Reserved",
+                31,"Motor Connected";
+        Param41 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Shutdown Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param42 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Warning Register",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param43 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Measured Position",    $ name
+                "",                     $ units
+                "Units: encoder counts (cnts)",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param44 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Measured Velocity",    $ name
+                "",                     $ units
+                "Units: cnts/s",        $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param45 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Measured Torque",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param46 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Position Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param47 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Velocity Target",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param48 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Read Param ID Echo",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param49 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Read Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param50 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor3 Move Type Ack", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param51 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Move Number Ack",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param52 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Ext Encoder Position", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param53 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Ext Encoder Velocity", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param54 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Ext Encoder Index Position",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param55 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC1,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Ext Encoder Alarm Flag",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param56 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC1,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Ext Encoder Add to Position Ack",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param101 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD2,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Digital Outputs",      $ name
+                "",                     $ units
+                "I/O 0-11 = Bits 0-11", $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param102 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Output I/O-12", $ name
+                "",                     $ units
+                "0-20,000 uA",          $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param104 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Controlword",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum104 =
+                0,"Enable",
+                1,"Shutdown Reset",
+                2,"Clear Shutdown History",
+                3,"Clear Warning History",
+                4,"External Positive Limit",
+                5,"External Negative Limit",
+                6,"Write Parameter",
+                7,"Pause Parameter Reading",
+                8,"Stop All Motion";
+        Param106 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor0 Move Type",     $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param107 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Move Number",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param108 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Read Param ID", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param109 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Write Param ID",$ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param110 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Write Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param111 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Controlword",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum111 =
+                0,"Enable",
+                1,"Shutdown Reset",
+                2,"Clear Shutdown History",
+                3,"Clear Warning History",
+                4,"External Positive Limit",
+                5,"External Negative Limit",
+                6,"Write Parameter",
+                7,"Pause Parameter Reading",
+                8,"Stop All Motion";
+        Param113 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor1 Move Type",     $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param114 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Move Number",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param115 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Read Param ID", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param116 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Write Param ID",$ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param117 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Write Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param118 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Controlword",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum118 =
+                0,"Enable",
+                1,"Shutdown Reset",
+                2,"Clear Shutdown History",
+                3,"Clear Warning History",
+                4,"External Positive Limit",
+                5,"External Negative Limit",
+                6,"Write Parameter",
+                7,"Pause Parameter Reading",
+                8,"Stop All Motion";
+        Param120 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor2 Move Type",     $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param121 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Move Number",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param122 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Read Param ID", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param123 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Write Param ID",$ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param124 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Write Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param125 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD3,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Controlword",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Enum125 =
+                0,"Enable",
+                1,"Shutdown Reset",
+                2,"Clear Shutdown History",
+                3,"Clear Warning History",
+                4,"External Positive Limit",
+                5,"External Negative Limit",
+                6,"Write Parameter",
+                7,"Pause Parameter Reading",
+                8,"Stop All Motion";
+        Param127 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Motor3 Move Type",     $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param128 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Move Number",   $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param129 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Read Param ID", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param130 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Write Param ID",$ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param131 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Write Param Value",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param132 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Ext Encoder Add to Position",    $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param133 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-0",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param134 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-1",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param135 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-2",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param136 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-3",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param137 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-4",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param138 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-5",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param139 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-6",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param140 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-7",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param141 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-8",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param142 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-9",   $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param143 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-10",  $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param144 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-11",  $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param145 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC7,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Analog Input I/O-12",  $ name
+                "",                     $ units
+                "Units: mV",            $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param150 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-0 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param151 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-1 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param152 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-2 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param153 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-3 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param154 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-4 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param155 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-5 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param156 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-6 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param157 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-7 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param158 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-8 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param159 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-9 Duty Cycle", $ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param160 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-10 Duty Cycle",$ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param161 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC6,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "PWM I/O-11 Duty Cycle",$ name
+                "",                     $ units
+                "0-255 = 0-100% duty cycle",    $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param170 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Move Param 1",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param171 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Move Param 2",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param172 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Move Param 3",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param173 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor0 Move Param 4",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param174 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Move Param 1",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param175 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Move Param 2",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param176 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Move Param 3",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param177 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor1 Move Param 4",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param178 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Move Param 1",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param179 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Move Param 2",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param180 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Move Param 3",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param181 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor2 Move Param 4",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param182 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Move Param 1",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param183 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Move Param 2",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param184 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Move Param 3",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param185 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC4,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "Motor3 Move Param 4",  $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param186 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor0 Torque Target", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param187 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor1 Torque Target", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param188 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor2 Torque Target", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param189 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xC3,                   $ Data Type
+                2,                      $ Data Size in bytes
+                "Motor3 Torque Target", $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param998 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0000,                 $ Descriptor
+                0xD1,                   $ Data Type
+                1,                      $ Data Size in bytes
+                "Reserved Byte",        $ name
+                "",                     $ units
+                "",                     $ help string
+                ,,0,                    $ min, max, default data values
+                ,,,,                    $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                ;                       $ decimal places
+        Param999 =
+                0,                      $ reserved, shall equal 0
+                ,,                      $ Link Path Size, Link Path
+                0x0004,                 $ Descriptor
+                0xC8,                   $ Data Type
+                4,                      $ Data Size in bytes
+                "RPI Range",            $ name
+                "",                     $ units
+                "This parameter limits the range of the RPI (Requested Packet Interval) value",    $ help string
+                1000,1000000,10000,     $ min, max, default data values
+                1,1000,1,0,             $ mult, div, base, offset scaling
+                ,,,,                    $ mult, div, base, offset links
+                1;                      $ decimal places
+
+[Assembly]
+        Object_Name = "Assembly Object";
+        Object_Class_Code = 0x04;
+        Assem100 =
+                "Input Assembly 4 Motors with IO and Encoder",
+                "20 04 24 64 30 03",
+                228,
+                0x0000,
+                ,,
+                16,Param1,
+                8,Param2,
+                8,Param2,
+                8,Param2,
+                8,Param2,
+                8,Param2,
+                8,Param2,
+                8,Param2,
+                8,Param998,
+                16,Param133,
+                16,Param134,
+                16,Param135,
+                16,Param136,
+                16,Param137,
+                16,Param138,
+                16,Param139,
+                16,Param140,
+                16,Param141,
+                16,Param142,
+                16,Param143,
+                16,Param144,
+                16,Param145,
+                32,Param4,
+                32,Param5,
+                32,Param6,
+                32,Param7,
+                32,Param8,
+                16,Param9,
+                32,Param10,
+                32,Param11,
+                16,Param186,
+                16,Param12,
+                32,Param13,
+                8,Param14,
+                16,Param15,
+                8,Param998,
+                8,Param998,
+                8,Param998,
+                32,Param16,
+                32,Param17,
+                32,Param18,
+                32,Param19,
+                32,Param20,
+                16,Param21,
+                32,Param22,
+                32,Param23,
+                16,Param187,
+                16,Param24,
+                32,Param25,
+                8,Param26,
+                16,Param27,
+                8,Param998,
+                8,Param998,
+                8,Param998,
+                32,Param28,
+                32,Param29,
+                32,Param30,
+                32,Param31,
+                32,Param32,
+                16,Param33,
+                32,Param34,
+                32,Param35,
+                16,Param188,
+                16,Param36,
+                32,Param37,
+                8,Param38,
+                16,Param39,
+                8,Param998,
+                8,Param998,
+                8,Param998,
+                32,Param40,
+                32,Param41,
+                32,Param42,
+                32,Param43,
+                32,Param44,
+                16,Param45,
+                32,Param46,
+                32,Param47,
+                16,Param189,
+                16,Param48,
+                32,Param49,
+                8,Param50,
+                16,Param51,
+                8,Param998,
+                8,Param998,
+                8,Param998,
+                32,Param52,
+                32,Param53,
+                32,Param54,
+                8,Param55,
+                8,Param56,
+                8,Param998,
+                8,Param998;
+        Assem101 =
+                "Output Assembly 4 Motors with IO and Encoder",
+                "20 04 24 65 30 03",
+                148,
+                0x0000,
+                ,,
+                16,Param101,
+                16,Param102,
+                8,Param150,
+                8,Param151,
+                8,Param152,
+                8,Param153,
+                8,Param154,
+                8,Param155,
+                8,Param156,
+                8,Param157,
+                8,Param158,
+                8,Param159,
+                8,Param160,
+                8,Param161,
+                32,Param104,
+                32,Param170,
+                32,Param171,
+                32,Param172,
+                32,Param173,
+                8,Param106,
+                16,Param107,
+                16,Param108,
+                16,Param109,
+                32,Param110,
+                8,Param998,
+                32,Param111,
+                32,Param174,
+                32,Param175,
+                32,Param176,
+                32,Param177,
+                8,Param113,
+                16,Param114,
+                16,Param115,
+                16,Param116,
+                32,Param117,
+                8,Param998,
+                32,Param118,
+                32,Param178,
+                32,Param179,
+                32,Param180,
+                32,Param181,
+                8,Param120,
+                16,Param121,
+                16,Param122,
+                16,Param123,
+                32,Param124,
+                8,Param998,
+                32,Param125,
+                32,Param182,
+                32,Param183,
+                32,Param184,
+                32,Param185,
+                8,Param127,
+                16,Param128,
+                16,Param129,
+                16,Param130,
+                32,Param131,
+                8,Param998,
+                32,Param132;
+
+[Connection Manager]
+        Object_Name = "Connection Manager Object";
+        Object_Class_Code = 0x06;
+        Connection1 =
+                0x04010002,             $ 0-15    = supported transport classes
+                                        $ 16      = trigger: cyclic
+                                        $ 17      = trigger: change of state
+                                        $ 18      = trigger: application
+                                        $ 19-23   = trigger: reserved
+                                        $ 24      = application type: listen-only
+                                        $ 25      = application type: input-only
+                                        $ 26      = application type: exclusive-owner
+                                        $ 27      = application type: redundant-owner
+                                        $ 28-30   = reserved
+                                        $ 31      = Direction: Client = 0 / Server = 1
+                0x77750405,             $ 0       = O->T fixed size supported
+                                        $ 1       = O->T variable size supported
+                                        $ 2       = T->O fixed size supported
+                                        $ 3       = T->O variable size supported
+                                        $ 4-5     = O->T number of bytes per slot (obsolete)
+                                        $ 6-7     = T->O number of bytes per slot (obsolete)
+                                        $ 8-10    = O->T Real time transfer format
+                                        $ 11      = reserved
+                                        $ 12-14   = T->O Real time transfer format
+                                        $ 15      = reserved
+                                        $ 16      = O->T connection type: NULL
+                                        $ 17      = O->T connection type: MULTICAST
+                                        $ 18      = O->T connection type: POINT2POINT
+                                        $ 19      = O->T connection type: reserved
+                                        $ 20      = T->O connection type: NULL
+                                        $ 21      = T->O connection type: MULTICAST
+                                        $ 22      = T->O connection type: POINT2POINT
+                                        $ 23      = T->O connection type: reserved
+                                        $ 24      = O->T priority: LOW
+                                        $ 25      = O->T priority: HIGH
+                                        $ 26      = O->T priority: SCHEDULED
+                                        $ 27      = O->T priority: reserved
+                                        $ 28      = T->O priority: LOW
+                                        $ 29      = T->O priority: HIGH
+                                        $ 30      = T->O priority: SCHEDULED
+                                        $ 31      = T->O priority: reserved
+                Param999,148,Assem101,  $ O->T RPI, size, format
+                Param999,228,Assem100,  $ T->O RPI, size, format
+                ,,                      $ proxy config size, format
+                0,,                     $ target config size, format
+                "IO-Hub_4Motor_IO_Encoder",    $ Connection Name
+                "",                     $ help string
+                "20 04 24 01 2C 65 2C 64";    $ Path
+
+[Port]
+        Object_Name = "Port Object";
+        Object_Class_Code = 0xF4;
+        Port1 =
+                TCP,
+                "EtherNet/IP Port",
+                "20 F5 24 01",
+                1,
+                0x00,
+                ;
+
+[Capacity]
+        MaxIOConnections = 1;
+        MaxMsgConnections = 5;
+        MaxConsumersPerMcast = 0;
+        TSpec1 = Rx, 0, 1000;
+        TSpec2 = Rx, 148, 1000;
+        TSpec3 = Tx, 228, 1000;
+        TSpec4 = Rx, 288, 1000;
+        TSpec5 = Tx, 364, 1000;
+
+[Ethernet Link Class]
+        Revision = 4;
+        Object_Name = "Ethernet Link Object";
+        Object_Class_Code = 0xF6;
+        MaxInst = 2;
+        Number_Of_Static_Instances = 2;
+        Max_Number_Of_Dynamic_Instances = 0;
+        InterfaceLabel1 = "Port 1";
+        InterfaceLabel2 = "Port 2";
+
+[LLDP Management Class]
+        Revision = 1;
+        Object_Name = "LLDP Management Object";
+        Object_Class_Code = 0x109;
+        MaxInst = 1;
+        Number_Of_Static_Instances = 1;
+        Max_Number_Of_Dynamic_Instances = 0;
+
+[LLDP Data Table Class]
+        Revision = 1;
+        Object_Name = "LLDP Data Table Object";
+        Object_Class_Code = 0x10A;
+        MaxInst = 8;
+        Number_Of_Static_Instances = 0;
+        Max_Number_Of_Dynamic_Instances = 8;
+

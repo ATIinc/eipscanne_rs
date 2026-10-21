@@ -1,20 +1,18 @@
+[workspace]
+members = ["hex_assert", "scanner", "eds_parser", "eds_parser_derive"]
+# `cargo run --example`, `cargo test` and friends cover the library, the scanner and the EDS parser without `-p`
+default-members = [".", "scanner", "eds_parser"]
+
 [package]
 name = "eipscanne_rs"
-version = "0.2.0"
+version = "0.4.0"
 edition = "2024"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
-bilge = "0.2.0"
-binrw = "0.14.1"
-hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
-pretty_assertions = "1.4.1"
+bilge = "0.5.0"
+binrw = "0.15.2"
+hex-assert = { version = "0.2.0", path = "hex_assert" }
 
 [dev-dependencies]
-# Not actually a dependency of the package, just used for testing the examples
-clap = { version = "4.5.27", features = ["derive"] }
-tokio = { version = "1.42.0", features = ["full"] }
-
-[features]
-default = [] # Comment to enable async support
-# default = ["async"]   # UN-Comment to enable async support for testing
-async = []
+pretty_assertions = "1.4.1"

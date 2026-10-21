@@ -1,6 +1,8 @@
 # Build artifacts
 target/
 
+docs/
+# GH_TOKEN for the devcontainer, written by .devcontainer/initializeHost.sh
+.devcontainer/.env
 # Test Capture
 captures/test.pcap
-
