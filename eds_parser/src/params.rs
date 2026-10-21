@@ -56,7 +56,7 @@ pub struct ParamEntry {
 }
 
 /// Field 4 of `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`: what the param
-/// supports and how a tool treats it. `0x0004` is supports_scaling (bit 2); `0x0010` is read-only
+/// supports and how a tool treats it. `0x0004` is `supports_scaling` (bit 2); `0x0010` is read-only
 /// (bit 4).
 #[bitsize(16)]
 #[derive(FromBits, PartialEq, DebugBits, Copy, Clone, FromField)]
@@ -80,7 +80,7 @@ pub struct ParamDescriptor {
 
 /// Field 5 of `Param1 = 0,,,0x0004,0xC8,4,"RPI","us","",1000,1000000,1000000;`: the CIP data type
 /// of the param's value. `0xC8` is UDINT. Each variant is the EDS spelling in Rust case
-/// (`TimeOfDay` is TIME_OF_DAY); an unlisted code is `Unknown(code)`.
+/// (`TimeOfDay` is `TIME_OF_DAY`); an unlisted code is `Unknown(code)`.
 #[bitsize(8)]
 #[derive(FromBits, PartialEq, Debug, Copy, Clone, FromField)]
 #[repr(u8)]

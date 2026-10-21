@@ -4,13 +4,7 @@ use std::io::{Read, Seek, Write};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use binrw::meta::{EndianKind, ReadEndian, WriteEndian};
-use binrw::{
-    BinRead, // trait for reading
-    BinResult,
-    BinWrite, // trait for writing
-    Endian,
-    binrw, // #[binrw] attribute
-};
+use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
 
 use crate::cip::types::{CipInt, CipUdint, CipUint, CipUsint};
 
@@ -29,7 +23,7 @@ const SOCKET_ADDR_FAMILY_INET: CipInt = 2;
 #[brw(little)]
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct SocketAddrInfo {
-    /// Address family: 2 (AF_INET, IPv4)
+    /// Address family: 2 (`AF_INET`, IPv4)
     #[brw(big)]
     pub sin_family: CipInt,
     /// Port number

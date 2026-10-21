@@ -1,7 +1,8 @@
 mod common;
 
-use binrw::BinRead;
+use std::io::{BufReader, Cursor};
 
+use binrw::BinRead;
 use pretty_assertions::assert_eq;
 
 use eipscanne_rs::cip::message::request::{MessageRouterRequest, RequestData};
@@ -87,8 +88,8 @@ fn test_deserialize_cip_identity_request() {
         0x00, 0x25, 0x00, 0x01, 0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(identity_request_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(identity_request_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let cip_identity_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 
@@ -156,8 +157,8 @@ fn test_deserialize_registration_request() {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(registration_request_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(registration_request_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let registration_request = RequestObjectAssembly::read_le(&mut buf_reader).unwrap();
 

@@ -1,28 +1,26 @@
-//! Opens the class 1 connection an EDS file describes, exchanges cyclic I/O for a number of
-//! cycles and closes it again: the stages of the scanner's `implicit-io` example, with the
-//! connection settings read from the EDS.
+//! The stages of `opener-implicit`, with the connection read from this crate's
+//! `sample_adapter.eds` fixture, the EDS of the OpENer sample.
 //!
-//! The defaults describe the OpENer adapter of `tests/integration`: `--eds` is this crate's
-//! `sample_adapter.eds` fixture and `--host` is `172.28.0.10`. Start the adapter on the host, then
-//! run the example in the devcontainer:
+//! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
 //!
 //! ```text
 //! tests/integration/start-opener.sh
-//! cargo run --example eds-implicit-io
+//! cargo run --example opener-eds-implicit
 //! ```
 //!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
-//! I/O travels over UDP 2222 in both directions, so the scanner must reach the adapter's Docker
-//! network; the devcontainer's host networking does (`tests/integration/README.md`).
-//!
-//! Another device: `--eds <its EDS file> --host <ip>`, plus `--connection <N>` to open
-//! `ConnectionN` instead of the first connection it can open. The outputs are zeros, sent idle
-//! (run flag cleared) unless `--run` is given, since an output assembly may drive real outputs.
+//! The outputs are zeros, sent idle (run flag cleared) unless `--run` is given.
 
+use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
 use bilge::prelude::u4;
 use clap::Parser;
+use tokio::signal::ctrl_c;
+use tokio::time::{interval, sleep_until};
+
+use eds_parser::Eds;
+use eds_parser::connection_manager::ConnectionEntry;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -42,10 +40,7 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-use eds_parser::Eds;
-use eds_parser::connection_manager::ConnectionEntry;
-
-/// Who this scanner says it is in the Forward_Open (the same values as `implicit-io`)
+/// Who this scanner says it is in the Forward_Open (the same values as `opener-implicit`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
 const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
 const CONNECTION_SERIAL_NUMBER: u16 = 1;
@@ -57,19 +52,15 @@ const SAMPLE_ADAPTER_EDS: &str = concat!(
     "/tests/fixtures/sample_adapter.eds"
 );
 
-/// Exchanges cyclic I/O with an adapter over the connection its EDS file describes
+/// Exchanges cyclic I/O with the OpENer sample over a connection its EDS file describes
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    /// The device's EDS file
-    #[arg(long, default_value = SAMPLE_ADAPTER_EDS)]
-    eds: std::path::PathBuf,
-
     /// The N of the `ConnectionN` to open. Default: the first connection this scanner can open
     #[arg(long)]
     connection: Option<u32>,
 
-    /// IP address of the adapter
+    /// IP address of the OpENer adapter
     #[arg(long, default_value = "172.28.0.10")]
     host: String,
 
@@ -92,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     // ========= Read the EDS and pick the connection ============
-    let text = std::fs::read_to_string(&args.eds)?;
+    let text = read_to_string(SAMPLE_ADAPTER_EDS)?;
     let eds = Eds::parse(&text)?;
     let number: u32 = match args.connection {
         Some(number) => number,
@@ -129,8 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!(
         "Connection{number} ({}) from {}",
-        connection.name,
-        args.eds.display()
+        connection.name, SAMPLE_ADAPTER_EDS
     );
     println!("{request:#?}");
 
@@ -172,9 +162,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ========= 3. Exchange I/O ============
-    // The same loop as implicit-io, kept here so the example reads top to bottom. The outputs
+    // The same loop as opener-implicit, kept here so the example reads top to bottom. The outputs
     // never change, so the CIP sequence count stays put after the first packet
-    let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
+    let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
@@ -188,7 +178,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so a press is not lost between two iterations;
     // Ctrl+C ends the exchange and the connection is still closed below
-    let ctrl_c = tokio::signal::ctrl_c();
+    let ctrl_c = ctrl_c();
     tokio::pin!(ctrl_c);
     loop {
         tokio::select! {
@@ -240,7 +230,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
+            _ = sleep_until(tokio::time::Instant::from_std(deadline)) => {
                 eprintln!("the connection timed out: no input packet in time");
                 break;
             }

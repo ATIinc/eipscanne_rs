@@ -1,5 +1,5 @@
 //! Exchanges cyclic I/O with a SICK flexi-net over a class 1 connection; `main` is the five
-//! stages of `implicit-io` in order. The connection path is the device's electronic key, then
+//! stages of `opener-implicit` in order. The connection path is the device's electronic key, then
 //! configuration assembly 1278 (no configuration data), outputs to connection point 151 and
 //! inputs from connection point 152, 4 data bytes each way.
 //!
@@ -23,6 +23,7 @@
 //!
 //! `cargo run --example flexi-net-implicit -- --host 172.31.19.210`
 
+use std::array::from_fn;
 use std::cmp::Ordering;
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
@@ -30,6 +31,8 @@ use std::time::{Duration, Instant};
 use bilge::prelude::{u4, u7, u9};
 use clap::Parser;
 use tokio::net::UdpSocket;
+use tokio::signal::ctrl_c;
+use tokio::time::{interval, sleep_until};
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -55,7 +58,7 @@ use scanner::implicit::t2o::{
 };
 use scanner::session::Session;
 
-/// Who this scanner is in the Forward_Open (the same as `implicit-io`). Together they are the
+/// Who this scanner is in the Forward_Open (the same as `opener-implicit`). Together they are the
 /// connection triad, which only has to differ from other connections to the device; the
 /// Forward_Close repeats it.
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -224,7 +227,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= 3. Exchange I/O ============
     // The outputs go out every actual packet interval, the one the adapter granted: the count
     // only decides what they carry, so the connection keeps its timing between counts
-    let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
+    let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     // The encapsulation sequence number starts at random and advances every packet; the CIP
@@ -246,7 +249,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Counts output packets, one per RPI, to line up the printed sends and receives
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so no press is lost; the connection is still closed
-    let ctrl_c = tokio::signal::ctrl_c();
+    let ctrl_c = ctrl_c();
     tokio::pin!(ctrl_c);
     loop {
         tokio::select! {
@@ -307,7 +310,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
+            _ = sleep_until(tokio::time::Instant::from_std(deadline)) => {
                 eprintln!("the connection timed out: no input packet in time");
                 break;
             }
@@ -348,7 +351,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn count(step: u8) -> [u8; OUTPUT_SIZE as usize] {
     let counting = step / (COUNT_STEPS + 1);
     let offset = step % (COUNT_STEPS + 1);
-    std::array::from_fn(|index| {
+    from_fn(|index| {
         let start = COUNT_STEPS * index as u8;
         match (index as u8).cmp(&counting) {
             Ordering::Less => start + COUNT_STEPS,

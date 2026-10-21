@@ -1,10 +1,11 @@
 mod common;
 
+use std::io::{BufReader, Cursor};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{
@@ -13,8 +14,7 @@ use eipscanne_rs::cip::message::response::{
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::CommandSpecificData;
-use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
-use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, NO_ENCAPSULATION_TIMEOUT};
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
@@ -42,13 +42,13 @@ fn test_serialize_socket_addr_info_big_endian_fields() {
     let socket_addr_info = SocketAddrInfo::from(sample_address());
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     socket_addr_info.write(&mut writer).unwrap();
 
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
-    let byte_cursor = std::io::Cursor::new(expected_byte_array);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(expected_byte_array);
+    let mut buf_reader = BufReader::new(byte_cursor);
     let deserialized = SocketAddrInfo::read(&mut buf_reader).unwrap();
 
     assert_eq!(deserialized, socket_addr_info);
@@ -56,7 +56,7 @@ fn test_serialize_socket_addr_info_big_endian_fields() {
 }
 
 /// The data of a successful Forward_Open reply: connection ids, serial numbers and actual packet
-/// intervals echoed by the target (same exchange as tests/test_forward_open.rs)
+/// intervals echoed by the target (same exchange as `tests/test_forward_open.rs`)
 fn forward_open_success_body() -> Vec<CipByte> {
     vec![
         0xd4, 0xc3, 0xb2, 0xa1, 0x78, 0x56, 0x34, 0x12, 0x01, 0x00, 0x56, 0x01, 0x45, 0x23, 0x01,
@@ -124,8 +124,8 @@ fn test_response_assembly_with_trailing_socket_addr_item() {
         0x02, 0x08, 0xae, 0xc0, 0xa8, 0x01, 0x0a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes.clone());
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes.clone());
+    let mut buf_reader = BufReader::new(byte_cursor);
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 
     assert!(
@@ -140,7 +140,7 @@ fn test_response_assembly_with_trailing_socket_addr_item() {
 
     // Writing the parsed object must reproduce the packet, including the lengths and the item count
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     response_object.write(&mut writer).unwrap();
 
     assert_eq_hex!(raw_bytes, byte_array_buffer);
@@ -167,12 +167,11 @@ fn test_write_then_read_response() {
 
     let mut written_bytes: Vec<u8> = Vec::new();
     response
-        .write(&mut std::io::Cursor::new(&mut written_bytes))
+        .write(&mut Cursor::new(&mut written_bytes))
         .unwrap();
 
     // ...and the scanner reads it back as a response, with the lengths filled in
-    let read_back =
-        ResponseObjectAssembly::read(&mut std::io::Cursor::new(&written_bytes)).unwrap();
+    let read_back = ResponseObjectAssembly::read(&mut Cursor::new(&written_bytes)).unwrap();
 
     assert_eq!(read_back.header.length, Some(66));
     assert_eq!(read_back.response(), response.response());

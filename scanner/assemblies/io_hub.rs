@@ -3,7 +3,7 @@
 //! module, and the library frames the assemblies without modelling their content.
 //!
 //! Based on the ClearPath-IP Software Reference (Appendix H has the assembly tables):
-//! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60
+//! <https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60>
 
 pub mod input;
 pub mod output;

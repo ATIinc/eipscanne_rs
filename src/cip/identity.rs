@@ -1,8 +1,5 @@
 use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u4};
-
-use binrw::{
-    binrw, // #[binrw] attribute
-};
+use binrw::binrw;
 
 use crate::cip::types::{CipByte, CipShortString, CipUint};
 

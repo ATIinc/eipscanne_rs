@@ -26,6 +26,7 @@ pub mod fields;
 pub mod params;
 mod syntax;
 
+use std::any::type_name;
 use std::collections::BTreeMap;
 
 use assembly::AssemblyEntry;
@@ -169,7 +170,7 @@ impl Eds {
     /// (field 12). A number `T` cannot hold is an error naming where it comes from and `T`:
     /// `70000 is out of range for u16`, `Param3's default 70000 is out of range for u16`
     fn resolve_value<T: TryFrom<i64>>(&self, value: NumberOrParam) -> Result<T> {
-        let type_name = std::any::type_name::<T>();
+        let type_name = type_name::<T>();
         match value {
             NumberOrParam::Number(number) => T::try_from(number)
                 .map_err(|_| Error::Reference(format!("{number} is out of range for {type_name}"))),

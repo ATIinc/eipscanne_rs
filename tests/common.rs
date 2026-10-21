@@ -1,16 +1,15 @@
-//! Values shared by the integration tests, taken from the captures the tests are built on.
+//! Values shared by the integration tests, taken from the packet bytes the tests are built on.
 //! Each test binary compiles this module on its own and uses only some of it.
 // Cargo also compiles this file as an integration test target of its own, where nothing uses
 // these items.
 #![allow(dead_code)]
 
-use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::cip::types::{CipUint, CipUsint};
+use eipscanne_rs::cip::types::{CipUdint, CipUint, CipUsint};
 
-/// Session handle of the read-identity captures (Register Session, Identity, Unregister Session)
+/// Session handle of the read-identity packets (Register Session, Identity, Unregister Session)
 pub const IDENTITY_SESSION_HANDLE: CipUdint = 0x06;
 
-/// Session handle of the ClearLink assembly and I/O connection captures
+/// Session handle of the ClearLink assembly and I/O connection packets
 pub const CLEARLINK_IO_SESSION_HANDLE: CipUdint = 0x03;
 
 /// Assembly instances of the ClearLink

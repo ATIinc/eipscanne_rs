@@ -1,18 +1,18 @@
 [workspace]
-members = ["hex_test_macros", "scanner", "eds_parser", "eds_parser_derive"]
+members = ["hex_assert", "scanner", "eds_parser", "eds_parser_derive"]
 # `cargo run --example`, `cargo test` and friends cover the library, the scanner and the EDS parser without `-p`
 default-members = [".", "scanner", "eds_parser"]
 
 [package]
 name = "eipscanne_rs"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
 bilge = "0.5.0"
 binrw = "0.15.2"
-hex-test-macros = { version = "0.1.0", path = "hex_test_macros" }
+hex-assert = { version = "0.2.0", path = "hex_assert" }
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"

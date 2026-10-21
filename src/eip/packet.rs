@@ -56,12 +56,10 @@
 //! Register Session and Unregister Session packets have no items; their command specific data is
 //! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or nothing.
 
-use binrw::meta::WriteEndian;
-use binrw::{
-    BinWrite, // trait for writing
-    binread,
-    binwrite,
-};
+use std::io::{Cursor, Seek, Write};
+
+use binrw::meta::{EndianKind, WriteEndian};
+use binrw::{BinResult, BinWrite, Endian, binread, binwrite};
 
 use crate::cip::message::CipMessage;
 use crate::cip::message::response::MessageRouterResponse;
@@ -88,7 +86,7 @@ pub struct EncapsulationHeader {
 // ======= Start of EncapsulationHeader impl ========
 
 #[binrw::writer(writer: writer, endian)]
-fn header_length_writer(obj: &Option<CipUint>, arg0: u16) -> binrw::BinResult<()> {
+fn header_length_writer(obj: &Option<CipUint>, arg0: u16) -> BinResult<()> {
     if obj.is_some() {
         let existing_value = obj.unwrap();
         return existing_value.write_options(writer, endian, ());
@@ -197,22 +195,22 @@ impl EnIpPacket {
 }
 
 impl WriteEndian for EnIpPacket {
-    const ENDIAN: binrw::meta::EndianKind = binrw::meta::EndianKind::Endian(binrw::Endian::Little);
+    const ENDIAN: EndianKind = EndianKind::Endian(Endian::Little);
 }
 
 impl BinWrite for EnIpPacket {
     type Args<'a> = ();
 
-    fn write_options<W: std::io::Write + std::io::Seek>(
+    fn write_options<W: Write + Seek>(
         &self,
         writer: &mut W,
-        endian: binrw::Endian,
+        endian: Endian,
         _args: Self::Args<'_>,
-    ) -> binrw::BinResult<()> {
+    ) -> BinResult<()> {
         // Step 1: Serialize the `command_specific_data` field, its size is the Length of the header
         let mut command_specific_data_buffer = Vec::new();
         self.command_specific_data.write_options(
-            &mut std::io::Cursor::new(&mut command_specific_data_buffer),
+            &mut Cursor::new(&mut command_specific_data_buffer),
             endian,
             (),
         )?;

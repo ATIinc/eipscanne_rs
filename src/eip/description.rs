@@ -1,12 +1,6 @@
 use std::io::Cursor;
 
-use binrw::{
-    BinRead, // trait for reading
-    BinResult,
-    BinWrite, // trait for writing
-    Endian,
-    binrw, // #[binrw] attribute
-};
+use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
 
 use crate::cip::types::CipUint;
 

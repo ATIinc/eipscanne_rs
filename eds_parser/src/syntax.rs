@@ -11,9 +11,8 @@
 //!                16;
 //! ```
 
-use pest::Parser;
-use pest::Position;
 use pest::iterators::Pair;
+use pest::{Parser, Position};
 use pest_derive::Parser;
 
 use crate::error::{Error, Result};

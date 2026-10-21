@@ -1,5 +1,7 @@
 mod common;
 
+use std::io::{BufReader, Cursor};
+
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::identity::{
@@ -29,13 +31,13 @@ use common::IDENTITY_SESSION_HANDLE;
 fn test_deserialize_device_type() {
     let generic_device_type_bytes: Vec<CipByte> = vec![0x2b, 0x00];
     let generic_device_type =
-        DeviceType::read(&mut std::io::Cursor::new(generic_device_type_bytes)).unwrap();
+        DeviceType::read(&mut Cursor::new(generic_device_type_bytes)).unwrap();
     let expected_generic_device_type = DeviceType::GenericDevice;
     assert_eq!(expected_generic_device_type, generic_device_type);
 
     let unknown_device_type_bytes: Vec<CipByte> = vec![0x4b, 0x00];
     let unknown_device_type =
-        DeviceType::read(&mut std::io::Cursor::new(unknown_device_type_bytes)).unwrap();
+        DeviceType::read(&mut Cursor::new(unknown_device_type_bytes)).unwrap();
     let expected_unknown_device_type = DeviceType::Unknown(0x4b);
     assert_eq!(expected_unknown_device_type, unknown_device_type);
 }
@@ -107,7 +109,7 @@ fn test_serialize_new_identity_request() {
     let identity_request_packet = RequestObjectAssembly::new_identity(IDENTITY_SESSION_HANDLE);
 
     let mut identity_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut identity_byte_array);
+    let mut writer = Cursor::new(&mut identity_byte_array);
 
     identity_request_packet.write(&mut writer).unwrap();
 
@@ -154,8 +156,8 @@ fn test_deserialize_just_cip_identity_response() {
         0x43, 0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b,
     ];
 
-    let byte_cursor = std::io::Cursor::new(identity_response_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(identity_response_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let cip_identity_response = IdentityResponse::read(&mut buf_reader).unwrap();
 
@@ -238,8 +240,8 @@ fn test_deserialize_cip_identity_response() {
         0x3d, 0xff, 0x01, 0x09, 0x43, 0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b,
     ];
 
-    let byte_cursor = std::io::Cursor::new(identity_response_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(identity_response_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let cip_identity_response =
         MessageRouterResponse::read_args(&mut buf_reader, (message_router_response_length,))
@@ -362,8 +364,8 @@ fn test_deserialize_full_identity_response() {
         0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b,
     ];
 
-    let byte_cursor = std::io::Cursor::new(identity_response_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(identity_response_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let identity_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 

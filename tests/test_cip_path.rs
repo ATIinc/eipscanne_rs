@@ -1,10 +1,11 @@
 mod common;
 
-use binrw::{BinRead, BinWrite};
-
-use hex_test_macros::prelude::*;
+use std::io::{BufReader, Cursor};
 
 use bilge::prelude::u7;
+use binrw::{BinRead, BinResult, BinWrite};
+
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
 use eipscanne_rs::cip::path::{
@@ -20,14 +21,14 @@ use common::{
 
 fn write_path(path: &CipPath) -> Vec<u8> {
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
     path.write(&mut writer).unwrap();
     byte_array_buffer
 }
 
-fn read_path(raw_bytes: &[u8]) -> binrw::BinResult<CipPath> {
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+fn read_path(raw_bytes: &[u8]) -> BinResult<CipPath> {
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
     CipPath::read_le_args(&mut buf_reader, ((raw_bytes.len() / 2) as u8,))
 }
 
@@ -144,8 +145,8 @@ fn test_unsupported_segment_type_is_rejected() {
 fn test_segment_overrunning_the_path_length_is_rejected() {
     let raw_bytes: Vec<CipByte> = vec![0x21, 0x00, 0x06, 0x00];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // The declared length (1 word) ends in the middle of the 16-bit class segment
     assert!(CipPath::read_le_args(&mut buf_reader, (1,)).is_err());

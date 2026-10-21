@@ -1,6 +1,8 @@
+use std::io::{BufReader, Cursor};
+
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::types::{CipByte, CipShortString};
 
@@ -23,7 +25,7 @@ fn test_serialize_cip_string() {
 
     // Write the cip_string binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
 
     cip_string.write(&mut writer).unwrap();
 
@@ -45,8 +47,8 @@ fn test_deserialize_cip_string() {
     */
     let raw_bytes: Vec<CipByte> = vec![0x09, 0x43, 0x6c, 0x65, 0x61, 0x72, 0x4c, 0x69, 0x6e, 0x6b];
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let cip_string = CipShortString::read(&mut buf_reader).unwrap();
 

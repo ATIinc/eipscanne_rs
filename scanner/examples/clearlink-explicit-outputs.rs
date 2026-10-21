@@ -7,6 +7,7 @@
 use std::time::Duration;
 
 use clap::Parser;
+use tokio::time::sleep;
 
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
@@ -163,7 +164,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
     // ========= Check the output against the inputs ============
-    tokio::time::sleep(SETTLE_TIME).await;
+    sleep(SETTLE_TIME).await;
     println!("REQUESTING - GET inputs");
 
     let input_assembly_reply = send_request(

@@ -1,6 +1,7 @@
 //! The encapsulation session over TCP port 44818, shared by explicit and implicit messaging. It
 //! carries the Forward_Open and Forward_Close too, so it is opened first and closed last.
 
+use std::env::var_os;
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr};
 use std::time::Duration;
@@ -21,7 +22,7 @@ use crate::error::{Error, Result};
 
 /// HACK for Claude: with `EIP_DUMP` set, every encapsulation packet is printed to stderr as hex
 /// for `scripts/dissect.sh`, since the devcontainer cannot capture packets:
-/// `EIP_DUMP=1 cargo run --example implicit-io -- ...`
+/// `EIP_DUMP=1 cargo run --example opener-implicit -- ...`
 const DUMP_VARIABLE: &str = "EIP_DUMP";
 
 /// Size of the encapsulation header on the wire
@@ -167,7 +168,7 @@ impl Session {
 
 /// Prints `bytes` as hex after `direction` when `EIP_DUMP` is set (see `DUMP_VARIABLE`)
 fn print_packet_hex(direction: &str, bytes: &[u8]) {
-    if std::env::var_os(DUMP_VARIABLE).is_none() {
+    if var_os(DUMP_VARIABLE).is_none() {
         return;
     }
     let hex: Vec<String> = bytes.iter().map(|byte| format!("{byte:02x}")).collect();

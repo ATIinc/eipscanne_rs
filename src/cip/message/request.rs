@@ -3,11 +3,12 @@ use std::mem;
 
 use binrw::binrw;
 
-use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 use crate::cip::message::data::{CipData, CipDataOpt};
 use crate::cip::message::shared::{BYTES_IN_A_WORD, SIZE_OF_CIP_USINT};
 use crate::cip::path::{CipPath, write_path_with_word_size};
 use crate::cip::types::CipUsint;
+
+use super::shared::{SIZE_OF_SERVICE_CONTAINER, ServiceCode, ServiceContainer};
 
 #[binrw]
 #[derive(Debug, PartialEq)]
@@ -16,7 +17,7 @@ use crate::cip::types::CipUsint;
 pub struct RequestData {
     pub total_word_size: CipUsint,
     // override the total_word_size by seeking back before it
-    #[bw(seek_before = SeekFrom::Current(-1 * (mem::size_of::<CipUsint>() as i64)), write_with = write_path_with_word_size)]
+    #[bw(seek_before = SeekFrom::Current(-(mem::size_of::<CipUsint>() as i64)), write_with = write_path_with_word_size)]
     #[br(args(total_word_size))]
     pub cip_path: CipPath,
 

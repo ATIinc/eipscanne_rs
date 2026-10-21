@@ -1,8 +1,13 @@
-//! Opens a class 1 connection, exchanges cyclic I/O for a number of cycles and closes it; `main`
-//! is the five stages in order. The defaults match the OpENer sample (`tests/integration`), which
-//! echoes the outputs of assembly 150 as the inputs of assembly 100:
+//! Opens a class 1 connection to the OpENer sample, exchanges cyclic I/O for a number of cycles
+//! and closes it; `main` is the five stages in order. OpENer echoes the outputs of assembly 150 as
+//! the inputs of assembly 100.
 //!
-//! `cargo run --example implicit-io -- --host 172.28.0.10`
+//! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
+//!
+//! ```text
+//! tests/integration/start-opener.sh
+//! cargo run --example opener-implicit
+//! ```
 
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
@@ -10,6 +15,8 @@ use std::time::{Duration, Instant};
 use bilge::prelude::{u4, u9};
 use clap::Parser;
 use tokio::net::UdpSocket;
+use tokio::signal::ctrl_c;
+use tokio::time::{interval, sleep_until};
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -41,34 +48,20 @@ const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
 /// OpENer sample takes a run/idle header on the outputs only.
 const O2T_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Header32Bit;
 const T2O_REAL_TIME_FORMAT: RealTimeFormat = RealTimeFormat::Modeless;
+/// The OpENer sample's assembly instances
+const CONFIGURATION_INSTANCE: u8 = 151;
+const OUTPUT_INSTANCE: u8 = 150;
+const INPUT_INSTANCE: u8 = 100;
+/// Data bytes per packet, each way
+const DATA_SIZE: u16 = 32;
 
-/// Exchanges cyclic I/O with an EtherNet/IP adapter over a class 1 connection
+/// Exchanges cyclic I/O with the OpENer sample over a class 1 connection
 #[derive(Parser)]
 #[command(version)]
 struct Args {
-    /// IP address of the adapter
+    /// IP address of the OpENer adapter
     #[arg(long, default_value = "172.28.0.10")]
     host: String,
-
-    /// Assembly instance holding the configuration
-    #[arg(long, default_value_t = 151)]
-    configuration_instance: u8,
-
-    /// Assembly instance that consumes the outputs (O->T)
-    #[arg(long, default_value_t = 150)]
-    output_instance: u8,
-
-    /// Assembly instance that produces the inputs (T->O)
-    #[arg(long, default_value_t = 100)]
-    input_instance: u8,
-
-    /// Output bytes per packet
-    #[arg(long, default_value_t = 32)]
-    output_size: u16,
-
-    /// Input bytes per packet
-    #[arg(long, default_value_t = 32)]
-    input_size: u16,
 
     /// Requested packet interval of both directions, in milliseconds
     #[arg(long, default_value_t = 1000)]
@@ -88,16 +81,10 @@ impl Args {
     fn forward_open_request(&self) -> Result<ForwardOpenRequest, Box<dyn std::error::Error>> {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
-        let o2t_size: u16 = connection_size(
-            self.output_size,
-            TransportClass::Class1,
-            O2T_REAL_TIME_FORMAT,
-        );
-        let t2o_size: u16 = connection_size(
-            self.input_size,
-            TransportClass::Class1,
-            T2O_REAL_TIME_FORMAT,
-        );
+        let o2t_size: u16 =
+            connection_size(DATA_SIZE, TransportClass::Class1, O2T_REAL_TIME_FORMAT);
+        let t2o_size: u16 =
+            connection_size(DATA_SIZE, TransportClass::Class1, T2O_REAL_TIME_FORMAT);
 
         Ok(ForwardOpenRequest {
             // 5 ticks of 1024 ms until the request itself times out
@@ -125,9 +112,9 @@ impl Args {
                 .direction(Direction::Client)
                 .build(),
             connection_path: CipPath::new_assembly_connection(
-                self.configuration_instance,
-                self.output_instance,
-                self.input_instance,
+                CONFIGURATION_INSTANCE,
+                OUTPUT_INSTANCE,
+                INPUT_INSTANCE,
             ),
         })
     }
@@ -199,12 +186,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= 3. Exchange I/O ============
     // The outputs: the encapsulation sequence number starts at random and advances every
     // packet; the CIP sequence count advances when the outputs change, here every cycle
-    let mut send_timer = tokio::time::interval(Duration::from_micros(u64::from(
+    let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
     let mut cip_sequence_count: u16 = 0;
-    let mut outputs = vec![0u8; usize::from(args.output_size)];
+    let mut outputs = vec![0u8; usize::from(DATA_SIZE)];
 
     // The inputs: the last accepted numbers, and the deadline every accepted packet moves
     let timeout: Duration = input_timeout(&connection);
@@ -215,7 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // One loop drives both directions; production code may send outputs from their own task
     let mut cycle: u32 = 0;
     // One Ctrl+C future for the whole loop, so no press is lost; the connection is still closed
-    let ctrl_c = tokio::signal::ctrl_c();
+    let ctrl_c = ctrl_c();
     tokio::pin!(ctrl_c);
     loop {
         tokio::select! {
@@ -272,7 +259,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
 
-            _ = tokio::time::sleep_until(tokio::time::Instant::from_std(deadline)) => {
+            _ = sleep_until(tokio::time::Instant::from_std(deadline)) => {
                 eprintln!("the connection timed out: no input packet in time");
                 break;
             }

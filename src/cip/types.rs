@@ -1,6 +1,4 @@
-use binrw::{
-    binrw, // #[binrw] attribute
-};
+use binrw::binrw;
 
 // This file contains the basic types used in the CIP protocol
 pub type CipOctet = u8; // 8-bit value that indicates particular data type

@@ -1,10 +1,10 @@
 mod common;
 
-use std::io::Cursor;
+use std::io::{BufReader, Cursor};
 
 use binrw::{BinRead, BinWrite};
 
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::command::{
@@ -64,7 +64,7 @@ fn test_serialize_register_session_request() {
 
     // Write into a byte array
     let mut registration_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut registration_byte_array);
+    let mut writer = Cursor::new(&mut registration_byte_array);
 
     registration_packet.write(&mut writer).unwrap();
 
@@ -102,7 +102,7 @@ fn test_deserialize_register_session_response_packet_description() {
 
     let byte_cursor = Cursor::new(raw_response);
 
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let session_response = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
@@ -167,7 +167,7 @@ fn test_deserialize_register_session_response() {
 
     let byte_cursor = Cursor::new(raw_response);
 
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     // Read from buffered reader
     let session_response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
@@ -232,7 +232,7 @@ fn test_serialize_unregister_session_request() {
 
     // Write into a byte array
     let mut unregistration_byte_array: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut unregistration_byte_array);
+    let mut writer = Cursor::new(&mut unregistration_byte_array);
 
     unregistration_packet.write(&mut writer).unwrap();
 

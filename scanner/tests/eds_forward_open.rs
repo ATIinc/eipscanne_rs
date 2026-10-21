@@ -1,10 +1,13 @@
 //! The fixture end to end: file → `Eds` → `ForwardOpenRequest` → the Forward_Open bytes the library
 //! tests were built on.
 
-use binrw::BinWrite;
-use hex_test_macros::prelude::*;
+use std::io::Cursor;
 
 use bilge::prelude::u4;
+use binrw::BinWrite;
+
+use eds_parser::Eds;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -13,8 +16,6 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
-
-use eds_parser::Eds;
 use scanner::implicit::eds::forward_open_request;
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
@@ -40,7 +41,7 @@ fn request(eds: &Eds) -> ForwardOpenRequest {
 }
 
 #[test]
-fn the_exclusive_owner_connection_builds_the_captured_forward_open() {
+fn the_exclusive_owner_connection_builds_the_known_forward_open() {
     let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
 
     // The same bytes as the library's Forward_Open request test, where Wireshark's dissection
@@ -54,7 +55,7 @@ fn the_exclusive_owner_connection_builds_the_captured_forward_open() {
         0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
     ];
     let packet = RequestObjectAssembly::new_forward_open(0x03, request(&eds));
-    let mut bytes = std::io::Cursor::new(Vec::new());
+    let mut bytes = Cursor::new(Vec::new());
     packet.write(&mut bytes).unwrap();
     let bytes = bytes.into_inner();
 

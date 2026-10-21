@@ -4,6 +4,7 @@
 use std::io::Cursor;
 use std::net::SocketAddrV4;
 
+use bilge::prelude::u2;
 use binrw::BinWrite;
 use tokio::net::UdpSocket;
 
@@ -58,7 +59,7 @@ pub fn build_o2t_packet(
             RunIdleHeader::builder()
                 .run_idle(run)
                 .claim_output_ownership(false)
-                .ready_for_ownership_of_outputs(bilge::prelude::u2::new(0))
+                .ready_for_ownership_of_outputs(u2::new(0))
                 .build(),
         ),
         RealTimeFormat::Modeless | RealTimeFormat::ZeroLength | RealTimeFormat::Heartbeat => None,
@@ -98,7 +99,9 @@ pub async fn send_io_packet(
 
 #[cfg(test)]
 mod tests {
-    use hex_test_macros::prelude::*;
+    use core::array::from_fn;
+
+    use hex_assert::prelude::*;
 
     use eipscanne_rs::cip::connection_manager::parameters::ConnectionSizeType;
     use eipscanne_rs::cip::types::CipByte;
@@ -116,7 +119,7 @@ mod tests {
     }
 
     #[test]
-    fn packet_matches_the_capture() {
+    fn packet_matches_the_known_bytes() {
         // The first O->T packet of the library's I/O packet test (sequence 1, count 1, run,
         // outputs 0x00..0x1f)
         let mut expected_byte_array: Vec<CipByte> = vec![
@@ -126,7 +129,7 @@ mod tests {
             0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
         ];
         let connection = sample_connection();
-        let outputs: [u8; 32] = core::array::from_fn(|index| index as u8);
+        let outputs: [u8; 32] = from_fn(|index| index as u8);
 
         let raw = build(&connection, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
         let typed = build(&connection, CipDataOpt::Typed(Box::new(outputs)), true).unwrap();

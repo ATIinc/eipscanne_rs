@@ -1,13 +1,6 @@
 use std::io::{Seek, Write};
 
-use binrw::{
-    BinRead,
-    BinResult,
-    BinWrite, // #[binrw] attribute
-    Endian,
-    binrw,
-};
-
+use binrw::{BinRead, BinResult, BinWrite, Endian, binrw};
 //  Tried to use Deku but that didn't support nested structs: https://github.com/sharksforarms/deku
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u2, u3, u7};
 
@@ -303,10 +296,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::cip::object_ids::{
         ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
     };
+
+    use super::*;
 
     #[test]
     fn test_cip_path_accessors_and_sizes() {

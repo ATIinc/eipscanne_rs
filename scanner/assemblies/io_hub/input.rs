@@ -1,13 +1,12 @@
 //! The input assembly of a Teknic IO-HUB-4-E (instance 100, 228 bytes): what the hub reports.
 //! ClearPath-IP Software Reference, Appendix H, IO-HUB-4-E T2O Input Assembly:
-//! https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60
+//! <https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=60>
 //!
 //! Written from that table. Where the hub's EDS declares another type, the original line is
 //! commented out above the one that follows the EDS.
 
-use binrw::{BinRead, BinWrite, binrw};
-
 use bilge::prelude::{DebugBits, FromBits, TryFromBits, bitsize, u2, u3, u4, u10, u56};
+use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 
@@ -15,7 +14,7 @@ use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
 pub const INPUT_ASSEMBLY_INSTANCE: u8 = 0x64;
 
 /// Motor Statusword: the real-time status bits of one motor
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=49)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=49>)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -80,7 +79,7 @@ pub struct MotorStatusword {
 }
 
 /// Motor Shutdown Register: which shutdowns (faults) are present
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=45)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=45>)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -108,7 +107,7 @@ pub struct MotorShutdownRegister {
 }
 
 /// Motor Warning Register: non-critical warnings and why the last move was cancelled
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=47)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=47>)
 #[bitsize(32)]
 #[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
 #[br(map = u32::into)]
@@ -146,7 +145,7 @@ pub struct MotorWarningRegister {
 }
 
 /// AOI Error Code: what `move_type_ack` carries when a move is rejected (values of 100 and up)
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=43)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=43>)
 #[bitsize(8)]
 #[derive(TryFromBits, PartialEq, Copy, Clone, Debug)]
 pub enum AoiErrorCode {
@@ -274,7 +273,7 @@ pub struct DigitalInputs {
 }
 
 /// The electrical mode of one I/O point, a 4-bit nibble
-/// (https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=68)
+/// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=68>)
 #[bitsize(4)]
 #[derive(TryFromBits, PartialEq, Copy, Clone, Debug)]
 pub enum IoConfigMode {

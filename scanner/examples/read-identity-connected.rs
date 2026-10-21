@@ -1,13 +1,21 @@
 //! Opens a class 3 connection to an adapter's Message Router, reads its Identity object over the
 //! connection a number of times and closes it again.
 //!
-//! `cargo run --example read-identity-connected` reads the OpENer adapter at 172.28.0.10 (see
-//! tests/integration/README.md); `-- --host <adapter IP>` reads another adapter
+//! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
+//!
+//! ```text
+//! tests/integration/start-opener.sh
+//! cargo run --example read-identity-connected
+//! ```
+//!
+//! `-- --host <adapter IP>` reads another adapter.
 
 use std::time::Duration;
 
 use bilge::prelude::{u4, u9};
 use clap::Parser;
+use tokio::signal::ctrl_c;
+use tokio::time::interval;
 
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
@@ -123,10 +131,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Read the identity over the connection ============
     // A new request advances the CIP sequence count; the reply repeats it
-    let mut read_timer = tokio::time::interval(Duration::from_millis(u64::from(args.interval)));
+    let mut read_timer = interval(Duration::from_millis(u64::from(args.interval)));
     let mut cip_sequence_count: u16 = 0;
     // One Ctrl+C future for the whole loop, so no press is lost; the connection is still closed
-    let ctrl_c = tokio::signal::ctrl_c();
+    let ctrl_c = ctrl_c();
     tokio::pin!(ctrl_c);
     for read in 1..=args.reads {
         tokio::select! {

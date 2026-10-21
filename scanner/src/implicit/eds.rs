@@ -26,6 +26,7 @@ use eds_parser::Eds;
 use eds_parser::connection_manager::{
     ConnectionEntry, ConnectionParametersMask, RealTimeTransferFormat,
 };
+
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,

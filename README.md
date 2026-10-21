@@ -1,48 +1,21 @@
 # eipScanne-RS (Ethernet/IP Scanner - rust)
 
-`eipscanne_rs` reads and writes Ethernet/IP packets with [`binrw`](https://docs.rs/binrw) and [`bilge`](https://docs.rs/bilge): the encapsulation session and **explicit messaging**. Sockets and state belong to the caller.
+`eipscanne_rs` reads and writes EtherNet/IP packets with [`binrw`](https://docs.rs/binrw) and [`bilge`](https://docs.rs/bilge); its types follow Wireshark's names for the same bytes, and its [tests](./tests/) check them against known packet bytes.
 
-This was created by using the [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) library to communicate with an Ethernet/IP Adapter while monitoring the network traffic with Wireshark.
-
-The struct definitions/names heavily correlate to their Wireshark counterparts. The [tests](./tests/) hold the captured packets as hex dumps.
-
-## Workspace
-
-* `eipscanne_rs` (this directory): the packet library.
-* [`scanner`](./scanner/): sessions, explicit (unconnected and class 3 connected) and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
-* [`eds_parser`](./eds_parser/README.md): reads a device's EDS file into its params, assemblies and connections; the scanner's `implicit::eds` opens a connection from it (`eds-implicit-io`, `io-hub-implicit` examples).
-* `eds_parser_derive`: `#[derive(FromEntry)]` and `#[derive(FromField)]` for `eds_parser`'s entry structs and bitfields.
-* `hex_test_macros`: hex assertions for the byte-exact tests.
-
-`cargo build`, `cargo test` and `cargo run --example <name>` work from the root without `-p`.
-
-## Reading PDF references
-
-Reference PDFs (e.g. protocol specifications) can be kept in the git-ignored [docs](./docs/) directory. The devcontainer installs `poppler-utils` for working with them:
-
-* `scripts/pdf-to-text.sh <input.pdf> [output.txt]` extracts the text layer into a text file with a `=====PAGE n=====` marker per page, which is easier to search with `grep` than the PDF itself. PDFs whose text is drawn with embedded glyph fonts are decoded through the fonts' Unicode tables; scanned PDFs only give text if they have an OCR layer.
-* `pdftoppm` also lets Claude Code render PDF pages directly, which helps with tables and diagrams that don't survive text extraction.
-
-## Implicit messaging
-
-The library also covers class 1 implicit messaging (cyclic I/O): Forward_Open and Forward_Close, and the I/O packets on UDP port 2222. Its plan and ground rules live in [phases/](./phases/).
+* [`scanner`](./scanner/README.md): sessions, explicit and implicit messaging on top of the library, and the examples.
+* [`eds_parser`](./eds_parser/README.md): reads a device's EDS file into its params, assemblies and connections.
+* [`eds_parser_derive`](./eds_parser_derive/README.md): the derives of `eds_parser`'s entry structs and fields.
+* [`hex_assert`](./hex_assert/README.md): hex assertions for the byte-exact tests.
 
 ## Related projects
 
-Other implementations that were reviewed while planning the implicit messaging work. None of their code is used here, but they are useful references and possible interoperability test targets:
+None of their code is used here:
 
-* [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) (C++, [ATI fork](https://github.com/ATIinc/EIPScanner)) — used to capture the Wireshark traffic the packet types follow.
-* [OpENer](https://github.com/EIPStackGroup/OpENer) (C) — open source adapter used for the integration tests in [tests/integration](./tests/integration/).
-* [EthernetIpRust](https://github.com/CristianMori/EthernetIpRust) (Rust, Apache-2.0) — async scanner/adapter crates (`ethernetip-core`, `ethernetip-connections`) with class 1 I/O. Its `echo-adapter` sample could serve as a future loopback interoperability target.
-* [rseip](https://github.com/Joylei/eip-rs) (Rust, MIT) — explicit messaging client with class 3 connected messaging.
+* [EIPScanner](https://github.com/nimbuscontrols/EIPScanner) (C++, [ATI fork](https://github.com/ATIinc/EIPScanner)): the scanner whose Wireshark captures the packet types follow.
+* [OpENer](https://github.com/EIPStackGroup/OpENer) (C): the adapter of the integration tests in [tests/integration](./tests/integration/README.md).
+* [EthernetIpRust](https://github.com/CristianMori/EthernetIpRust) (Rust): async scanner and adapter crates with class 1 I/O.
+* [rseip](https://github.com/Joylei/eip-rs) (Rust): an explicit messaging client with class 3 connected messaging.
 
 ## License
 
-Licensed under either of
-
-* Apache License, Version 2.0 ([LICENSE-APACHE](./LICENSE-APACHE))
-* MIT license ([LICENSE-MIT](./LICENSE-MIT))
-
-at your option.
-
-Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
+Licensed under either of [Apache License, Version 2.0](./LICENSE-APACHE) or [MIT license](./LICENSE-MIT) at your option.

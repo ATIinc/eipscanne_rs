@@ -1,37 +1,37 @@
-//! Byte-exact tests of the ClearLink config assembly against captured packets
+//! Byte-exact tests of the ClearLink config assembly against known packet bytes
 
+use std::io::{BufReader, Cursor};
 use std::vec;
 
 use binrw::{BinRead, BinWrite};
 
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseData};
-use hex_test_macros::prelude::*;
+use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::cip::message::response::ResponseStatusCode;
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::cip::types::CipByte;
+use eipscanne_rs::cip::types::{CipByte, CipUdint};
 use eipscanne_rs::eip::command::{
     CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
 };
-use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
-use eipscanne_rs::eip::packet::EncapsulationHeader;
-use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
-use eipscanne_rs::object_assembly::ResponseObjectAssembly;
-
-use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
-use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::{
     CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
     NO_ENCAPSULATION_TIMEOUT,
 };
+use eipscanne_rs::eip::description::{CommonPacketDescriptor, CommonPacketItemId};
+use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
+use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use crate::assemblies::clearlink::config::{CONFIG_ASSEMBLY_INSTANCE, ConfigAssemblyObject};
 
-/// Session handle of the captures below
-const CAPTURE_SESSION_HANDLE: CipUdint = 0x03;
+/// Session handle of the packets below
+const PACKET_SESSION_HANDLE: CipUdint = 0x03;
 
 #[test]
 fn test_write_clearlink_config_assembly_object() {
@@ -108,7 +108,7 @@ fn test_write_clearlink_config_assembly_object() {
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00,
     ];
 
-    let provided_session_handle = CAPTURE_SESSION_HANDLE;
+    let provided_session_handle = PACKET_SESSION_HANDLE;
 
     let set_clearlink_config_message = MessageRouterRequest::new_data(
         ServiceCode::SetAttributeSingle,
@@ -120,16 +120,15 @@ fn test_write_clearlink_config_assembly_object() {
         Some(Box::new(ConfigAssemblyObject::default())),
     );
 
-    let set_clearlink_config_object =
-        eipscanne_rs::object_assembly::RequestObjectAssembly::new_send_rr_data(
-            provided_session_handle,
-            NO_ENCAPSULATION_TIMEOUT,
-            set_clearlink_config_message,
-        );
+    let set_clearlink_config_object = RequestObjectAssembly::new_send_rr_data(
+        provided_session_handle,
+        NO_ENCAPSULATION_TIMEOUT,
+        set_clearlink_config_message,
+    );
 
     // Write the object_assembly binary data to the buffer
     let mut byte_array_buffer: Vec<u8> = Vec::new();
-    let mut writer = std::io::Cursor::new(&mut byte_array_buffer);
+    let mut writer = Cursor::new(&mut byte_array_buffer);
 
     set_clearlink_config_object.write(&mut writer).unwrap();
 
@@ -188,7 +187,7 @@ fn test_read_clearlink_config_assembly_object_response() {
         header: EncapsulationHeader {
             command: EnIpCommand::SendRrData,
             length: Some(20),
-            session_handle: CAPTURE_SESSION_HANDLE,
+            session_handle: PACKET_SESSION_HANDLE,
             status_code: EncapsStatusCode::Success,
             sender_context: EMPTY_SENDER_CONTEXT,
             options: DEFAULT_ENCAPSULATION_OPTIONS,
@@ -218,8 +217,8 @@ fn test_read_clearlink_config_assembly_object_response() {
         }),
     };
 
-    let byte_cursor = std::io::Cursor::new(raw_bytes);
-    let mut buf_reader = std::io::BufReader::new(byte_cursor);
+    let byte_cursor = Cursor::new(raw_bytes);
+    let mut buf_reader = BufReader::new(byte_cursor);
 
     let response_object = ResponseObjectAssembly::read(&mut buf_reader).unwrap();
 

@@ -4,7 +4,7 @@
 //! frames the assemblies without modelling their content.
 //!
 //! Based on the ClearLink Ethernet/IP Object Reference:
-//! https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf
+//! <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf>
 
 pub mod config;
 pub mod input;

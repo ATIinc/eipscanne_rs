@@ -219,11 +219,11 @@ dependencies = [
 
 [[package]]
 name = "eipscanne_rs"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bilge",
  "binrw",
- "hex-test-macros",
+ "hex-assert",
  "pretty_assertions",
 ]
 
@@ -268,8 +268,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hex-test-macros"
-version = "0.1.0"
+name = "hex-assert"
+version = "0.2.0"
 dependencies = [
  "pretty-hex",
 ]
@@ -515,14 +515,14 @@ dependencies = [
 
 [[package]]
 name = "scanner"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bilge",
  "binrw",
  "clap",
  "eds_parser",
  "eipscanne_rs",
- "hex-test-macros",
+ "hex-assert",
  "pretty_assertions",
  "rand",
  "tokio",
