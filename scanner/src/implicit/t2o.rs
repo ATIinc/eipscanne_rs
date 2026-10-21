@@ -19,7 +19,7 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
-use crate::implicit::connection::{OpenConnection, data_len_matches_connection, data_size};
+use crate::implicit::connection::{ImplicitConnection, data_len_matches_connection, data_size};
 
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
@@ -55,7 +55,7 @@ const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 /// `Error::UnexpectedPacket` saying why it was discarded (`Error::Parse` if the data does not
 /// decode).
 pub fn accept_t2o_packet(
-    connection: &OpenConnection,
+    connection: &ImplicitConnection,
     last_sequence_number: Option<CipUdint>,
     packet: &EnIpIoPacket,
     from: SocketAddr,
@@ -132,7 +132,7 @@ pub fn accept_t2o_packet(
 
 /// How long the inputs may stop before the connection times out: the timeout multiplier times
 /// the T->O actual packet interval
-pub fn input_timeout(connection: &OpenConnection) -> Duration {
+pub fn input_timeout(connection: &ImplicitConnection) -> Duration {
     // The timeout multiplier as a factor: 4, 8, ... 512
     let multiplier: u32 = connection
         .request
@@ -176,7 +176,7 @@ mod tests {
 
     /// Accepts a 32-byte input packet numbered `received` after one numbered `last`
     fn accept_after(
-        connection: &OpenConnection,
+        connection: &ImplicitConnection,
         last: CipUdint,
         received: CipUdint,
     ) -> Result<(SequencedAddress, CipIoData)> {
@@ -189,7 +189,11 @@ mod tests {
     }
 
     /// Why a packet numbered `received` after one numbered `last` is discarded
-    fn discarded_after(connection: &OpenConnection, last: CipUdint, received: CipUdint) -> String {
+    fn discarded_after(
+        connection: &ImplicitConnection,
+        last: CipUdint,
+        received: CipUdint,
+    ) -> String {
         accept_after(connection, last, received)
             .unwrap_err()
             .to_string()

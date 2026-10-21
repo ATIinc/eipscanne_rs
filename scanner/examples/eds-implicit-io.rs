@@ -32,7 +32,7 @@ use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::error::Error;
-use scanner::implicit::connection::{forward_close, forward_open};
+use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::eds::{
     first_openable_connection, forward_open_request, o2t_real_time_format, t2o_real_time_format,
 };
@@ -150,7 +150,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The socket first: the adapter starts sending as soon as it has replied
     let socket = bind_io_socket().await?;
     println!("OPENING the connection");
-    let connection = forward_open(
+    let connection = forward_open_implicit(
         &mut session,
         request,
         o2t_real_time_format,
@@ -254,7 +254,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 4. Close the connection ============
     println!("CLOSING the connection");
-    forward_close(&mut session, &connection).await?;
+    forward_close(&mut session, &connection.request).await?;
 
     // ========= 5. End the session ============
     println!("UNREGISTERING the session");

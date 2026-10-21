@@ -9,7 +9,7 @@ The struct definitions/names heavily correlate to their Wireshark counterparts. 
 ## Workspace
 
 * `eipscanne_rs` (this directory): the packet library.
-* [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
+* [`scanner`](./scanner/): sessions, explicit (unconnected and class 3 connected) and implicit messaging on top of the library, and the [examples](./scanner/examples/README.md).
 * [`eds_parser`](./eds_parser/README.md): reads a device's EDS file into its params, assemblies and connections; the scanner's `implicit::eds` opens a connection from it (`eds-implicit-io`, `io-hub-implicit` examples).
 * `eds_parser_derive`: `#[derive(FromEntry)]` and `#[derive(FromField)]` for `eds_parser`'s entry structs and bitfields.
 * `hex_test_macros`: hex assertions for the byte-exact tests.

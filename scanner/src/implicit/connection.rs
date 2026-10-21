@@ -26,7 +26,7 @@ use crate::session::Session;
 ///
 /// Connection IDs and packet intervals come from `response`; the request's are only proposals.
 #[derive(Debug)]
-pub struct OpenConnection {
+pub struct ImplicitConnection {
     pub request: ForwardOpenRequest,
     pub response: ForwardOpenResponse,
     /// How the outputs signal run/idle (from the EDS file or device manual)
@@ -41,12 +41,12 @@ pub struct OpenConnection {
 
 /// Sends `request` (a Forward_Open or Large_Forward_Open, by the width of its connection
 /// parameters) and reads the adapter's reply.
-pub async fn forward_open(
+pub async fn forward_open_implicit(
     session: &mut Session,
     request: ForwardOpenRequest,
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
-) -> Result<OpenConnection> {
+) -> Result<ImplicitConnection> {
     let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
@@ -56,7 +56,7 @@ pub async fn forward_open(
     let response: ForwardOpenResponse = decode_reply(&reply)?;
 
     let target_ip: Ipv4Addr = session.peer_ip();
-    Ok(OpenConnection {
+    Ok(ImplicitConnection {
         o2t_endpoint: o2t_endpoint(&reply, target_ip),
         request,
         response,
@@ -66,24 +66,24 @@ pub async fn forward_open(
     })
 }
 
-/// Closes `connection` and returns the adapter's reply. A failed close is not fatal: the adapter
-/// drops the connection once it times out.
+/// Closes the connection `request` opened (class 1 or class 3) and returns the adapter's reply. A
+/// failed close is not fatal: the adapter drops the connection once it times out.
 pub async fn forward_close(
     session: &mut Session,
-    connection: &OpenConnection,
+    request: &ForwardOpenRequest,
 ) -> Result<ForwardCloseResponse> {
     // The connection is named by its Forward_Open's triad and path
-    let request = ForwardCloseRequest {
-        priority_time_tick: connection.request.priority_time_tick,
-        timeout_ticks: connection.request.timeout_ticks,
-        connection_triad: connection.request.connection_triad,
-        connection_path: connection.request.connection_path.clone(),
+    let close_request = ForwardCloseRequest {
+        priority_time_tick: request.priority_time_tick,
+        timeout_ticks: request.timeout_ticks,
+        connection_triad: request.connection_triad,
+        connection_path: request.connection_path.clone(),
     };
 
     let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_close(
             session.session_handle(),
-            request,
+            close_request,
         ))
         .await?;
     decode_reply(&reply)
@@ -163,7 +163,7 @@ pub(crate) mod test_support {
     use eipscanne_rs::cip::types::CipUdint;
     use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 
-    use super::OpenConnection;
+    use super::ImplicitConnection;
 
     pub const TARGET_IP: Ipv4Addr = Ipv4Addr::new(172, 28, 0, 10);
     /// The connection IDs of the library's I/O packet tests
@@ -217,7 +217,7 @@ pub(crate) mod test_support {
     }
 
     /// The connection `sample_request` opens, with the run/idle header on the outputs only
-    pub fn sample_connection() -> OpenConnection {
+    pub fn sample_connection() -> ImplicitConnection {
         let request = sample_request();
         let response = ForwardOpenResponse {
             o2t_network_connection_id: O2T_NETWORK_CONNECTION_ID,
@@ -229,7 +229,7 @@ pub(crate) mod test_support {
             application_reply: vec![],
         };
 
-        OpenConnection {
+        ImplicitConnection {
             request,
             response,
             o2t_real_time_format: RealTimeFormat::Header32Bit,

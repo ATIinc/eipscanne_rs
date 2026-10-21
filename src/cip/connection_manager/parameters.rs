@@ -103,7 +103,7 @@ pub enum TransportClass {
     /// One way (the end point only produces or only consumes), over UDP
     #[default]
     Class0 = 0,
-    /// Class 0 plus the sequence count: cyclic I/O, the only class the scanner opens
+    /// Class 0 plus the sequence count: cyclic I/O
     Class1 = 1,
     /// Request/reply over TCP: each packet the server consumes makes it reply at once
     Class2 = 2,

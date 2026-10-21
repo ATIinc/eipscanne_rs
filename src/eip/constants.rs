@@ -17,14 +17,18 @@ pub const EMPTY_SENDER_CONTEXT: [CipByte; SENDER_CONTEXT_SIZE] = [0x00; SENDER_C
 /// Options of the encapsulation header: none are defined, so always 0
 pub const DEFAULT_ENCAPSULATION_OPTIONS: CipUdint = 0;
 
-/// Interface handle of Send RR Data: always 0 for CIP
+/// Interface handle of Send RR Data and Send Unit Data: always 0 for CIP
 pub const CIP_INTERFACE_HANDLE: CipUdint = 0;
 
-/// Timeout of Send RR Data: 0 relies on the CIP timeout, which is always the case for CIP
+/// Timeout of Send RR Data: 0 relies on the CIP timeout, which is always the case for CIP. Send
+/// Unit Data always has 0.
 pub const NO_ENCAPSULATION_TIMEOUT: CipUint = 0;
 
 /// Items every Send RR Data packet starts with: an address item followed by a data item
 pub const SEND_RR_DATA_REQUIRED_ITEM_COUNT: CipUint = 2;
+
+/// Items of a Send Unit Data packet: the Connected Address Item followed by the Connected Data Item
+pub const SEND_UNIT_DATA_ITEM_COUNT: CipUint = 2;
 
 /// Protocol version requested by Register Session
 pub const ENCAPSULATION_PROTOCOL_VERSION: CipUint = 1;

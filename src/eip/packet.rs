@@ -32,6 +32,27 @@
 //!
 //! The one structural difference: Wireshark shows the CIP message as its own top-level tree, while
 //! here it is the data of the Unconnected Data Item, which is where its bytes are on the wire.
+//!
+//! A Send Unit Data packet (a class 3 connected message) has the same header and differs in its
+//! command specific data:
+//!
+//! ```text
+//! Wireshark                                      Rust
+//! ---------------------------------------------  --------------------------------------------------
+//!     Command Specific Data                        .command_specific_data: CommandSpecificData::SendUnitData
+//!         Interface Handle                           .interface_handle
+//!         Timeout                                    .timeout
+//!         Item Count                                 (not stored: always 2)
+//!             Type ID: Connected Address Item (0x00a1)
+//!                                                    .connected_address_item.type_id
+//!                 Length                               .connected_address_item.packet_length (4)
+//!                 Connection ID                      .connection_id
+//!             Type ID: Connected Data Item (0x00b1)  .connected_data_item.type_id
+//!                 Length                               .connected_data_item.packet_length
+//!                                                      (computed on write when None)
+//!                 CIP Sequence Count                 .cip_sequence_count
+//! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
+//! ```
 //! Register Session and Unregister Session packets have no items; their command specific data is
 //! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or nothing.
 
@@ -46,7 +67,7 @@ use crate::cip::message::CipMessage;
 use crate::cip::message::response::MessageRouterResponse;
 use crate::cip::types::{CipByte, CipUdint, CipUint};
 
-use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
+use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, UnitPacketData};
 use super::constants as eip_constants;
 
 #[binwrite]
@@ -142,9 +163,33 @@ impl EnIpPacket {
         )
     }
 
-    /// The Message Router response carried by the packet, if it carries one
+    /// A Send Unit Data packet carrying `message` on the connection `connection_id`
+    pub fn new_send_unit_data(
+        session_handle: CipUdint,
+        connection_id: CipUdint,
+        cip_sequence_count: CipUint,
+        message: impl Into<CipMessage>,
+    ) -> Self {
+        EnIpPacket::new(
+            EnIpCommand::SendUnitData,
+            session_handle,
+            CommandSpecificData::SendUnitData(UnitPacketData::new_connected(
+                connection_id,
+                cip_sequence_count,
+                message,
+            )),
+        )
+    }
+
+    /// The Message Router response carried by the packet (Send RR Data or Send Unit Data), if it
+    /// carries one
     pub fn response(&self) -> Option<&MessageRouterResponse> {
-        match &self.command_specific_data.as_send_rr_data()?.cip_message {
+        let cip_message: &CipMessage = match &self.command_specific_data {
+            CommandSpecificData::SendRrData(rr_data) => &rr_data.cip_message,
+            CommandSpecificData::SendUnitData(unit_data) => &unit_data.cip_message,
+            _ => return None,
+        };
+        match cip_message {
             CipMessage::Response(response) => Some(response),
             CipMessage::Request(_) => None,
         }
