@@ -4,7 +4,13 @@ use binrw::{BinRead, BinWrite};
 
 use hex_test_macros::prelude::*;
 
-use eipscanne_rs::cip::path::CipPath;
+use bilge::prelude::u7;
+
+use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, MajorRevisionCompatibility,
+    PathData,
+};
 use eipscanne_rs::cip::types::CipByte;
 
 use common::{
@@ -52,6 +58,78 @@ fn test_assembly_connection_path() {
 
     assert_eq_hex!(expected_byte_array, write_path(&path));
     assert_eq!(read_path(&expected_byte_array).unwrap(), path);
+}
+
+#[test]
+fn test_assembly_connection_path_with_electronic_key() {
+    /*
+    Connection Path: [Key], Assembly, Instance: 0x04fe, Connection Point: 0x97, Connection Point: 0x98
+        Path Segment: 0x34 (Electronic Key Segment)
+            Key Format: 4
+            Vendor ID: 0x0328
+            Device Type: 0x0064
+            Product Code: 11584
+            Compatibility: Bit Cleared
+            Major Revision: 1
+            Minor Revision: 1
+        Path Segment: 0x20 (8-Bit Class Segment)
+            Class: Assembly (0x04)
+        Path Segment: 0x25 (16-Bit Instance Segment)
+            Instance: 0x04fe
+        Path Segment: 0x2c (8-Bit Connection Point Segment)
+            Connection Point: 0x97
+        Path Segment: 0x2c (8-Bit Connection Point Segment)
+            Connection Point: 0x98
+
+    Hex Dump:
+    0000   34 04 28 03 64 00 40 2d 01 01 20 04 25 00 fe 04
+    0010   2c 97 2c 98
+    */
+    let expected_byte_array: Vec<CipByte> = vec![
+        0x34, 0x04, 0x28, 0x03, 0x64, 0x00, 0x40, 0x2d, 0x01, 0x01, 0x20, 0x04, 0x25, 0x00, 0xfe,
+        0x04, 0x2c, 0x97, 0x2c, 0x98,
+    ];
+
+    let path = CipPath::from_segments(vec![
+        LogicalPathSegment::new_electronic_key(ElectronicKey {
+            vendor_id: 808,
+            device_type: 100,
+            product_code: 11584,
+            major_revision_compatibility: MajorRevisionCompatibility::builder()
+                .major_revision(u7::new(1))
+                .compatibility(false)
+                .build(),
+            minor_revision: 1,
+        }),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
+        LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, 1278),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, 151),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, 152),
+    ]);
+    assert_eq!(path.word_len(), 10);
+
+    assert_eq_hex!(expected_byte_array, write_path(&path));
+    assert_eq!(read_path(&expected_byte_array).unwrap(), path);
+}
+
+#[test]
+fn test_electronic_key_compatibility_is_bit_7() {
+    // Major revision 1 with the compatibility bit set
+    let raw_bytes: Vec<CipByte> = vec![0x34, 0x04, 0x28, 0x03, 0x64, 0x00, 0x40, 0x2d, 0x81, 0x01];
+
+    let path = read_path(&raw_bytes).unwrap();
+    let [segment] = path.segments.as_slice() else {
+        panic!("expected one segment, got {:?}", path.segments);
+    };
+    let PathData::ElectronicKey(electronic_key) = segment.data else {
+        panic!("expected an electronic key, got {:?}", segment.data);
+    };
+
+    assert!(electronic_key.major_revision_compatibility.compatibility());
+    assert_eq!(
+        electronic_key.major_revision_compatibility.major_revision(),
+        u7::new(1)
+    );
 }
 
 #[test]

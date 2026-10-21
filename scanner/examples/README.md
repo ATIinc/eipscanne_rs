@@ -4,9 +4,10 @@ The examples live in the `scanner` crate, which also holds what they are built o
 encapsulation `session` (shared), `explicit` messaging (one request, one reply; `connected` for
 a class 3 connection) and `implicit` messaging (a class 1 I/O connection: `connection` plus one
 submodule per direction). `read-identity` and `clearlink-explicit-outputs` use `session` and
-`explicit`; `read-identity-connected` uses `session` and `explicit::connected`; `implicit-io` uses
-`session` and `implicit`. `eds-implicit-io` and `io-hub-implicit` also use `implicit::eds`, which
-writes the Forward_Open of a connection read from an EDS file by the `eds_parser` crate.
+`explicit`; `read-identity-connected` uses `session` and `explicit::connected`; `implicit-io` and
+`flexi-net-implicit` use `session` and `implicit`. `eds-implicit-io` and `io-hub-implicit` also
+use `implicit::eds`, which writes the Forward_Open of a connection read from an EDS file by the
+`eds_parser` crate.
 
 ## Run Examples
 
@@ -24,6 +25,7 @@ lists the scanner among the workspace's default members, so no `-p scanner` is n
 | `implicit-io` | OpENer or any class 1 adapter | implicit | outputs of the adapter |
 | `eds-implicit-io` | OpENer or any class 1 adapter, from its EDS file | implicit | outputs of the adapter, with `--run` |
 | `io-hub-implicit` | Teknic IO-HUB-4-E, from its EDS file | implicit | no (every output off) |
+| `flexi-net-implicit` | SICK flexi-net | implicit | inputs of the safety logic |
 
 Every example is a single file. The device assemblies they use live outside the library in
 `scanner/assemblies/`: `clearlink.rs` (config, input, output) and `io_hub.rs` (input, output),
@@ -209,6 +211,25 @@ Opens the IO-HUB-4-E's connection from the hub's EDS, then decodes every input p
 ```
 cargo run --example io-hub-implicit -- --eds docs/IO-HUB-4-E_EDS_File.eds --host <ip> --motor 0
 ```
+
+### flexi-net-implicit
+
+The stages of `implicit-io` against a SICK flexi-net, with the device's connection fixed in
+constants: configuration assembly 1278 (no configuration data, so a 16-bit instance segment),
+outputs to connection point 151 and inputs from connection point 152, 4 data bytes each way, a
+run/idle header on the outputs only. The connection path starts with the electronic key. The outputs
+count slowly, with the run flag set: one byte at a time, byte `i` goes from `10 * i` to
+`10 * i + 10` and holds it while the next byte counts, one step every `--count-delay`, while
+packets keep going out every RPI. Every packet sent or received prints a line numbered by the
+packet count, and every step of the count prints a `COUNT` line. After the last count has been
+held for one delay, or on Ctrl+C, one packet sets every byte back to 0 (a `ZERO` line) and the
+connection closes. A longer test is a longer `--count-delay`.
+
+* `cargo run --example flexi-net-implicit -- --host 172.31.19.210`
+* `cargo run --example flexi-net-implicit -- --count-delay 3000`
+
+Flags: `--host` (`172.31.19.210` by default), `--rpi` (milliseconds, both directions, 20 by
+default), `--count-delay` (milliseconds, rounded up to whole RPIs, 1000 by default).
 
 ### Writing a device's assemblies
 
