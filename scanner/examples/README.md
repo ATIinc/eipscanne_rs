@@ -1,6 +1,6 @@
 # Examples
 
-The examples of the [`scanner`](../README.md) crate, each a single file. Run one from the
+The examples of the [`scanner`](../) crate, each a single file. Run one from the
 repository root: `cargo run --example <name>`; `-- --help` lists its flags.
 
 | Example | Device | Messaging | Moves hardware |
@@ -16,7 +16,7 @@ repository root: `cargo run --example <name>`; `-- --help` lists its flags.
 
 The identity and OpENer examples default to `172.28.0.10`, the adapter
 `tests/integration/start-opener.sh` starts on the host
-([tests/integration](../../tests/integration/README.md)). Device assemblies live in
+([tests/integration](../../tests/integration/)). Device assemblies live in
 `scanner/assemblies/`.
 
 ## Identity

@@ -1,7 +1,7 @@
 # Tests
 
 `cargo test` from the repository root runs the byte-exact packet tests here, one file per packet
-type. [integration](./integration/README.md) runs the examples against an OpENer adapter.
+type. [integration](./integration/) runs the examples against an OpENer adapter.
 
 ## Packet tests
 
@@ -12,10 +12,10 @@ files, such as session handles and connection IDs, live in `common.rs`.
 
 The bytes are known packet bytes, from one of:
 
-* Wireshark on the host, sniffing a scanner and adapter (the Identity packets come from
-  EIPScanner's Identity example): select the packet and copy it as a hex dump
-* `EIP_DUMP=1 cargo run --example <name>` in the devcontainer, which cannot sniff: every
-  encapsulation packet the scanner sends or receives is printed to stderr as hex
+* sniffed with Wireshark (the Identity packets come from EIPScanner's Identity example): copy the
+  packet as a hex dump. In the devcontainer: `sudo tshark -i any -f "port 44818 or port 2222"`
+* `EIP_DUMP=1 cargo run --example <name>`: every encapsulation packet the scanner sends or
+  receives is printed to stderr as hex
 * written by hand
 
 `scripts/dissect.sh` prints the dissection with `tshark`, which the devcontainer installs:

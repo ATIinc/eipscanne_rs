@@ -5,7 +5,9 @@
 	},
 	"initializeCommand": ".devcontainer/initializeHost.sh",
 	"runArgs": [
-		// Host network namespace, so EtherNet/IP devices on the host's networks are directly reachable
+		// Host network namespace, so EtherNet/IP devices on the host's networks are directly reachable. On macOS,
+		// enable host networking in Docker Desktop (Settings → Resources → Network) for implicit messaging with
+		// devices on the Mac's network
 		"--network=host",
 		// GH_TOKEN for gh (and git, via the host gitconfig's gh credential helper), see the DANGER note in initializeHost.sh
 		"--env-file",

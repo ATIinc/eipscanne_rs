@@ -7,4 +7,4 @@ The scanner side of EtherNet/IP, built on `eipscanne_rs`, written to be read top
 * `implicit`: a class 1 I/O connection, `connection` plus one module per direction (`o2t`, `t2o`); `implicit::eds` opens one from an EDS file read by `eds_parser`.
 * `error`: the one error type of every fallible call.
 
-The [examples](./examples/README.md) run from the repository root with `cargo run --example <name>`; [tests/integration](../tests/integration/README.md) runs them against an OpENer adapter.
+The [examples](./examples/) run from the repository root with `cargo run --example <name>`; [tests/integration](../tests/integration/) runs them against an OpENer adapter.

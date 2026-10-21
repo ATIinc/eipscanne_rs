@@ -1,6 +1,6 @@
 # eds_parser_derive
 
-The derives of [`eds_parser`](../eds_parser/README.md)'s two reading traits.
+The derives of [`eds_parser`](../eds_parser/)'s two reading traits.
 
 ## FromEntry
 
