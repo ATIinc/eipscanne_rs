@@ -14,7 +14,7 @@ use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_I
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 // The ClearLink assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -103,7 +103,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
-    let mut session = Session::register((cli_args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (cli_args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
     // ========= Write the ClearLink Config ============

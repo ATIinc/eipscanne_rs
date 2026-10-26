@@ -35,7 +35,7 @@ use eipscanne_rs::eip::packet::EnIpPacket;
 use scanner::explicit::connected::{ExplicitConnection, forward_open_explicit, send_request};
 use scanner::explicit::decode_reply;
 use scanner::implicit::connection::forward_close;
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Who this scanner is in the Forward_Open; the Forward_Close repeats it
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -116,7 +116,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= Open the connection ============
     println!("OPENING the connection");

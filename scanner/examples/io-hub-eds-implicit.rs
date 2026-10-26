@@ -42,7 +42,7 @@ use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -135,7 +135,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied

@@ -13,7 +13,7 @@ use clap::Parser;
 
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::read_identity;
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Reads the Identity object of an EtherNet/IP adapter
 #[derive(Parser)]
@@ -30,7 +30,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING registration");
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
     println!("  session handle {:#010x}\n", session.session_handle());
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 

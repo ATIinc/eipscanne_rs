@@ -27,12 +27,25 @@ const DUMP_VARIABLE: &str = "EIP_DUMP";
 /// Size of the encapsulation header on the wire
 const ENCAPSULATION_HEADER_LEN: usize = 24;
 
-/// How long connecting to the adapter may take: a wrong or unreachable address fails after this
-/// instead of after the operating system gives up (minutes on Linux)
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// How a [`Session`] waits on the adapter
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionConfig {
+    /// How long connecting to the adapter may take: a wrong or unreachable address fails after
+    /// this instead of after the operating system gives up (minutes on Linux)
+    pub connect_timeout: Duration,
+    /// How long the adapter may take to answer one request
+    pub reply_timeout: Duration,
+}
 
-/// How long the adapter may take to answer one request
-pub const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
+impl Default for SessionConfig {
+    /// 5 s to connect, 5 s per reply
+    fn default() -> Self {
+        SessionConfig {
+            connect_timeout: Duration::from_secs(5),
+            reply_timeout: Duration::from_secs(5),
+        }
+    }
+}
 
 /// A registered encapsulation session with one adapter
 #[derive(Debug)]
@@ -40,6 +53,7 @@ pub struct Session {
     stream: TcpStream,
     session_handle: CipUdint,
     peer_ip: Ipv4Addr,
+    config: SessionConfig,
 }
 
 // ======= Start of Session impl ========
@@ -47,13 +61,13 @@ pub struct Session {
 impl Session {
     /// Stage 1: connects to the adapter and registers a session with it. Fails with
     /// [`Error::Timeout`] when the adapter does not accept the connection within
-    /// [`CONNECT_TIMEOUT`] or does not answer within [`REPLY_TIMEOUT`].
-    pub async fn register(address: impl ToSocketAddrs) -> Result<Session> {
-        let stream = timeout(CONNECT_TIMEOUT, TcpStream::connect(address))
+    /// `config.connect_timeout` or does not answer within `config.reply_timeout`.
+    pub async fn register(address: impl ToSocketAddrs, config: SessionConfig) -> Result<Session> {
+        let stream = timeout(config.connect_timeout, TcpStream::connect(address))
             .await
             .map_err(|_| Error::Timeout {
                 waiting_for: "the TCP connection",
-                after: CONNECT_TIMEOUT,
+                after: config.connect_timeout,
             })??;
         let peer_ip = match stream.peer_addr()?.ip() {
             IpAddr::V4(ip) => ip,
@@ -64,6 +78,7 @@ impl Session {
             stream,
             session_handle: 0,
             peer_ip,
+            config,
         };
         session
             .send(&RequestObjectAssembly::new_registration())
@@ -95,14 +110,15 @@ impl Session {
 
     /// Reads one encapsulation packet: the header, then its Length in bytes. Fails on a
     /// non-success encapsulation status, and with [`Error::Timeout`] when the whole packet has
-    /// not arrived within [`REPLY_TIMEOUT`]; the session is unusable after a timeout, since part
-    /// of the packet may have been read.
+    /// not arrived within the configured reply timeout; the session is unusable after a timeout,
+    /// since part of the packet may have been read.
     pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
-        timeout(REPLY_TIMEOUT, self.read_packet())
+        let reply_timeout: Duration = self.config.reply_timeout;
+        timeout(reply_timeout, self.read_packet())
             .await
             .map_err(|_| Error::Timeout {
                 waiting_for: "a reply",
-                after: REPLY_TIMEOUT,
+                after: reply_timeout,
             })?
     }
 
