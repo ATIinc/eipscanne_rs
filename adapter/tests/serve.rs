@@ -65,7 +65,12 @@ impl Handler for TestDevice {
                 })))
             }
             (ASSEMBLY_CLASS, OUTPUT_INSTANCE, Some(DATA_ATTRIBUTE)) => {
-                Ok(CipDataOpt::Typed(Box::new(*self.outputs.lock().unwrap())))
+                Ok(CipDataOpt::Typed(Box::new(
+                    *self
+                        .outputs
+                        .lock()
+                        .expect("nothing panics while holding the outputs lock"),
+                )))
             }
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
@@ -80,7 +85,10 @@ impl Handler for TestDevice {
     ) -> Result<(), ResponseStatusCode> {
         match (class, instance, attribute) {
             (ASSEMBLY_CLASS, OUTPUT_INSTANCE, Some(DATA_ATTRIBUTE)) => {
-                *self.outputs.lock().unwrap() = decode(data)?;
+                *self
+                    .outputs
+                    .lock()
+                    .expect("nothing panics while holding the outputs lock") = decode(data)?;
                 Ok(())
             }
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
@@ -90,8 +98,13 @@ impl Handler for TestDevice {
 
 /// Serves a fresh device on an ephemeral port and returns the port
 async fn start_adapter() -> u16 {
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
-    let port = listener.local_addr().unwrap().port();
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let port = listener
+        .local_addr()
+        .expect("a bound listener has a local address")
+        .port();
     let device = TestDevice {
         outputs: Mutex::new(Outputs { word: 0 }),
     };
@@ -102,7 +115,7 @@ async fn start_adapter() -> u16 {
 async fn register(port: u16) -> Session {
     Session::register((Ipv4Addr::LOCALHOST, port), SessionConfig::default())
         .await
-        .unwrap()
+        .expect("the adapter answers Register Session")
 }
 
 /// The General Status a refused request was answered with
@@ -116,7 +129,9 @@ fn general_status(result: scanner::error::Result<EnIpPacket>) -> ResponseStatusC
 /// The bytes of `packet` on the wire
 fn bytes_of(packet: &EnIpPacket) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
-    packet.write(&mut bytes).unwrap();
+    packet
+        .write(&mut bytes)
+        .expect("encoding into a Vec cannot fail");
     bytes.into_inner()
 }
 
@@ -132,7 +147,9 @@ fn output_path() -> CipPath {
 async fn get_and_set_through_the_scanner() {
     let mut session = register(start_adapter().await).await;
 
-    let identity = read_identity(&mut session).await.unwrap();
+    let identity = read_identity(&mut session)
+        .await
+        .expect("the device serves the Identity object");
     assert_eq!(
         identity.product_name,
         CipShortString::from(PRODUCT_NAME.to_string())
@@ -145,7 +162,7 @@ async fn get_and_set_through_the_scanner() {
         Some(Box::new(Outputs { word: 0xdead_beef })),
     )
     .await
-    .unwrap();
+    .expect("the device serves the output assembly's data attribute");
 
     let reply = send_request(
         &mut session,
@@ -154,13 +171,16 @@ async fn get_and_set_through_the_scanner() {
         None,
     )
     .await
-    .unwrap();
+    .expect("the device serves the output assembly's data attribute");
     assert_eq!(
-        decode_reply::<Outputs>(&reply).unwrap(),
+        decode_reply::<Outputs>(&reply).expect("the reply carries the Outputs the Set wrote"),
         Outputs { word: 0xdead_beef }
     );
 
-    session.unregister().await.unwrap();
+    session
+        .unregister()
+        .await
+        .expect("the connection is open until Unregister Session");
 }
 
 #[tokio::test]
@@ -224,7 +244,9 @@ async fn refusals_are_general_statuses() {
     );
 
     // The session survives every refusal
-    read_identity(&mut session).await.unwrap();
+    read_identity(&mut session)
+        .await
+        .expect("refusals leave the session open");
 }
 
 #[tokio::test]
@@ -234,24 +256,37 @@ async fn each_connection_has_its_own_session() {
     let mut second = register(port).await;
     assert_ne!(first.session_handle(), second.session_handle());
 
-    read_identity(&mut first).await.unwrap();
-    read_identity(&mut second).await.unwrap();
+    read_identity(&mut first)
+        .await
+        .expect("the device serves the Identity object");
+    read_identity(&mut second)
+        .await
+        .expect("the device serves the Identity object");
 }
 
 #[tokio::test]
 async fn packets_are_read_whole_however_they_arrive() {
     let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, start_adapter().await))
         .await
-        .unwrap();
+        .expect("the listener is bound before serve starts");
 
     // Register Session split in two writes
     let register = bytes_of(&RequestObjectAssembly::new_registration());
-    stream.write_all(&register[..10]).await.unwrap();
-    stream.flush().await.unwrap();
-    stream.write_all(&register[10..]).await.unwrap();
+    stream
+        .write_all(&register[..10])
+        .await
+        .expect("the adapter keeps the connection open until Unregister Session");
+    stream
+        .flush()
+        .await
+        .expect("the adapter keeps the connection open until Unregister Session");
+    stream
+        .write_all(&register[10..])
+        .await
+        .expect("the adapter keeps the connection open until Unregister Session");
     let session_handle = read_packet(&mut stream)
         .await
-        .unwrap()
+        .expect("the adapter answers Register Session")
         .header
         .session_handle;
 
@@ -260,18 +295,32 @@ async fn packets_are_read_whole_however_they_arrive() {
     requests.extend(bytes_of(&RequestObjectAssembly::new_identity(
         session_handle,
     )));
-    stream.write_all(&requests).await.unwrap();
+    stream
+        .write_all(&requests)
+        .await
+        .expect("the adapter keeps the connection open until Unregister Session");
     for _ in 0..2 {
-        let reply = read_packet(&mut stream).await.unwrap();
-        assert!(reply.response().unwrap().is_success());
+        let reply = read_packet(&mut stream)
+            .await
+            .expect("the device serves the Identity object");
+        assert!(
+            reply
+                .response()
+                .expect("a Send RR Data reply carries a Message Router response")
+                .is_success()
+        );
     }
 }
 
 /// The header of a reply that only carries an encapsulation status
 async fn read_status_reply(stream: &mut TcpStream) -> EncapsulationHeader {
     let mut bytes = [0u8; 24];
-    stream.read_exact(&mut bytes).await.unwrap();
-    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes)).unwrap();
+    stream
+        .read_exact(&mut bytes)
+        .await
+        .expect("the adapter answers a refused packet with a bare header");
+    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes))
+        .expect("any 24 bytes parse as a header");
     assert_eq!(header.length, Some(0));
     header
 }
@@ -280,7 +329,7 @@ async fn read_status_reply(stream: &mut TcpStream) -> EncapsulationHeader {
 async fn encapsulation_refusals_keep_the_connection() {
     let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, start_adapter().await))
         .await
-        .unwrap();
+        .expect("the listener is bound before serve starts");
 
     // A request before Register Session
     let unregistered: CipUdint = 0x1234;
@@ -289,7 +338,7 @@ async fn encapsulation_refusals_keep_the_connection() {
             unregistered,
         )))
         .await
-        .unwrap();
+        .expect("the adapter keeps the connection open until Unregister Session");
     let header = read_status_reply(&mut stream).await;
     assert_eq!(header.command, EnIpCommand::SendRrData);
     assert_eq!(header.status_code, EncapsStatusCode::InvalidSessionHandle);
@@ -299,7 +348,10 @@ async fn encapsulation_refusals_keep_the_connection() {
     list_identity[..2].copy_from_slice(&0x0063_u16.to_le_bytes());
     list_identity[2..4].copy_from_slice(&0_u16.to_le_bytes());
     list_identity.truncate(24);
-    stream.write_all(&list_identity).await.unwrap();
+    stream
+        .write_all(&list_identity)
+        .await
+        .expect("the adapter keeps the connection open after a refusal");
     let header = read_status_reply(&mut stream).await;
     assert_eq!(header.command, EnIpCommand::ListIdentity);
     assert_eq!(header.status_code, EncapsStatusCode::UnsupportedCommand);
@@ -308,15 +360,22 @@ async fn encapsulation_refusals_keep_the_connection() {
     stream
         .write_all(&bytes_of(&RequestObjectAssembly::new_registration()))
         .await
-        .unwrap();
-    let reply = read_packet(&mut stream).await.unwrap();
+        .expect("the adapter keeps the connection open after a refusal");
+    let reply = read_packet(&mut stream)
+        .await
+        .expect("the adapter answers Register Session");
     assert_eq!(reply.header.status_code, EncapsStatusCode::Success);
 }
 
 #[tokio::test]
 async fn dropping_serve_closes_its_connections() {
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
-    let port = listener.local_addr().unwrap().port();
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let port = listener
+        .local_addr()
+        .expect("a bound listener has a local address")
+        .port();
     let device = TestDevice {
         outputs: Mutex::new(Outputs { word: 0 }),
     };
@@ -324,15 +383,23 @@ async fn dropping_serve_closes_its_connections() {
 
     let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
         .await
-        .unwrap();
+        .expect("the listener is bound before serve starts");
     stream
         .write_all(&bytes_of(&RequestObjectAssembly::new_registration()))
         .await
-        .unwrap();
-    read_packet(&mut stream).await.unwrap();
+        .expect("the adapter keeps the connection open until Unregister Session");
+    read_packet(&mut stream)
+        .await
+        .expect("the adapter answers Register Session");
 
     server.abort();
     let _ = server.await;
     let mut byte = [0u8; 1];
-    assert_eq!(stream.read(&mut byte).await.unwrap(), 0);
+    assert_eq!(
+        stream
+            .read(&mut byte)
+            .await
+            .expect("a connection closed by the adapter reads EOF"),
+        0
+    );
 }
