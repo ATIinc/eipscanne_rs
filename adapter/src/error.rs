@@ -1,4 +1,4 @@
-//! The one error type of the adapter, from a broken socket to a packet that does not parse.
+//! The one error type of the adapter.
 
 use std::fmt;
 

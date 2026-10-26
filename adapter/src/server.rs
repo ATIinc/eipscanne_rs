@@ -1,16 +1,11 @@
-//! The explicit messaging server: one task per connection, one session per connection, and every
-//! Get_Attribute and Set_Attribute request answered by the handler.
-//!
-//! A connection serves Register Session, Unregister Session and Send RR Data; any other command
-//! is answered with an encapsulation status and the connection stays open. It ends when the
-//! scanner unregisters or closes it, or when its bytes stop making packets.
+//! The explicit messaging server: one task and one session per connection.
 
 use std::io::{Cursor, ErrorKind};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicU32, Ordering};
 
 use binrw::BinRead;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinSet;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
@@ -27,18 +22,20 @@ use crate::handler::Handler;
 use crate::packet::{read_frame, request_of, write_header, write_packet};
 use crate::reply;
 
-/// Serves every scanner that connects to `listener` until accepting fails. Each connection runs
-/// in its own task with its own session handle.
+/// Serves every connecting scanner until accepting fails; dropping it closes every connection
 pub async fn serve(listener: TcpListener, handler: Arc<dyn Handler>) -> Result<()> {
-    let next_session_handle = AtomicU32::new(1);
+    let mut connections = JoinSet::new();
+    let mut next_session_handle: CipUdint = 1;
     loop {
         let (stream, _) = listener.accept().await?;
-        let session_handle = next_session_handle.fetch_add(1, Ordering::Relaxed);
+        let session_handle = next_session_handle;
+        next_session_handle = next_session_handle.wrapping_add(1);
         let handler = Arc::clone(&handler);
-        tokio::spawn(async move {
-            // The connection's end is the scanner's business; there is no one to report it to
+        connections.spawn(async move {
+            // A connection's end has no one to report to
             let _ = serve_connection(stream, session_handle, handler.as_ref()).await;
         });
+        while connections.try_join_next().is_some() {}
     }
 }
 
@@ -55,7 +52,7 @@ async fn serve_connection(
             frame => frame?,
         };
 
-        // Unregister Session has no reply: the adapter closes the connection
+        // Unregister Session has no reply
         if header.command == EnIpCommand::UnRegisterSession {
             return Ok(());
         }
@@ -128,8 +125,7 @@ fn respond(request: &MessageRouterRequest, handler: &dyn Handler) -> MessageRout
     }
 }
 
-/// Hands a Get or Set to the handler. The service decides whether the path names an attribute:
-/// the Single services need one, the All services must not have one.
+/// Hands a Get or Set to the handler; Single services need an attribute, All services none
 fn handle(
     service: ServiceCode,
     request: &MessageRouterRequest,
@@ -140,14 +136,14 @@ fn handle(
 
     match (service, attribute) {
         (ServiceCode::GetAttributeAll, None) | (ServiceCode::GetAttributeSingle, Some(_)) => {
-            Ok(CipDataOpt::Typed(handler.get(class, instance, attribute)?))
+            handler.handle_get_attribute(class, instance, attribute)
         }
         (ServiceCode::SetAttributeAll, None) | (ServiceCode::SetAttributeSingle, Some(_)) => {
             // Data read from the wire is always raw
             let CipDataOpt::Raw(data) = &request.request_data.additional_data else {
                 return Err(ResponseStatusCode::InvalidParameterValue);
             };
-            handler.set(class, instance, attribute, data)?;
+            handler.handle_set_attribute(class, instance, attribute, data)?;
             Ok(CipDataOpt::Raw(vec![]))
         }
         (
@@ -161,8 +157,7 @@ fn handle(
     }
 }
 
-/// The class, instance and optional attribute of a `[class, instance]` or
-/// `[class, instance, attribute]` path, of either width; `None` for any other path
+/// The class, instance and optional attribute of a logical path
 fn logical_ids(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
     match path.segments.as_slice() {
         [class, instance] => Some((
@@ -179,7 +174,7 @@ fn logical_ids(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
     }
 }
 
-/// The value of a segment of `logical_segment_type`; `None` for another type or an electronic key
+/// The value of a segment of `logical_segment_type`
 fn value_of(segment: &LogicalPathSegment, logical_segment_type: LogicalSegmentType) -> Option<u16> {
     if segment.path_definition.logical_segment_type() != logical_segment_type {
         return None;

@@ -1,4 +1,4 @@
-//! A small device served on the loopback interface, driven by the scanner crate and by raw bytes.
+//! A small device on loopback, driven by the scanner and by raw bytes.
 
 use std::io::Cursor;
 use std::net::Ipv4Addr;
@@ -11,7 +11,7 @@ use tokio::net::{TcpListener, TcpStream};
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
-use eipscanne_rs::cip::message::data::CipData;
+use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
@@ -46,30 +46,32 @@ struct TestDevice {
 }
 
 impl Handler for TestDevice {
-    fn get(
+    fn handle_get_attribute(
         &self,
         class: u16,
         instance: u16,
         attribute: Option<u16>,
-    ) -> Result<Box<dyn CipData>, ResponseStatusCode> {
+    ) -> Result<CipDataOpt, ResponseStatusCode> {
         match (class, instance, attribute) {
-            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID, None) => Ok(Box::new(IdentityResponse {
-                vendor_id: VendorId::TeknicInc,
-                device_type: DeviceType::GenericDevice,
-                product_code: 1,
-                revision: Revision { major: 1, minor: 2 },
-                status: IdentityStatusBits::default().into(),
-                serial_number: 0x0102_0304,
-                product_name: CipShortString::from(PRODUCT_NAME.to_string()),
-            })),
+            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID, None) => {
+                Ok(CipDataOpt::Typed(Box::new(IdentityResponse {
+                    vendor_id: VendorId::TeknicInc,
+                    device_type: DeviceType::GenericDevice,
+                    product_code: 1,
+                    revision: Revision { major: 1, minor: 2 },
+                    status: IdentityStatusBits::default().into(),
+                    serial_number: 0x0102_0304,
+                    product_name: CipShortString::from(PRODUCT_NAME.to_string()),
+                })))
+            }
             (ASSEMBLY_CLASS, OUTPUT_INSTANCE, Some(DATA_ATTRIBUTE)) => {
-                Ok(Box::new(*self.outputs.lock().unwrap()))
+                Ok(CipDataOpt::Typed(Box::new(*self.outputs.lock().unwrap())))
             }
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }
 
-    fn set(
+    fn handle_set_attribute(
         &self,
         class: u16,
         instance: u16,
@@ -309,4 +311,28 @@ async fn encapsulation_refusals_keep_the_connection() {
         .unwrap();
     let reply = read_packet(&mut stream).await.unwrap();
     assert_eq!(reply.header.status_code, EncapsStatusCode::Success);
+}
+
+#[tokio::test]
+async fn dropping_serve_closes_its_connections() {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let device = TestDevice {
+        outputs: Mutex::new(Outputs { word: 0 }),
+    };
+    let server = tokio::spawn(serve(listener, Arc::new(device)));
+
+    let mut stream = TcpStream::connect((Ipv4Addr::LOCALHOST, port))
+        .await
+        .unwrap();
+    stream
+        .write_all(&bytes_of(&RequestObjectAssembly::new_registration()))
+        .await
+        .unwrap();
+    read_packet(&mut stream).await.unwrap();
+
+    server.abort();
+    let _ = server.await;
+    let mut byte = [0u8; 1];
+    assert_eq!(stream.read(&mut byte).await.unwrap(), 0);
 }

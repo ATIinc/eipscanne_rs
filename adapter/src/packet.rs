@@ -1,5 +1,4 @@
-//! One encapsulation packet on a stream: the header, then as many bytes as its Length says, so
-//! a packet split over several reads or sharing one with the next is read whole.
+//! Encapsulation packets on a stream, read whole however the bytes arrive.
 
 use std::io::Cursor;
 
@@ -33,8 +32,7 @@ pub async fn write_packet(
     Ok(())
 }
 
-/// The Message Router request carried by `packet` (Send RR Data or Send Unit Data), if it carries
-/// one
+/// The Message Router request a Send RR Data or Send Unit Data packet carries
 pub fn request_of(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
     let cip_message = match &packet.command_specific_data {
         CommandSpecificData::SendRrData(rr_data) => &rr_data.cip_message,
@@ -47,9 +45,7 @@ pub fn request_of(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
     }
 }
 
-/// Reads the bytes of one encapsulation packet, header included, and its parsed header. The
-/// header alone parses for any command, so a packet whose command is not served can still be
-/// answered.
+/// One packet's parsed header and all its bytes, for any command
 pub(crate) async fn read_frame(
     stream: &mut (impl AsyncRead + Unpin),
 ) -> Result<(EncapsulationHeader, Vec<u8>)> {
@@ -66,7 +62,7 @@ pub(crate) async fn read_frame(
     Ok((header, bytes))
 }
 
-/// Writes a header without command specific data, the reply that only carries a status
+/// Writes a header without command specific data
 pub(crate) async fn write_header(
     stream: &mut (impl AsyncWrite + Unpin),
     header: &EncapsulationHeader,
