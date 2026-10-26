@@ -20,6 +20,8 @@ pub enum Error {
         waiting_for: &'static str,
         after: Duration,
     },
+    /// An earlier reply timed out, so the session is unusable
+    SessionPoisoned,
     /// A packet or a caller's assembly did not encode or decode
     Parse(binrw::Error),
     /// The adapter answered with an encapsulation status other than success
@@ -61,6 +63,7 @@ impl fmt::Display for Error {
             Error::Timeout { waiting_for, after } => {
                 write!(f, "timed out after {after:?} waiting for {waiting_for}")
             }
+            Error::SessionPoisoned => write!(f, "the session is poisoned by an earlier timeout"),
             Error::Parse(error) => write!(f, "a packet did not encode or decode: {error}"),
             Error::EncapsulationStatus(status) => {
                 write!(

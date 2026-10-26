@@ -47,13 +47,15 @@ impl Default for SessionConfig {
     }
 }
 
-/// A registered encapsulation session with one adapter
+/// A registered encapsulation session with one adapter. A reply timeout poisons it: later calls
+/// fail with [`Error::SessionPoisoned`].
 #[derive(Debug)]
 pub struct Session {
     stream: TcpStream,
     session_handle: CipUdint,
     peer_ip: Ipv4Addr,
     config: SessionConfig,
+    poisoned: bool,
 }
 
 // ======= Start of Session impl ========
@@ -79,6 +81,7 @@ impl Session {
             session_handle: 0,
             peer_ip,
             config,
+            poisoned: false,
         };
         session
             .send(&RequestObjectAssembly::new_registration())
@@ -99,8 +102,16 @@ impl Session {
         self.peer_ip
     }
 
+    /// See [`Session`]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
+
     /// Writes one encapsulation packet to the adapter
     pub async fn send(&mut self, packet: &EnIpPacket) -> Result<()> {
+        if self.poisoned {
+            return Err(Error::SessionPoisoned);
+        }
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes)?;
         print_packet_hex("REQUEST", bytes.get_ref());
@@ -110,15 +121,17 @@ impl Session {
 
     /// Reads one encapsulation packet: the header, then its Length in bytes. Fails on a
     /// non-success encapsulation status, and with [`Error::Timeout`] when the whole packet has
-    /// not arrived within the configured reply timeout; the session is unusable after a timeout,
-    /// since part of the packet may have been read.
+    /// not arrived within the configured reply timeout.
     pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
         let reply_timeout: Duration = self.config.reply_timeout;
         timeout(reply_timeout, self.read_packet())
             .await
-            .map_err(|_| Error::Timeout {
-                waiting_for: "a reply",
-                after: reply_timeout,
+            .map_err(|_| {
+                self.poisoned = true;
+                Error::Timeout {
+                    waiting_for: "a reply",
+                    after: reply_timeout,
+                }
             })?
     }
 
