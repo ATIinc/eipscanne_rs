@@ -16,6 +16,8 @@ binrw = "0.15.2"
 tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time", "signal"] }
 
 [dev-dependencies]
+# The fake adapter of the loopback test
+adapter = { path = "../adapter" }
 # Used by the examples only
 clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"

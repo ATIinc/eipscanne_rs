@@ -5,10 +5,11 @@ use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use bilge::prelude::{u4, u9};
-use binrw::{BinRead, BinWrite};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream, UdpSocket};
+use binrw::BinRead;
+use tokio::net::{TcpListener, UdpSocket};
 
+use adapter::packet::{read_packet, request_of, write_packet};
+use adapter::reply;
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -19,23 +20,14 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
-use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
-use eipscanne_rs::cip::message::response::{
-    MessageRouterResponse, ResponseData, ResponseStatusCode,
-};
-use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
-};
-use eipscanne_rs::eip::constants::{
-    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
-    ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
-};
+use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
+use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
-use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
+use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
@@ -91,66 +83,27 @@ fn request() -> ForwardOpenRequest {
 
 // ======= The fake adapter ========
 
-/// Reads one encapsulation packet the way an adapter does: the header, then its Length
-async fn read_request(stream: &mut TcpStream) -> EnIpPacket {
-    let mut bytes = vec![0u8; 24];
-    stream.read_exact(&mut bytes).await.unwrap();
-    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes)).unwrap();
-    bytes.resize(24 + usize::from(header.length.unwrap()), 0);
-    stream.read_exact(&mut bytes[24..]).await.unwrap();
-    EnIpPacket::read(&mut Cursor::new(&bytes)).unwrap()
-}
-
-async fn write_reply(stream: &mut TcpStream, reply: &EnIpPacket) {
-    let mut bytes = Cursor::new(Vec::new());
-    reply.write(&mut bytes).unwrap();
-    stream.write_all(bytes.get_ref()).await.unwrap();
-}
-
-fn header(command: EnIpCommand) -> EncapsulationHeader {
-    EncapsulationHeader {
-        command,
-        length: None,
-        session_handle: SESSION_HANDLE,
-        status_code: EncapsStatusCode::Success,
-        sender_context: EMPTY_SENDER_CONTEXT,
-        options: DEFAULT_ENCAPSULATION_OPTIONS,
-    }
-}
-
 /// A successful Connection Manager reply carrying `data` and `socket_addr_info_items`
 fn connection_manager_reply(
     service: ServiceCode,
     data: impl CipData + 'static,
     socket_addr_info_items: SocketAddrInfoItems,
 ) -> EnIpPacket {
-    let mut rr_data = RRPacketData::new_unconnected(
-        CIP_INTERFACE_HANDLE,
+    let mut reply = EnIpPacket::new_send_rr_data(
+        SESSION_HANDLE,
         NO_ENCAPSULATION_TIMEOUT,
-        MessageRouterResponse {
-            service_container: ServiceContainer::new_response(service),
-            response_data: ResponseData {
-                status: ResponseStatusCode::Success,
-                additional_status_size: 0,
-                additional_status: vec![],
-                data: CipDataOpt::Typed(Box::new(data)),
-            },
-        },
+        reply::success(service, CipDataOpt::Typed(Box::new(data))),
     );
+    let CommandSpecificData::SendRrData(rr_data) = &mut reply.command_specific_data else {
+        unreachable!("a Send RR Data packet");
+    };
     rr_data.socket_addr_info_items = socket_addr_info_items;
-    EnIpPacket {
-        header: header(EnIpCommand::SendRrData),
-        command_specific_data: CommandSpecificData::SendRrData(rr_data),
-    }
+    reply
 }
 
 /// The Forward_Open request inside a packet, as the adapter parses it
 fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) = packet
-        .command_specific_data
-        .as_send_rr_data()
-        .map(|rr_data| &rr_data.cip_message)
-    else {
+    let Some(message) = request_of(packet) else {
         panic!("expected a request, got {:?}", packet.command_specific_data);
     };
     assert_eq!(
@@ -172,22 +125,14 @@ async fn fake_adapter(
     let (mut stream, _) = listener.accept().await.unwrap();
 
     // 1. RegisterSession
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream).await.unwrap();
     assert_eq!(request.header.command, EnIpCommand::RegisterSession);
-    write_reply(
-        &mut stream,
-        &EnIpPacket {
-            header: header(EnIpCommand::RegisterSession),
-            command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
-                option_flags: REGISTER_SESSION_OPTION_FLAGS,
-            }),
-        },
-    )
-    .await;
+    let mut reply = EnIpPacket::new_registration();
+    reply.header.session_handle = SESSION_HANDLE;
+    write_packet(&mut stream, &reply).await.unwrap();
 
     // 2. Forward_Open: grant the intervals, pick the O->T ID and the outputs' port
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream).await.unwrap();
     assert_eq!(request.header.session_handle, SESSION_HANDLE);
     let forward_open = forward_open_request_of(&request);
     assert_eq!(
@@ -195,7 +140,7 @@ async fn fake_adapter(
         T2O_NETWORK_CONNECTION_ID
     );
     let io_port = io_socket.local_addr().unwrap().port();
-    write_reply(
+    write_packet(
         &mut stream,
         &connection_manager_reply(
             ServiceCode::ForwardOpen,
@@ -217,7 +162,8 @@ async fn fake_adapter(
             },
         ),
     )
-    .await;
+    .await
+    .unwrap();
 
     // 3. One output packet in, the same bytes back as an input packet
     let (packet, _) = recv_io_packet(&io_socket).await.unwrap();
@@ -241,19 +187,15 @@ async fn fake_adapter(
     .unwrap();
 
     // 4. Forward_Close
-    let request = read_request(&mut stream).await;
-    let Some(CipMessage::Request(message)) = request
-        .command_specific_data
-        .as_send_rr_data()
-        .map(|rr_data| &rr_data.cip_message)
-    else {
+    let request = read_packet(&mut stream).await.unwrap();
+    let Some(message) = request_of(&request) else {
         panic!("expected a Forward_Close request");
     };
     assert_eq!(
         message.service_container.service(),
         ServiceCode::ForwardClose
     );
-    write_reply(
+    write_packet(
         &mut stream,
         &connection_manager_reply(
             ServiceCode::ForwardClose,
@@ -265,10 +207,11 @@ async fn fake_adapter(
             SocketAddrInfoItems::empty(),
         ),
     )
-    .await;
+    .await
+    .unwrap();
 
     // 5. UnregisterSession
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream).await.unwrap();
     assert_eq!(request.header.command, EnIpCommand::UnRegisterSession);
 
     outputs

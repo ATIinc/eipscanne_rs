@@ -3,6 +3,16 @@
 version = 4
 
 [[package]]
+name = "adapter"
+version = "0.1.0"
+dependencies = [
+ "binrw",
+ "eipscanne_rs",
+ "scanner",
+ "tokio",
+]
+
+[[package]]
 name = "anstream"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -517,6 +527,7 @@ dependencies = [
 name = "scanner"
 version = "0.2.0"
 dependencies = [
+ "adapter",
  "bilge",
  "binrw",
  "clap",
