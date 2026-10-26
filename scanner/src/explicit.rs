@@ -20,14 +20,14 @@ use crate::session::Session;
 /// Sends `service` on `request_path` with optional `data` and returns the accepted reply
 pub async fn send_request(
     session: &mut Session,
-    request_path: CipPath,
+    request_path: &CipPath,
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket> {
     session
         .request(&RequestObjectAssembly::new_service_request(
             session.session_handle(),
-            request_path,
+            request_path.clone(),
             service,
             data,
         ))
@@ -58,7 +58,7 @@ pub async fn get_attribute<T>(session: &mut Session, path: &CipPath) -> Result<T
 where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
-    let reply = send_request(session, path.clone(), ServiceCode::GetAttributeSingle, None).await?;
+    let reply = send_request(session, path, ServiceCode::GetAttributeSingle, None).await?;
     decode_reply(&reply)
 }
 
@@ -70,7 +70,7 @@ pub async fn set_attribute(
 ) -> Result<()> {
     send_request(
         session,
-        path.clone(),
+        path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(data)),
     )

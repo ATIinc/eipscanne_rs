@@ -82,7 +82,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= Clear a shutdown, if one is present ============
     let reply = send_request(
         &mut session,
-        input_path.clone(),
+        &input_path,
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -98,7 +98,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         motor.controlword.set_shutdown_reset(true);
         send_request(
             &mut session,
-            output_path.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -110,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         motor.controlword.set_shutdown_reset(false);
         send_request(
             &mut session,
-            output_path.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -128,7 +128,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .set_enable(true);
         send_request(
             &mut session,
-            output_path.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -138,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // The hub acts on a move when its move number changes, so the command takes the next one
         let reply = send_request(
             &mut session,
-            input_path.clone(),
+            &input_path,
             ServiceCode::GetAttributeSingle,
             None,
         )
@@ -154,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .command_move(MoveType::HomingMove, move_number);
         send_request(
             &mut session,
-            output_path.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -165,7 +165,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let reply = send_request(
                 &mut session,
-                input_path.clone(),
+                &input_path,
                 ServiceCode::GetAttributeSingle,
                 None,
             )
@@ -205,7 +205,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_enable(false);
     send_request(
         &mut session,
-        output_path.clone(),
+        &output_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(outputs)),
     )

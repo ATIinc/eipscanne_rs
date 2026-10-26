@@ -62,7 +62,7 @@ pub async fn send_request(
     session: &mut Session,
     connection: &ExplicitConnection,
     cip_sequence_count: CipUint,
-    request_path: CipPath,
+    request_path: &CipPath,
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket> {
@@ -71,7 +71,7 @@ pub async fn send_request(
             session.session_handle(),
             connection.response.o2t_network_connection_id,
             cip_sequence_count,
-            MessageRouterRequest::new_data(service, request_path, data),
+            MessageRouterRequest::new_data(service, request_path.clone(), data),
         ))
         .await
 }

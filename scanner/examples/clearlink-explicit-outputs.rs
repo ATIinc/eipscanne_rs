@@ -112,26 +112,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");
-    send_request(
+    let _config_success_response = send_request(
         &mut session,
-        config_path.clone(),
+        &config_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(ConfigAssemblyObject::default())),
     )
     .await?;
+
+    // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
+    // println!("{:?}\n", _config_success_response);
     // ^^^^^^^^^ Write the ClearLink Config ^^^^^^^^^^^^
 
     // ========= Request the digital output ============
     println!("REQUESTING - GET digital output");
 
-    let reply = send_request(
+    let output_assembly_reply = send_request(
         &mut session,
-        output_path.clone(),
+        &output_path,
         ServiceCode::GetAttributeSingle,
         None,
     )
     .await?;
-    let mut output_assembly_object: OutputAssemblyObject = decode_reply(&reply)?;
+
+    let mut output_assembly_object: OutputAssemblyObject = decode_reply(&output_assembly_reply)?;
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
     // ========= Write the Digital Output ============
@@ -153,9 +157,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("REQUESTING - SET digital output");
 
-    send_request(
+    let _set_digital_io_success_response = send_request(
         &mut session,
-        output_path.clone(),
+        &output_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(output_assembly_object)),
     )
@@ -167,14 +171,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sleep(SETTLE_TIME).await;
     println!("REQUESTING - GET inputs");
 
-    let reply = send_request(
+    let input_assembly_reply = send_request(
         &mut session,
-        input_path.clone(),
+        &input_path,
         ServiceCode::GetAttributeSingle,
         None,
     )
     .await?;
-    let inputs: InputAssemblyObject = decode_reply(&reply)?;
+
+    let inputs: InputAssemblyObject = decode_reply(&input_assembly_reply)?;
 
     // DIP Status is set while IO-n is driven as an output, DOP Status while it is overloaded
     let driven = bit(u16::from(inputs.io_input_data.dip_status), index);

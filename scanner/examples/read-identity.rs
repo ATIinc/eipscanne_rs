@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("REQUESTING identity");
     let reply = send_request(
         &mut session,
-        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+        &CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
         ServiceCode::GetAttributeAll,
         None,
     )
