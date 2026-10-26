@@ -32,7 +32,9 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use scanner::explicit::connected::{ExplicitConnection, forward_open_explicit, send_request};
+use scanner::explicit::connected::{
+    ExplicitConnection, forward_open_explicit, send_connected_request,
+};
 use scanner::explicit::decode_reply;
 use scanner::implicit::connection::forward_close;
 use scanner::session::{Session, SessionConfig};
@@ -150,7 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         cip_sequence_count = cip_sequence_count.wrapping_add(1);
-        let reply: EnIpPacket = send_request(
+        let reply: EnIpPacket = send_connected_request(
             &mut session,
             &connection,
             cip_sequence_count,

@@ -2,9 +2,9 @@
 //!
 //! ```text
 //! Stage    What happens on the wire                                        Function
-//! -------  --------------------------------------------------------------  ---------------------
+//! -------  --------------------------------------------------------------  ----------------------
 //! Open     SendRRData(Forward_Open), read the reply -> ExplicitConnection  forward_open_explicit
-//! Request  SendUnitData(request) on O->T, read SendUnitData on T->O        send_request
+//! Request  SendUnitData(request) on O->T, read SendUnitData on T->O        send_connected_request
 //! Close    SendRRData(Forward_Close), read the reply                       forward_close
 //! ```
 //!
@@ -58,7 +58,7 @@ pub async fn forward_open_explicit(
 
 /// Sends `service` on `request_path` with optional `data` over `connection` and returns the
 /// accepted reply
-pub async fn send_request(
+pub async fn send_connected_request(
     session: &mut Session,
     connection: &ExplicitConnection,
     cip_sequence_count: CipUint,
