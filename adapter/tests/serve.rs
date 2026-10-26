@@ -25,7 +25,7 @@ use adapter::handler::{Handler, decode};
 use adapter::packet::read_packet;
 use adapter::server::serve;
 use scanner::error::Error;
-use scanner::explicit::{decode_reply, read_identity, send_request};
+use scanner::explicit::{decode_reply, send_request};
 use scanner::session::{Session, SessionConfig};
 
 const ASSEMBLY_CLASS: u16 = 0x04;
@@ -118,6 +118,18 @@ async fn register(port: u16) -> Session {
         .expect("the adapter answers Register Session")
 }
 
+/// Get_Attributes_All on the Identity object
+async fn read_identity(session: &mut Session) -> scanner::error::Result<IdentityResponse> {
+    let reply = send_request(
+        session,
+        &CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+        ServiceCode::GetAttributeAll,
+        None,
+    )
+    .await?;
+    decode_reply(&reply)
+}
+
 /// The General Status a refused request was answered with
 fn general_status(result: scanner::error::Result<EnIpPacket>) -> ResponseStatusCode {
     match result {
@@ -157,7 +169,7 @@ async fn get_and_set_through_the_scanner() {
 
     send_request(
         &mut session,
-        output_path(),
+        &output_path(),
         ServiceCode::SetAttributeSingle,
         Some(Box::new(Outputs { word: 0xdead_beef })),
     )
@@ -166,7 +178,7 @@ async fn get_and_set_through_the_scanner() {
 
     let reply = send_request(
         &mut session,
-        output_path(),
+        &output_path(),
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -189,7 +201,13 @@ async fn refusals_are_general_statuses() {
 
     // The handler's refusal
     let unknown = CipPath::new_full(ASSEMBLY_CLASS as u8, 0x65, DATA_ATTRIBUTE as u8);
-    let result = send_request(&mut session, unknown, ServiceCode::GetAttributeSingle, None).await;
+    let result = send_request(
+        &mut session,
+        &unknown,
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await;
     assert_eq!(
         general_status(result),
         ResponseStatusCode::ObjectDoesNotExist
@@ -198,7 +216,7 @@ async fn refusals_are_general_statuses() {
     // `decode`'s refusals
     let result = send_request(
         &mut session,
-        output_path(),
+        &output_path(),
         ServiceCode::SetAttributeSingle,
         Some(Box::new(0xbeef_u16)),
     )
@@ -206,7 +224,7 @@ async fn refusals_are_general_statuses() {
     assert_eq!(general_status(result), ResponseStatusCode::NotEnoughData);
     let result = send_request(
         &mut session,
-        output_path(),
+        &output_path(),
         ServiceCode::SetAttributeSingle,
         Some(Box::new(0xdead_beef_u64)),
     )
@@ -216,7 +234,7 @@ async fn refusals_are_general_statuses() {
     // A Single service without an attribute
     let result = send_request(
         &mut session,
-        CipPath::new(ASSEMBLY_CLASS, OUTPUT_INSTANCE),
+        &CipPath::new(ASSEMBLY_CLASS, OUTPUT_INSTANCE),
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -229,7 +247,7 @@ async fn refusals_are_general_statuses() {
     // A path that names no attribute: a connection path
     let result = send_request(
         &mut session,
-        CipPath::new_assembly_connection(0x01, 0x64, 0x65),
+        &CipPath::new_assembly_connection(0x01, 0x64, 0x65),
         ServiceCode::GetAttributeAll,
         None,
     )
@@ -237,7 +255,7 @@ async fn refusals_are_general_statuses() {
     assert_eq!(general_status(result), ResponseStatusCode::PathSegmentError);
 
     // A service other than Get and Set
-    let result = send_request(&mut session, output_path(), ServiceCode::Reset, None).await;
+    let result = send_request(&mut session, &output_path(), ServiceCode::Reset, None).await;
     assert_eq!(
         general_status(result),
         ResponseStatusCode::ServiceNotSupported
