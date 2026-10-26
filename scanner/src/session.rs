@@ -4,12 +4,13 @@
 use std::env::var_os;
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr};
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::response::Rejection;
@@ -90,6 +91,25 @@ impl Session {
         session.session_handle = reply.header.session_handle;
 
         Ok(session)
+    }
+
+    /// [`Session::register`] up to `attempts` times, `delay` apart; fails with the last attempt's error
+    pub async fn register_with_retry(
+        address: impl ToSocketAddrs + Clone,
+        config: SessionConfig,
+        attempts: NonZeroUsize,
+        delay: Duration,
+    ) -> Result<Session> {
+        let mut attempt = 1;
+        loop {
+            match Session::register(address.clone(), config).await {
+                Err(_) if attempt < attempts.get() => {
+                    attempt += 1;
+                    sleep(delay).await;
+                }
+                result => return result,
+            }
+        }
     }
 
     /// The handle the adapter gave this session, carried by every packet
