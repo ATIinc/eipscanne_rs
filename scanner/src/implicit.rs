@@ -16,6 +16,7 @@
 //! owns the sequence numbers and the deadline (see the `opener-implicit` example).
 
 pub mod connection;
+#[cfg(feature = "eds")]
 pub mod eds;
 pub mod o2t;
 pub mod t2o;

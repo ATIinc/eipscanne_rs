@@ -43,6 +43,7 @@ pub enum Error {
         actual: usize,
     },
     /// An EDS file that does not read, or a connection that refers to what the file does not define
+    #[cfg(feature = "eds")]
     Eds(eds_parser::error::Error),
     /// A connection of an EDS file this scanner does not open, with what the connection offers
     UnsupportedConnection(String),
@@ -109,6 +110,7 @@ impl fmt::Display for Error {
                     "{actual} output bytes given, the connection carries {expected} {data_size}"
                 )
             }
+            #[cfg(feature = "eds")]
             Error::Eds(error) => write!(f, "{error}"),
             Error::UnsupportedConnection(message) => f.write_str(message),
         }
@@ -120,6 +122,7 @@ impl std::error::Error for Error {
         match self {
             Error::Io(error) => Some(error),
             Error::Parse(error) => Some(error),
+            #[cfg(feature = "eds")]
             Error::Eds(error) => Some(error),
             _ => None,
         }
@@ -144,6 +147,7 @@ impl From<Rejection> for Error {
     }
 }
 
+#[cfg(feature = "eds")]
 impl From<eds_parser::error::Error> for Error {
     fn from(error: eds_parser::error::Error) -> Self {
         Error::Eds(error)
