@@ -11,8 +11,12 @@
 
 use clap::Parser;
 
+use eipscanne_rs::cip::identity::IdentityResponse;
+use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use scanner::explicit::read_identity;
+use scanner::explicit::{decode_reply, send_request};
 use scanner::session::{Session, SessionConfig};
 
 /// Reads the Identity object of an EtherNet/IP adapter
@@ -40,7 +44,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Request the identity object ============
     println!("REQUESTING identity");
-    let identity_response = read_identity(&mut session).await?;
+    let reply = send_request(
+        &mut session,
+        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+        ServiceCode::GetAttributeAll,
+        None,
+    )
+    .await?;
+    let identity_response: IdentityResponse = decode_reply(&reply)?;
 
     // println!("{:#?}\n", identity_response);      // NOTE: the :#? triggers a pretty-print
     println!("{:?}\n", identity_response);

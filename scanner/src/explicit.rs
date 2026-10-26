@@ -8,10 +8,8 @@ use std::io::Cursor;
 
 use binrw::BinRead;
 
-use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
 use eipscanne_rs::cip::message::shared::ServiceCode;
-use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
@@ -53,18 +51,6 @@ where
         ));
     };
     Ok(T::read_le(&mut Cursor::new(raw))?)
-}
-
-/// Get_Attributes_All on the Identity object: who the adapter is
-pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse> {
-    let reply = send_request(
-        session,
-        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
-        ServiceCode::GetAttributeAll,
-        None,
-    )
-    .await?;
-    decode_reply(&reply)
 }
 
 /// Get_Attribute_Single on `path`, decoded as `T`

@@ -13,10 +13,11 @@ use clap::Parser;
 use tokio::signal::ctrl_c;
 use tokio::time::sleep;
 
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use scanner::explicit::{get_attribute, set_attribute};
+use scanner::explicit::{decode_reply, send_request};
 use scanner::session::{Session, SessionConfig};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
@@ -79,7 +80,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut outputs = OutputAssemblyHub4E::default();
 
     // ========= Clear a shutdown, if one is present ============
-    let inputs: InputAssemblyHub4E = get_attribute(&mut session, &input_path).await?;
+    let reply = send_request(
+        &mut session,
+        input_path.clone(),
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
+    let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
     if inputs
         .motor_input(args.motor)
         .statusword
@@ -88,13 +96,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("REQUESTING - SET shutdown reset");
         let motor = outputs.motor_output_mut(args.motor);
         motor.controlword.set_shutdown_reset(true);
-        set_attribute(&mut session, &output_path, outputs.clone()).await?;
+        send_request(
+            &mut session,
+            output_path.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
         sleep(SHUTDOWN_RESET_TIME).await;
 
         // Lowered again so the next reset has a rising edge
         let motor = outputs.motor_output_mut(args.motor);
         motor.controlword.set_shutdown_reset(false);
-        set_attribute(&mut session, &output_path, outputs.clone()).await?;
+        send_request(
+            &mut session,
+            output_path.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
     }
 
     // The motion steps run until they finish, fail or Ctrl+C is pressed; the motor is disabled
@@ -106,11 +126,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .motor_output_mut(args.motor)
             .controlword
             .set_enable(true);
-        set_attribute(&mut session, &output_path, outputs.clone()).await?;
+        send_request(
+            &mut session,
+            output_path.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
 
         // ========= Send the homing command ============
         // The hub acts on a move when its move number changes, so the command takes the next one
-        let inputs: InputAssemblyHub4E = get_attribute(&mut session, &input_path).await?;
+        let reply = send_request(
+            &mut session,
+            input_path.clone(),
+            ServiceCode::GetAttributeSingle,
+            None,
+        )
+        .await?;
+        let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
         let move_number = inputs
             .motor_input(args.motor)
             .move_number_ack
@@ -119,12 +152,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         outputs
             .motor_output_mut(args.motor)
             .command_move(MoveType::HomingMove, move_number);
-        set_attribute(&mut session, &output_path, outputs.clone()).await?;
+        send_request(
+            &mut session,
+            output_path.clone(),
+            ServiceCode::SetAttributeSingle,
+            Some(Box::new(outputs.clone())),
+        )
+        .await?;
 
         // ========= Wait for the motor to home ============
         let deadline = Instant::now() + Duration::from_secs(args.timeout_s);
         loop {
-            let inputs: InputAssemblyHub4E = get_attribute(&mut session, &input_path).await?;
+            let reply = send_request(
+                &mut session,
+                input_path.clone(),
+                ServiceCode::GetAttributeSingle,
+                None,
+            )
+            .await?;
+            let inputs: InputAssemblyHub4E = decode_reply(&reply)?;
             let motor = inputs.motor_input(args.motor);
             print_status(motor);
 
@@ -157,7 +203,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .motor_output_mut(args.motor)
         .controlword
         .set_enable(false);
-    set_attribute(&mut session, &output_path, outputs).await?;
+    send_request(
+        &mut session,
+        output_path.clone(),
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(outputs)),
+    )
+    .await?;
 
     // ========= UnRegister the session ============
     println!("REQUESTING - UN REGISTER session");
