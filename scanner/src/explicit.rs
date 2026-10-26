@@ -66,3 +66,28 @@ pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse> {
     .await?;
     decode_reply(&reply)
 }
+
+/// Get_Attribute_Single on `path`, decoded as `T`
+pub async fn get_attribute<T>(session: &mut Session, path: &CipPath) -> Result<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
+    let reply = send_request(session, path.clone(), ServiceCode::GetAttributeSingle, None).await?;
+    decode_reply(&reply)
+}
+
+/// Set_Attribute_Single on `path`
+pub async fn set_attribute(
+    session: &mut Session,
+    path: &CipPath,
+    data: impl CipData + 'static,
+) -> Result<()> {
+    send_request(
+        session,
+        path.clone(),
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(data)),
+    )
+    .await?;
+    Ok(())
+}

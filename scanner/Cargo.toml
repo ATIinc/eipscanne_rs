@@ -8,12 +8,15 @@ description = "The scanner side built on eipscanne_rs: sessions, explicit reques
 
 [dependencies]
 eipscanne_rs = { path = ".." }
-# Only `implicit::eds` uses it; worth a feature gate if the scanner is ever wanted without it, for
-# explicit messaging alone
-eds_parser = { path = "../eds_parser" }
+eds_parser = { path = "../eds_parser", optional = true }
 bilge = "0.5.0"
 binrw = "0.15.2"
-tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros", "time", "signal"] }
+tokio = { version = "1.53.2", features = ["net", "io-util", "time"] }
+
+[features]
+default = ["eds"]
+# `implicit::eds`: Forward_Open from an EDS file
+eds = ["dep:eds_parser"]
 
 [dev-dependencies]
 # The fake adapter of the loopback test
@@ -23,3 +26,16 @@ clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"
 hex-assert = { version = "0.2.0", path = "../hex_assert" }
 pretty_assertions = "1.4.1"
+tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "signal"] }
+
+[[example]]
+name = "io-hub-eds-implicit"
+required-features = ["eds"]
+
+[[example]]
+name = "opener-eds-implicit"
+required-features = ["eds"]
+
+[[test]]
+name = "eds_forward_open"
+required-features = ["eds"]
