@@ -11,7 +11,7 @@ eipscanne_rs = { path = ".." }
 eds_parser = { path = "../eds_parser", optional = true }
 bilge = "0.5.0"
 binrw = "0.15.2"
-tokio = { version = "1.53.2", features = ["net", "io-util", "time"] }
+tokio = { version = "1", features = ["net", "io-util", "time"] }
 
 [features]
 default = ["eds"]
@@ -26,7 +26,7 @@ clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"
 hex-assert = { version = "0.2.0", path = "../hex_assert" }
 pretty_assertions = "1.4.1"
-tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros", "signal"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
 
 [[example]]
 name = "io-hub-eds-implicit"

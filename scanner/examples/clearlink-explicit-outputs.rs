@@ -9,10 +9,11 @@ use std::time::Duration;
 use clap::Parser;
 use tokio::time::sleep;
 
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
-use scanner::explicit::{get_attribute, set_attribute};
+use scanner::explicit::{decode_reply, send_request};
 use scanner::session::{Session, SessionConfig};
 
 // The ClearLink assemblies live outside the library, in scanner/assemblies/
@@ -111,14 +112,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");
-    set_attribute(&mut session, &config_path, ConfigAssemblyObject::default()).await?;
+    let _config_success_response = send_request(
+        &mut session,
+        &config_path,
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(ConfigAssemblyObject::default())),
+    )
+    .await?;
+
+    // println!("{:#?}\n", _config_success_response);      // NOTE: the :#? triggers a pretty-print
+    // println!("{:?}\n", _config_success_response);
     // ^^^^^^^^^ Write the ClearLink Config ^^^^^^^^^^^^
 
     // ========= Request the digital output ============
     println!("REQUESTING - GET digital output");
 
-    let mut output_assembly_object: OutputAssemblyObject =
-        get_attribute(&mut session, &output_path).await?;
+    let output_assembly_reply = send_request(
+        &mut session,
+        &output_path,
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
+
+    let mut output_assembly_object: OutputAssemblyObject = decode_reply(&output_assembly_reply)?;
     // ^^^^^^^^^ Request the digital output ^^^^^^^^^^^^
 
     // ========= Write the Digital Output ============
@@ -140,7 +157,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("REQUESTING - SET digital output");
 
-    set_attribute(&mut session, &output_path, output_assembly_object).await?;
+    let _set_digital_io_success_response = send_request(
+        &mut session,
+        &output_path,
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(output_assembly_object)),
+    )
+    .await?;
 
     // ^^^^^^^^^ Write the Digital Output ^^^^^^^^^^^^
 
@@ -148,7 +171,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sleep(SETTLE_TIME).await;
     println!("REQUESTING - GET inputs");
 
-    let inputs: InputAssemblyObject = get_attribute(&mut session, &input_path).await?;
+    let input_assembly_reply = send_request(
+        &mut session,
+        &input_path,
+        ServiceCode::GetAttributeSingle,
+        None,
+    )
+    .await?;
+
+    let inputs: InputAssemblyObject = decode_reply(&input_assembly_reply)?;
 
     // DIP Status is set while IO-n is driven as an output, DOP Status while it is overloaded
     let driven = bit(u16::from(inputs.io_input_data.dip_status), index);

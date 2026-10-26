@@ -154,7 +154,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             &mut session,
             &connection,
             cip_sequence_count,
-            CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+            &CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
             ServiceCode::GetAttributeAll,
             None,
         )
