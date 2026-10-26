@@ -45,3 +45,25 @@ where
     }
     Ok(value)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_reads_exactly_the_data() {
+        assert_eq!(decode::<u32>(&[0xef, 0xbe, 0xad, 0xde]), Ok(0xdead_beef));
+    }
+
+    #[test]
+    fn decode_refuses_short_and_long_data() {
+        assert_eq!(
+            decode::<u32>(&[0xef, 0xbe]),
+            Err(ResponseStatusCode::NotEnoughData)
+        );
+        assert_eq!(
+            decode::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
+            Err(ResponseStatusCode::TooMuchData)
+        );
+    }
+}

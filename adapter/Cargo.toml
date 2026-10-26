@@ -12,6 +12,5 @@ binrw = "0.15.2"
 tokio = { version = "1", features = ["net", "io-util", "rt"] }
 
 [dev-dependencies]
-# The tests talk to the adapter through the scanner
-scanner = { path = "../scanner" }
-tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros"] }
+clap = { version = "4.6.7", features = ["derive"] }
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "signal"] }

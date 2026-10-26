@@ -4,7 +4,8 @@ use std::io::{Cursor, ErrorKind};
 use std::sync::Arc;
 
 use binrw::BinRead;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -33,15 +34,15 @@ pub async fn serve(listener: TcpListener, handler: Arc<dyn Handler>) -> Result<(
         let handler = Arc::clone(&handler);
         connections.spawn(async move {
             // A connection's end has no one to report to
-            let _ = serve_connection(stream, session_handle, handler.as_ref()).await;
+            let _ = serve_stream(stream, session_handle, handler.as_ref()).await;
         });
         while connections.try_join_next().is_some() {}
     }
 }
 
-/// Answers one scanner's packets until it unregisters or closes the connection
-async fn serve_connection(
-    mut stream: TcpStream,
+/// Answers one scanner's packets as session `session_handle` until it unregisters or closes the stream
+pub async fn serve_stream(
+    mut stream: impl AsyncRead + AsyncWrite + Unpin,
     session_handle: CipUdint,
     handler: &dyn Handler,
 ) -> Result<()> {
