@@ -9,9 +9,9 @@ description = "The adapter side built on eipscanne_rs: an explicit messaging ser
 [dependencies]
 eipscanne_rs = { path = ".." }
 binrw = "0.15.2"
-tokio = { version = "1.53.2", features = ["net", "io-util", "rt"] }
+tokio = { version = "1", features = ["net", "io-util", "rt"] }
 
 [dev-dependencies]
 # The tests talk to the adapter through the scanner
 scanner = { path = "../scanner" }
-tokio = { version = "1.53.2", features = ["net", "io-util", "rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros"] }
