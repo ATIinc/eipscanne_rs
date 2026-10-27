@@ -36,7 +36,7 @@ use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Who this scanner is in the Forward_Open; the Forward_Close repeats it
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -152,11 +152,16 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied

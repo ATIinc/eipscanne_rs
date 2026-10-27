@@ -32,10 +32,12 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use scanner::explicit::connected::{ExplicitConnection, forward_open_explicit, send_request};
+use scanner::explicit::connected::{
+    ExplicitConnection, forward_open_explicit, send_connected_request,
+};
 use scanner::explicit::decode_reply;
 use scanner::implicit::connection::forward_close;
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Who this scanner is in the Forward_Open; the Forward_Close repeats it
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -112,11 +114,16 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= Open the connection ============
     println!("OPENING the connection");
@@ -146,11 +153,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         cip_sequence_count = cip_sequence_count.wrapping_add(1);
-        let reply: EnIpPacket = send_request(
+        let reply: EnIpPacket = send_connected_request(
             &mut session,
             &connection,
             cip_sequence_count,
-            CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
+            &CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
             ServiceCode::GetAttributeAll,
             None,
         )

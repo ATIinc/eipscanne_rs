@@ -14,7 +14,7 @@ use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_I
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 // The ClearLink assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -82,20 +82,21 @@ struct CliArgs {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let cli_args = CliArgs::parse();
 
     // The three assemblies this example talks to
-    let config_assembly = CipPath::new_full(
+    let config_path = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         CONFIG_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
     );
-    let output_assembly = CipPath::new_full(
+    let output_path = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         OUTPUT_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
     );
-    let input_assembly = CipPath::new_full(
+    let input_path = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         INPUT_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
@@ -103,14 +104,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
-    let mut session = Session::register((cli_args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (cli_args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
     // ^^^^^^^^^ Register the session ^^^^^^^^^^^^
 
     // ========= Write the ClearLink Config ============
     println!("REQUESTING - SET config");
     let _config_success_response = send_request(
         &mut session,
-        config_assembly,
+        &config_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(ConfigAssemblyObject::default())),
     )
@@ -125,7 +130,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_assembly_reply = send_request(
         &mut session,
-        output_assembly.clone(),
+        &output_path,
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -155,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _set_digital_io_success_response = send_request(
         &mut session,
-        output_assembly,
+        &output_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(output_assembly_object)),
     )
@@ -169,7 +174,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let input_assembly_reply = send_request(
         &mut session,
-        input_assembly,
+        &input_path,
         ServiceCode::GetAttributeSingle,
         None,
     )

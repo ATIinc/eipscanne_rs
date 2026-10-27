@@ -20,6 +20,8 @@ pub enum Error {
         waiting_for: &'static str,
         after: Duration,
     },
+    /// An earlier reply timed out, so the session is unusable
+    SessionPoisoned,
     /// A packet or a caller's assembly did not encode or decode
     Parse(binrw::Error),
     /// The adapter answered with an encapsulation status other than success
@@ -41,6 +43,7 @@ pub enum Error {
         actual: usize,
     },
     /// An EDS file that does not read, or a connection that refers to what the file does not define
+    #[cfg(feature = "eds")]
     Eds(eds_parser::error::Error),
     /// A connection of an EDS file this scanner does not open, with what the connection offers
     UnsupportedConnection(String),
@@ -61,6 +64,7 @@ impl fmt::Display for Error {
             Error::Timeout { waiting_for, after } => {
                 write!(f, "timed out after {after:?} waiting for {waiting_for}")
             }
+            Error::SessionPoisoned => write!(f, "the session is poisoned by an earlier timeout"),
             Error::Parse(error) => write!(f, "a packet did not encode or decode: {error}"),
             Error::EncapsulationStatus(status) => {
                 write!(
@@ -106,6 +110,7 @@ impl fmt::Display for Error {
                     "{actual} output bytes given, the connection carries {expected} {data_size}"
                 )
             }
+            #[cfg(feature = "eds")]
             Error::Eds(error) => write!(f, "{error}"),
             Error::UnsupportedConnection(message) => f.write_str(message),
         }
@@ -117,6 +122,7 @@ impl std::error::Error for Error {
         match self {
             Error::Io(error) => Some(error),
             Error::Parse(error) => Some(error),
+            #[cfg(feature = "eds")]
             Error::Eds(error) => Some(error),
             _ => None,
         }
@@ -141,6 +147,7 @@ impl From<Rejection> for Error {
     }
 }
 
+#[cfg(feature = "eds")]
 impl From<eds_parser::error::Error> for Error {
     fn from(error: eds_parser::error::Error) -> Self {
         Error::Eds(error)

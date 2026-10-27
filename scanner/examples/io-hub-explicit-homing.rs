@@ -18,7 +18,7 @@ use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_I
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::explicit::{decode_reply, send_request};
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -54,15 +54,16 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // The two assemblies this example talks to
-    let input_assembly = CipPath::new_full(
+    let input_path = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         INPUT_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
     );
-    let output_assembly = CipPath::new_full(
+    let output_path = CipPath::new_full(
         ASSEMBLY_CLASS_ID,
         OUTPUT_ASSEMBLY_INSTANCE,
         ASSEMBLY_DATA_ATTRIBUTE_ID,
@@ -70,7 +71,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= Register the session ============
     println!("REQUESTING - REGISTER session");
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // Every write sends the whole output assembly, so it is kept here and changed in place
     let mut outputs = OutputAssemblyHub4E::default();
@@ -78,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========= Clear a shutdown, if one is present ============
     let reply = send_request(
         &mut session,
-        input_assembly.clone(),
+        &input_path,
         ServiceCode::GetAttributeSingle,
         None,
     )
@@ -94,7 +99,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         motor.controlword.set_shutdown_reset(true);
         send_request(
             &mut session,
-            output_assembly.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -106,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         motor.controlword.set_shutdown_reset(false);
         send_request(
             &mut session,
-            output_assembly.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -124,7 +129,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .set_enable(true);
         send_request(
             &mut session,
-            output_assembly.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -134,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // The hub acts on a move when its move number changes, so the command takes the next one
         let reply = send_request(
             &mut session,
-            input_assembly.clone(),
+            &input_path,
             ServiceCode::GetAttributeSingle,
             None,
         )
@@ -150,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .command_move(MoveType::HomingMove, move_number);
         send_request(
             &mut session,
-            output_assembly.clone(),
+            &output_path,
             ServiceCode::SetAttributeSingle,
             Some(Box::new(outputs.clone())),
         )
@@ -161,7 +166,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let reply = send_request(
                 &mut session,
-                input_assembly.clone(),
+                &input_path,
                 ServiceCode::GetAttributeSingle,
                 None,
             )
@@ -201,7 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_enable(false);
     send_request(
         &mut session,
-        output_assembly,
+        &output_path,
         ServiceCode::SetAttributeSingle,
         Some(Box::new(outputs)),
     )

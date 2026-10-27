@@ -51,8 +51,14 @@ pub fn first_openable_connection(eds: &Eds, large: Option<bool>) -> Result<u32> 
     let mut refusals = String::new();
     for (number, connection) in &eds.connections {
         match forward_open_request(eds, connection, large) {
-            Ok(_) => return Ok(*number),
-            Err(refusal) => refusals.push_str(&format!("\n  Connection{number}: {refusal}")),
+            Ok(_) => {
+                tracing::debug!(number, "chose an EDS connection");
+                return Ok(*number);
+            }
+            Err(refusal) => {
+                tracing::debug!(number, %refusal, "skipped an EDS connection");
+                refusals.push_str(&format!("\n  Connection{number}: {refusal}"));
+            }
         }
     }
     Err(Error::UnsupportedConnection(format!(

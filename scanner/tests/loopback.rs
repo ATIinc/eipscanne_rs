@@ -40,7 +40,7 @@ use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 const SESSION_HANDLE: CipUdint = 0x0000_0042;
 const O2T_NETWORK_CONNECTION_ID: CipUdint = 0xa1b2_c3d4;
@@ -288,7 +288,9 @@ async fn one_connection_against_a_fake_adapter() {
     let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket, scanner_io_port));
 
     // 1. Session
-    let mut session = Session::register((LOCALHOST, adapter_port)).await.unwrap();
+    let mut session = Session::register((LOCALHOST, adapter_port), SessionConfig::default())
+        .await
+        .unwrap();
     assert_eq!(session.session_handle(), SESSION_HANDLE);
     assert_eq!(session.peer_ip(), LOCALHOST);
 
