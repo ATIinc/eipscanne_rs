@@ -54,7 +54,7 @@
 //! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
 //! ```
 //! Register Session and Unregister Session packets have no items; their command specific data is
-//! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or nothing.
+//! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or `::NoData`.
 
 use std::io::{Cursor, Seek, Write};
 
@@ -144,7 +144,7 @@ impl EnIpPacket {
         EnIpPacket::new(
             EnIpCommand::UnRegisterSession,
             session_handle,
-            CommandSpecificData::UnregisterSession,
+            CommandSpecificData::NoData,
         )
     }
 
