@@ -8,9 +8,14 @@ The adapter side of EtherNet/IP, built on `eipscanne_rs`: an explicit messaging 
 * `packet`: reads and writes one encapsulation packet on a stream, and finds the request it carries.
 * `error`: the one error type of every fallible call.
 
-`examples/identity-device` serves an Identity object and one output assembly; the scanner's `read-identity` reads it:
+## Sample ClearLink
+
+`examples/sample-clearlink-adapter` serves a sample Teknic ClearLink on `127.0.0.1:44818`: an Identity object and the configuration, output and input assemblies. Its inputs report an output as driven while it is on or has a PWM duty cycle. Start it in one terminal and run the scanner's examples against it from another:
 
 ```text
-cargo run --example identity-device
+cargo run --example sample-clearlink-adapter
 cargo run --example read-identity -- --host 127.0.0.1
+cargo run --example clearlink-explicit-outputs -- --host 127.0.0.1 --index 4 --on
 ```
+
+`read-identity` prints `Product Name: "Sample Clearlink"`; `clearlink-explicit-outputs` prints `IO-4: driven true (expected true), overloaded false`. `--host 0.0.0.0` serves other hosts too. The adapter serves unconnected messaging only, so `read-identity-connected` is refused.
