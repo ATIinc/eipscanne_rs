@@ -25,7 +25,7 @@ use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::handler::{Handler, decode};
+use adapter::handler::{Handler, decode_request};
 use adapter::server::serve;
 
 const ASSEMBLY_CLASS: u16 = 0x04;
@@ -106,7 +106,7 @@ impl Handler for IdentityDevice {
     ) -> Result<(), ResponseStatusCode> {
         match (class, instance, attribute) {
             (ASSEMBLY_CLASS, OUTPUT_INSTANCE, DATA_ATTRIBUTE) => {
-                let outputs: Outputs = decode(data)?;
+                let outputs: Outputs = decode_request(data)?;
                 tracing::info!("outputs set to {:#010x}", outputs.word);
                 *self
                     .outputs

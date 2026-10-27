@@ -50,8 +50,9 @@ pub trait Handler: Send + Sync {
     }
 }
 
-/// The data of a Set as `T`, refused with the General Status the scanner receives
-pub fn decode<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
+/// The data of a Set as `T`, refused with the General Status the scanner receives; mirrors the
+/// scanner's `decode_reply`
+pub fn decode_request<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
 {
@@ -74,18 +75,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decode_reads_exactly_the_data() {
-        assert_eq!(decode::<u32>(&[0xef, 0xbe, 0xad, 0xde]), Ok(0xdead_beef));
+    fn decode_request_reads_exactly_the_data() {
+        assert_eq!(
+            decode_request::<u32>(&[0xef, 0xbe, 0xad, 0xde]),
+            Ok(0xdead_beef)
+        );
     }
 
     #[test]
-    fn decode_refuses_short_and_long_data() {
+    fn decode_request_refuses_short_and_long_data() {
         assert_eq!(
-            decode::<u32>(&[0xef, 0xbe]),
+            decode_request::<u32>(&[0xef, 0xbe]),
             Err(ResponseStatusCode::NotEnoughData)
         );
         assert_eq!(
-            decode::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
+            decode_request::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
             Err(ResponseStatusCode::TooMuchData)
         );
     }
