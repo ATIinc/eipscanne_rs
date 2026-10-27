@@ -121,7 +121,8 @@ fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
     let CipDataOpt::Raw(data) = &message.request_data.additional_data else {
         panic!("expected raw request data");
     };
-    ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (false,)).unwrap()
+    ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (false,))
+        .expect("the scanner sends a well-formed Forward_Open")
 }
 
 /// Plays the adapter for one connection; returns the output packet's sequence number and data
@@ -130,24 +131,33 @@ async fn fake_adapter(
     io_socket: UdpSocket,
     scanner_io_port: u16,
 ) -> Vec<u8> {
-    let (mut stream, _) = listener.accept().await.unwrap();
+    let (mut stream, _) = listener.accept().await.expect("the scanner connects once");
 
     // 1. RegisterSession
-    let request = read_packet(&mut stream).await.unwrap();
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Register Session");
     assert_eq!(request.header.command, EnIpCommand::RegisterSession);
     let mut reply = EnIpPacket::new_registration();
     reply.header.session_handle = SESSION_HANDLE;
-    write_packet(&mut stream, &reply).await.unwrap();
+    write_packet(&mut stream, &reply)
+        .await
+        .expect("the scanner waits for the Register Session reply");
 
     // 2. Forward_Open: grant the intervals, pick the O->T ID and the outputs' port
-    let request = read_packet(&mut stream).await.unwrap();
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Forward_Open");
     assert_eq!(request.header.session_handle, SESSION_HANDLE);
     let forward_open = forward_open_request_of(&request);
     assert_eq!(
         forward_open.t2o_network_connection_id,
         T2O_NETWORK_CONNECTION_ID
     );
-    let io_port = io_socket.local_addr().unwrap().port();
+    let io_port = io_socket
+        .local_addr()
+        .expect("a bound socket has a local address")
+        .port();
     write_packet(
         &mut stream,
         &connection_manager_reply(
@@ -171,10 +181,12 @@ async fn fake_adapter(
         ),
     )
     .await
-    .unwrap();
+    .expect("the scanner waits for the Forward_Open reply");
 
     // 3. One output packet in, the same bytes back as an input packet
-    let (packet, _) = recv_io_packet(&io_socket).await.unwrap();
+    let (packet, _) = recv_io_packet(&io_socket)
+        .await
+        .expect("the scanner sends one output packet");
     assert_eq!(
         packet.sequenced_address.connection_id,
         O2T_NETWORK_CONNECTION_ID
@@ -192,10 +204,12 @@ async fn fake_adapter(
         SocketAddrV4::new(LOCALHOST, scanner_io_port),
     )
     .await
-    .unwrap();
+    .expect("UDP sends to the scanner's bound loopback port");
 
     // 4. Forward_Close
-    let request = read_packet(&mut stream).await.unwrap();
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Forward_Close");
     let Some(message) = message_router_request(&request) else {
         panic!("expected a Forward_Close request");
     };
@@ -216,10 +230,12 @@ async fn fake_adapter(
         ),
     )
     .await
-    .unwrap();
+    .expect("the scanner waits for the Forward_Close reply");
 
     // 5. UnregisterSession
-    let request = read_packet(&mut stream).await.unwrap();
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Unregister Session");
     assert_eq!(request.header.command, EnIpCommand::UnRegisterSession);
 
     outputs
@@ -229,19 +245,31 @@ async fn fake_adapter(
 
 #[tokio::test]
 async fn one_connection_against_a_fake_adapter() {
-    let listener = TcpListener::bind((LOCALHOST, 0)).await.unwrap();
-    let adapter_port = listener.local_addr().unwrap().port();
-    let adapter_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
+    let listener = TcpListener::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let adapter_port = listener
+        .local_addr()
+        .expect("a bound listener has a local address")
+        .port();
+    let adapter_io_socket = UdpSocket::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
     // An ephemeral port, so the test never collides with a running scanner
-    let scanner_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
-    let scanner_io_port = scanner_io_socket.local_addr().unwrap().port();
+    let scanner_io_socket = UdpSocket::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let scanner_io_port = scanner_io_socket
+        .local_addr()
+        .expect("a bound socket has a local address")
+        .port();
 
     let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket, scanner_io_port));
 
     // 1. Session
     let mut session = Session::register((LOCALHOST, adapter_port), SessionConfig::default())
         .await
-        .unwrap();
+        .expect("the fake adapter grants Register Session");
     assert_eq!(session.session_handle(), SESSION_HANDLE);
     assert_eq!(session.peer_ip(), LOCALHOST);
 
@@ -253,7 +281,7 @@ async fn one_connection_against_a_fake_adapter() {
         RealTimeFormat::Modeless,
     )
     .await
-    .unwrap();
+    .expect("the fake adapter grants the Forward_Open");
     assert_eq!(
         connection.response.o2t_network_connection_id,
         O2T_NETWORK_CONNECTION_ID
@@ -267,14 +295,17 @@ async fn one_connection_against_a_fake_adapter() {
 
     // 3. One cycle each way
     let outputs = [0xde, 0xad, 0xbe, 0xef];
-    let packet =
-        build_o2t_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
+    let packet = build_o2t_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true)
+        .expect("the four output bytes fit the O->T size");
     send_io_packet(&scanner_io_socket, &packet, connection.o2t_endpoint)
         .await
-        .unwrap();
+        .expect("UDP sends to the fake adapter's bound loopback port");
 
-    let (packet, from) = recv_io_packet(&scanner_io_socket).await.unwrap();
-    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from).unwrap();
+    let (packet, from) = recv_io_packet(&scanner_io_socket)
+        .await
+        .expect("the fake adapter echoes the outputs as one input packet");
+    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from)
+        .expect("the fake adapter sends on the granted T->O connection ID");
     assert_eq!(address.encapsulation_sequence_number, 1);
     assert_eq!(inputs.cip_sequence_count, Some(1));
     assert_eq!(inputs.run_idle_header, None);
@@ -283,8 +314,14 @@ async fn one_connection_against_a_fake_adapter() {
     // 4. Close, 5. End session
     forward_close(&mut session, &connection.request)
         .await
-        .unwrap();
-    session.unregister().await.unwrap();
+        .expect("the fake adapter grants the Forward_Close");
+    session
+        .unregister()
+        .await
+        .expect("the fake adapter reads Unregister Session");
 
-    assert_eq!(adapter.await.unwrap(), outputs);
+    assert_eq!(
+        adapter.await.expect("the fake adapter's asserts hold"),
+        outputs
+    );
 }
