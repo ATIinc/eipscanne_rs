@@ -1,6 +1,6 @@
-//! An explicit messaging server: a device implements [`handler::Handler`], [`server::serve`] does the rest.
+//! An explicit messaging server: a device implements [`device::Device`], [`server::serve`] does the rest.
 
+pub mod device;
 pub mod error;
-pub mod handler;
 pub mod packet;
 pub mod server;

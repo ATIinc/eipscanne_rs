@@ -8,7 +8,7 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
 
 /// A device behind [`crate::server::serve`]; calls can overlap, and a service it leaves out is not supported
-pub trait Handler: Send + Sync {
+pub trait Device: Send + Sync {
     /// Get_Attributes_All
     fn handle_get_attributes_all(
         &self,

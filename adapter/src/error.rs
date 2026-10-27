@@ -2,6 +2,8 @@
 
 use std::fmt;
 
+use eipscanne_rs::eip::packet::EncapsulationHeader;
+
 /// What every fallible call of the adapter returns
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -11,6 +13,11 @@ pub enum Error {
     Io(std::io::Error),
     /// A packet did not encode or decode
     Parse(binrw::Error),
+    /// A packet whose header decoded but whose command specific data did not
+    Undecodable {
+        header: EncapsulationHeader,
+        error: binrw::Error,
+    },
 }
 
 // ======= Start of Error impl ========
@@ -20,6 +27,9 @@ impl fmt::Display for Error {
         match self {
             Error::Io(error) => write!(f, "I/O error: {error}"),
             Error::Parse(error) => write!(f, "a packet did not encode or decode: {error}"),
+            Error::Undecodable { header, error } => {
+                write!(f, "a {:?} packet did not decode: {error}", header.command)
+            }
         }
     }
 }
@@ -29,6 +39,7 @@ impl std::error::Error for Error {
         match self {
             Error::Io(error) => Some(error),
             Error::Parse(error) => Some(error),
+            Error::Undecodable { error, .. } => Some(error),
         }
     }
 }

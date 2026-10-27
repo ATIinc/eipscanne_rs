@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device's handler"
+description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device"
 
 [dependencies]
 eipscanne_rs = { path = ".." }

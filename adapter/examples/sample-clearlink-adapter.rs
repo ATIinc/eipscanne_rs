@@ -30,7 +30,7 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::handler::{Handler, decode_request};
+use adapter::device::{Device, decode_request};
 use adapter::server::serve;
 
 // The ClearLink assemblies the scanner's examples use, in scanner/assemblies/
@@ -97,7 +97,7 @@ impl SampleClearlinkAdapter {
     }
 }
 
-impl Handler for SampleClearlinkAdapter {
+impl Device for SampleClearlinkAdapter {
     fn handle_get_attributes_all(
         &self,
         class: u16,

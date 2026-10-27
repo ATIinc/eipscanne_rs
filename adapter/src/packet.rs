@@ -10,15 +10,24 @@ use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 
 /// Size of the encapsulation header on the wire
 const ENCAPSULATION_HEADER_LEN: usize = 24;
 
-/// Reads one encapsulation packet
+/// Reads one encapsulation packet whole; [`Error::Undecodable`] when only its header decodes
 pub async fn read_packet(stream: &mut (impl AsyncRead + Unpin)) -> Result<EnIpPacket> {
-    let (_, bytes) = read_frame(stream).await?;
-    Ok(EnIpPacket::read(&mut Cursor::new(&bytes))?)
+    let mut bytes = vec![0u8; ENCAPSULATION_HEADER_LEN];
+    stream.read_exact(&mut bytes).await?;
+
+    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes))?;
+    let length = usize::from(header.length.unwrap_or(0));
+    bytes.resize(ENCAPSULATION_HEADER_LEN + length, 0);
+    stream
+        .read_exact(&mut bytes[ENCAPSULATION_HEADER_LEN..])
+        .await?;
+
+    EnIpPacket::read(&mut Cursor::new(&bytes)).map_err(|error| Error::Undecodable { header, error })
 }
 
 /// Writes one encapsulation packet
@@ -33,7 +42,7 @@ pub async fn write_packet(
 }
 
 /// The Message Router request a Send RR Data or Send Unit Data packet carries
-pub fn request_of(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
+pub fn message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
     let cip_message = match &packet.command_specific_data {
         CommandSpecificData::SendRrData(rr_data) => &rr_data.cip_message,
         CommandSpecificData::SendUnitData(unit_data) => &unit_data.cip_message,
@@ -43,32 +52,4 @@ pub fn request_of(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
         CipMessage::Request(request) => Some(request),
         CipMessage::Response(_) => None,
     }
-}
-
-/// One packet's parsed header and all its bytes, for any command
-pub(crate) async fn read_frame(
-    stream: &mut (impl AsyncRead + Unpin),
-) -> Result<(EncapsulationHeader, Vec<u8>)> {
-    let mut bytes = vec![0u8; ENCAPSULATION_HEADER_LEN];
-    stream.read_exact(&mut bytes).await?;
-
-    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes))?;
-    let length = usize::from(header.length.unwrap_or(0));
-    bytes.resize(ENCAPSULATION_HEADER_LEN + length, 0);
-    stream
-        .read_exact(&mut bytes[ENCAPSULATION_HEADER_LEN..])
-        .await?;
-
-    Ok((header, bytes))
-}
-
-/// Writes a header without command specific data
-pub(crate) async fn write_header(
-    stream: &mut (impl AsyncWrite + Unpin),
-    header: &EncapsulationHeader,
-) -> Result<()> {
-    let mut bytes = Cursor::new(Vec::new());
-    header.write_le_args(&mut bytes, (0,))?;
-    stream.write_all(bytes.get_ref()).await?;
-    Ok(())
 }

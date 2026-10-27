@@ -8,7 +8,7 @@ use bilge::prelude::{u4, u9};
 use binrw::BinRead;
 use tokio::net::{TcpListener, UdpSocket};
 
-use adapter::packet::{read_packet, request_of, write_packet};
+use adapter::packet::{message_router_request, read_packet, write_packet};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -111,7 +111,7 @@ fn connection_manager_reply(
 
 /// The Forward_Open request inside a packet, as the adapter parses it
 fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(message) = request_of(packet) else {
+    let Some(message) = message_router_request(packet) else {
         panic!("expected a request, got {:?}", packet.command_specific_data);
     };
     assert_eq!(
@@ -196,7 +196,7 @@ async fn fake_adapter(
 
     // 4. Forward_Close
     let request = read_packet(&mut stream).await.unwrap();
-    let Some(message) = request_of(&request) else {
+    let Some(message) = message_router_request(&request) else {
         panic!("expected a Forward_Close request");
     };
     assert_eq!(

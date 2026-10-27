@@ -1,9 +1,8 @@
 //! The explicit messaging server: one task and one session per connection.
 
-use std::io::{Cursor, ErrorKind};
+use std::io::ErrorKind;
 use std::sync::Arc;
 
-use binrw::BinRead;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
@@ -21,22 +20,23 @@ use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand, EncapsStatusC
 use eipscanne_rs::eip::constants::{ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
+use crate::device::Device;
 use crate::error::{Error, Result};
-use crate::handler::Handler;
-use crate::packet::{read_frame, request_of, write_header, write_packet};
+use crate::packet::{message_router_request, read_packet, write_packet};
 
 /// Serves every connecting scanner until accepting fails; dropping it closes every connection
-pub async fn serve(listener: TcpListener, handler: Arc<dyn Handler>) -> Result<()> {
+pub async fn serve(listener: TcpListener, device: Arc<dyn Device>) -> Result<()> {
     let mut connections = JoinSet::new();
     let mut next_session_handle: CipUdint = 1;
     loop {
         let (stream, peer) = listener.accept().await?;
         let session_handle = next_session_handle;
         next_session_handle = next_session_handle.wrapping_add(1);
-        let handler = Arc::clone(&handler);
+        let device = Arc::clone(&device);
         connections.spawn(
             async move {
-                if let Err(error) = serve_stream(stream, session_handle, handler.as_ref()).await {
+                if let Err(error) = serve_connection(stream, session_handle, device.as_ref()).await
+                {
                     tracing::warn!(%error, "connection ended");
                 }
             }
@@ -47,94 +47,109 @@ pub async fn serve(listener: TcpListener, handler: Arc<dyn Handler>) -> Result<(
 }
 
 /// Answers one scanner's packets as session `session_handle` until it unregisters or closes the stream
-#[tracing::instrument(skip(stream, handler))]
-pub async fn serve_stream(
+#[tracing::instrument(skip(stream, device))]
+pub async fn serve_connection(
     mut stream: impl AsyncRead + AsyncWrite + Unpin,
     session_handle: CipUdint,
-    handler: &dyn Handler,
+    device: &dyn Device,
 ) -> Result<()> {
     let mut registered = false;
     loop {
-        let (header, bytes) = match read_frame(&mut stream).await {
+        let packet = match read_packet(&mut stream).await {
+            Ok(packet) => packet,
+            // Answered as a packet without data
+            Err(Error::Undecodable { header, error }) => {
+                tracing::warn!(%error, "packet did not decode");
+                EnIpPacket {
+                    header,
+                    command_specific_data: CommandSpecificData::NoData,
+                }
+            }
             Err(Error::Io(error)) if error.kind() == ErrorKind::UnexpectedEof => {
                 tracing::info!("scanner closed the stream");
                 return Ok(());
             }
-            frame => frame?,
+            Err(error) => return Err(error),
         };
 
-        let reply = match header.command {
+        let header = &packet.header;
+        let mut reply = match header.command {
+            // NOP has no reply
+            EnIpCommand::NOP => continue,
             // Unregister Session has no reply
             EnIpCommand::UnRegisterSession => {
                 tracing::info!("session unregistered");
                 return Ok(());
             }
+            // A request with a Status has no reply
+            _ if header.status_code != EncapsStatusCode::Success => {
+                tracing::warn!(command = ?header.command, status = ?header.status_code, "ignored a request with a Status");
+                continue;
+            }
             EnIpCommand::RegisterSession => {
-                let reply = handle_register_session(&bytes, session_handle);
-                if reply.is_ok() {
+                let reply = handle_register_session(&packet, session_handle);
+                if reply.header.status_code == EncapsStatusCode::Success {
                     tracing::info!("session registered");
                     registered = true;
                 }
                 reply
             }
-            EnIpCommand::SendRrData if registered && header.session_handle == session_handle => {
-                handle_send_rr_data(&bytes, session_handle, handler)
+            EnIpCommand::SendRrData => {
+                if registered && header.session_handle == session_handle {
+                    handle_send_rr_data(&packet, session_handle, device)
+                } else {
+                    refusal(header, EncapsStatusCode::InvalidSessionHandle)
+                }
             }
-            EnIpCommand::SendRrData => Err(EncapsStatusCode::InvalidSessionHandle),
-            _ => Err(EncapsStatusCode::UnsupportedCommand),
+            _ => refusal(header, EncapsStatusCode::UnsupportedCommand),
         };
-
-        match reply {
-            Ok(mut reply) => {
-                reply.header.sender_context = header.sender_context;
-                write_packet(&mut stream, &reply).await?;
-            }
-            Err(status_code) => {
-                tracing::warn!(command = ?header.command, status = ?status_code, "refused a packet");
-                let reply = EncapsulationHeader {
-                    length: None,
-                    status_code,
-                    ..header
-                };
-                write_header(&mut stream, &reply).await?;
-            }
-        }
+        reply.header.sender_context = header.sender_context;
+        write_packet(&mut stream, &reply).await?;
     }
 }
 
-/// The Register Session reply granting `session_handle`
-fn handle_register_session(
-    bytes: &[u8],
-    session_handle: CipUdint,
-) -> std::result::Result<EnIpPacket, EncapsStatusCode> {
-    let packet = EnIpPacket::read(&mut Cursor::new(bytes)).map_err(|error| {
-        tracing::warn!(%error, "packet did not decode");
-        EncapsStatusCode::InvalidFormatOrData
-    })?;
-    let CommandSpecificData::RegisterSession(register_data) = &packet.command_specific_data else {
-        return Err(EncapsStatusCode::InvalidFormatOrData);
-    };
-    if register_data.protocol_version != ENCAPSULATION_PROTOCOL_VERSION {
-        return Err(EncapsStatusCode::UnsupportedProtocolVersion);
+/// The reply refusing the packet with `header`
+fn refusal(header: &EncapsulationHeader, status_code: EncapsStatusCode) -> EnIpPacket {
+    tracing::warn!(command = ?header.command, status = ?status_code, "refused a packet");
+    EnIpPacket {
+        header: EncapsulationHeader {
+            length: None,
+            status_code,
+            ..*header
+        },
+        command_specific_data: CommandSpecificData::NoData,
     }
+}
+
+/// The Register Session reply granting `session_handle`, or refusing another protocol version with ours
+fn handle_register_session(packet: &EnIpPacket, session_handle: CipUdint) -> EnIpPacket {
+    let CommandSpecificData::RegisterSession(register_data) = &packet.command_specific_data else {
+        return refusal(&packet.header, EncapsStatusCode::InvalidFormatOrData);
+    };
     let mut reply = EnIpPacket::new_registration();
+    if register_data.protocol_version != ENCAPSULATION_PROTOCOL_VERSION {
+        tracing::warn!(
+            protocol_version = register_data.protocol_version,
+            "refused Register Session"
+        );
+        reply.header.status_code = EncapsStatusCode::UnsupportedProtocolVersion;
+        return reply;
+    }
     reply.header.session_handle = session_handle;
-    Ok(reply)
+    reply
 }
 
 /// The Send RR Data reply carrying the Message Router's response to the request inside
 fn handle_send_rr_data(
-    bytes: &[u8],
+    packet: &EnIpPacket,
     session_handle: CipUdint,
-    handler: &dyn Handler,
-) -> std::result::Result<EnIpPacket, EncapsStatusCode> {
-    let packet = EnIpPacket::read(&mut Cursor::new(bytes)).map_err(|error| {
-        tracing::warn!(%error, "packet did not decode");
-        EncapsStatusCode::InvalidFormatOrData
-    })?;
-    let request = request_of(&packet).ok_or(EncapsStatusCode::InvalidFormatOrData)?;
+    device: &dyn Device,
+) -> EnIpPacket {
+    let Some(request) = message_router_request(packet) else {
+        return refusal(&packet.header, EncapsStatusCode::InvalidFormatOrData);
+    };
     let service = request.service_container.service();
-    let (status, data) = match route(service, request, handler) {
+    let (status, data) = match handle_request(request, device) {
         Ok(data) => (ResponseStatusCode::Success, data),
         Err(status) => (status, CipDataOpt::Raw(vec![])),
     };
@@ -147,20 +162,16 @@ fn handle_send_rr_data(
             data,
         },
     };
-    Ok(EnIpPacket::new_send_rr_data(
-        session_handle,
-        NO_ENCAPSULATION_TIMEOUT,
-        response,
-    ))
+    EnIpPacket::new_send_rr_data(session_handle, NO_ENCAPSULATION_TIMEOUT, response)
 }
 
-/// Hands a Get or Set to the handler; Single services need an attribute, All services none
-fn route(
-    service: ServiceCode,
+/// Hands a Get or Set to the device; Single services need an attribute, All services none
+fn handle_request(
     request: &MessageRouterRequest,
-    handler: &dyn Handler,
+    device: &dyn Device,
 ) -> std::result::Result<CipDataOpt, ResponseStatusCode> {
-    let Some((class, instance, attribute)) = logical_ids(&request.request_data.cip_path) else {
+    let service = request.service_container.service();
+    let Some((class, instance, attribute)) = cip_path_ids(&request.request_data.cip_path) else {
         tracing::warn!(
             ?service,
             "refused a request whose path is not class, instance and attribute"
@@ -172,14 +183,14 @@ fn route(
     };
 
     let reply = match (service, attribute) {
-        (ServiceCode::GetAttributeAll, None) => handler.handle_get_attributes_all(class, instance),
+        (ServiceCode::GetAttributeAll, None) => device.handle_get_attributes_all(class, instance),
         (ServiceCode::GetAttributeSingle, Some(attribute)) => {
-            handler.handle_get_attribute_single(class, instance, attribute)
+            device.handle_get_attribute_single(class, instance, attribute)
         }
-        (ServiceCode::SetAttributeAll, None) => handler
+        (ServiceCode::SetAttributeAll, None) => device
             .handle_set_attributes_all(class, instance, data)
             .map(|()| CipDataOpt::Raw(vec![])),
-        (ServiceCode::SetAttributeSingle, Some(attribute)) => handler
+        (ServiceCode::SetAttributeSingle, Some(attribute)) => device
             .handle_set_attribute_single(class, instance, attribute, data)
             .map(|()| CipDataOpt::Raw(vec![])),
         (
@@ -209,24 +220,27 @@ fn route(
 }
 
 /// The class, instance and optional attribute of a logical path
-fn logical_ids(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
+fn cip_path_ids(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
     match path.segments.as_slice() {
         [class, instance] => Some((
-            value_of(class, LogicalSegmentType::ClassId)?,
-            value_of(instance, LogicalSegmentType::InstanceId)?,
+            segment_id(class, LogicalSegmentType::ClassId)?,
+            segment_id(instance, LogicalSegmentType::InstanceId)?,
             None,
         )),
         [class, instance, attribute] => Some((
-            value_of(class, LogicalSegmentType::ClassId)?,
-            value_of(instance, LogicalSegmentType::InstanceId)?,
-            Some(value_of(attribute, LogicalSegmentType::AttributeId)?),
+            segment_id(class, LogicalSegmentType::ClassId)?,
+            segment_id(instance, LogicalSegmentType::InstanceId)?,
+            Some(segment_id(attribute, LogicalSegmentType::AttributeId)?),
         )),
         _ => None,
     }
 }
 
 /// The value of a segment of `logical_segment_type`
-fn value_of(segment: &LogicalPathSegment, logical_segment_type: LogicalSegmentType) -> Option<u16> {
+fn segment_id(
+    segment: &LogicalPathSegment,
+    logical_segment_type: LogicalSegmentType,
+) -> Option<u16> {
     if segment.path_definition.logical_segment_type() != logical_segment_type {
         return None;
     }
