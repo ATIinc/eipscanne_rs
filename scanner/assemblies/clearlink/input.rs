@@ -1,7 +1,7 @@
 //! The ClearLink input assembly (instance 0x64): what the device reports back.
 //! <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30>
 
-use bilge::prelude::{DebugBits, FromBits, bitsize, u3, u10, u12, u20};
+use bilge::prelude::{BuilderBits, DebugBits, DefaultBits, FromBits, bitsize, u3, u10, u12, u20};
 use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipBool, CipDint, CipInt, CipReal, CipUdint, CipUlint, CipUsint};
@@ -9,8 +9,10 @@ use eipscanne_rs::cip::types::{CipBool, CipDint, CipInt, CipReal, CipUdint, CipU
 /// Assembly instance holding the ClearLink inputs
 pub const INPUT_ASSEMBLY_INSTANCE: u8 = 0x64;
 
-#[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[bitsize(16, new = pub)]
+#[derive(
+    FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, BuilderBits, DefaultBits,
+)]
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct DigitalInputs {
@@ -32,7 +34,7 @@ pub struct DigitalInputs {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct AnalogInputValues {
     pub input9: CipInt,
     pub input10: CipInt,
@@ -41,7 +43,7 @@ pub struct AnalogInputValues {
 }
 
 #[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct AnalogInputStates {
@@ -53,7 +55,7 @@ pub struct AnalogInputStates {
 }
 
 #[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct AnalogAndDigitalOutputStates {
@@ -68,7 +70,7 @@ pub struct AnalogAndDigitalOutputStates {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct IOInputData {
     pub dip_value: DigitalInputs,
     pub dip_status: DigitalInputs,
@@ -83,7 +85,7 @@ pub struct IOInputData {
 
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct EncoderInputData {
     pub encoder_position: CipDint,
     pub encoder_velocity: CipDint,
@@ -94,7 +96,7 @@ pub struct EncoderInputData {
 
 /// The status bits of one motor connector
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct MotorStatus {
@@ -125,7 +127,7 @@ pub struct MotorStatus {
 
 /// Why a motor connector shut down
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct MotorShutdowns {
@@ -148,7 +150,7 @@ pub struct MotorShutdowns {
 /// <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=53>
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct MotorInputData {
     pub commanded_position: CipDint,
     pub commanded_velocity: CipDint,
@@ -173,11 +175,29 @@ pub struct SerialAsciiInputData {
     pub input_data: [CipUsint; 128],
 }
 
+// ======= Start of SerialAsciiInputData impl ========
+
+impl Default for SerialAsciiInputData {
+    fn default() -> Self {
+        SerialAsciiInputData {
+            serial_status: 0x0,
+            output_char_count: 0x0,
+            input_char_count: 0x0,
+            output_sequence_ack: 0x0,
+            input_size: 0x0,
+            input_sequence: 0x0,
+            input_data: [0x0; 128],
+        }
+    }
+}
+
+// ^^^^^^^^ End of SerialAsciiInputData impl ^^^^^^^^
+
 /// Based on the ClearLink Ethernet/IP Object Reference:
 /// <https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=30>
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct InputAssemblyObject {
     pub io_input_data: IOInputData,
     pub encoder_input_data: EncoderInputData,
