@@ -12,11 +12,9 @@
 //!
 //! The adapter serves unconnected messaging only, so `read-identity-connected` is refused.
 
-use std::io::Cursor;
 use std::net::Ipv4Addr;
 use std::sync::{Arc, Mutex};
 
-use binrw::BinRead;
 use clap::Parser;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
@@ -55,9 +53,6 @@ const CONFIG_INSTANCE: u16 = CONFIG_ASSEMBLY_INSTANCE as u16;
 const OUTPUT_INSTANCE: u16 = OUTPUT_ASSEMBLY_INSTANCE as u16;
 const INPUT_INSTANCE: u16 = INPUT_ASSEMBLY_INSTANCE as u16;
 
-/// Bytes of the input assembly
-const INPUT_SIZE: usize = 332;
-
 /// Serves a sample ClearLink
 #[derive(Parser)]
 #[command(version)]
@@ -79,15 +74,25 @@ impl SampleClearlinkAdapter {
             .outputs
             .lock()
             .expect("nothing panics while holding the outputs lock");
-        let dop_value: u16 = u16::from(outputs.io_output_data.dop_value);
+        let dop_value = outputs.io_output_data.dop_value;
         let dop_pwm: [u8; 6] = outputs.io_output_data.dop_pwm;
-        let dip_status: u16 = (0..dop_pwm.len())
-            .filter(|&index| dop_value >> index & 1 == 1 || dop_pwm[index] != 0)
-            .fold(0, |bits, index| bits | 1 << index);
 
-        let mut inputs = InputAssemblyObject::read_le(&mut Cursor::new([0u8; INPUT_SIZE]))
-            .expect("zero bytes of the input assembly's size decode");
-        inputs.io_input_data.dip_status = DigitalInputs::from(dip_status);
+        let mut inputs = InputAssemblyObject::default();
+        inputs.io_input_data.dip_status = DigitalInputs::builder()
+            .input0(dop_value.output0() || dop_pwm[0] != 0)
+            .input1(dop_value.output1() || dop_pwm[1] != 0)
+            .input2(dop_value.output2() || dop_pwm[2] != 0)
+            .input3(dop_value.output3() || dop_pwm[3] != 0)
+            .input4(dop_value.output4() || dop_pwm[4] != 0)
+            .input5(dop_value.output5() || dop_pwm[5] != 0)
+            .input6(false)
+            .input7(false)
+            .input8(false)
+            .input9(false)
+            .input10(false)
+            .input11(false)
+            .input12(false)
+            .build();
         inputs
     }
 }
