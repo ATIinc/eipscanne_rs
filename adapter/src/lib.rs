@@ -3,5 +3,4 @@
 pub mod error;
 pub mod handler;
 pub mod packet;
-pub mod reply;
 pub mod server;

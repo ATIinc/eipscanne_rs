@@ -20,27 +20,16 @@ use adapter::server::serve_stream;
 
 const SESSION_HANDLE: CipUdint = 0x10;
 
-/// Answers every Get with one byte
+/// Answers Get_Attributes_All with one byte
 struct Device;
 
 impl Handler for Device {
-    fn handle_get_attribute(
+    fn handle_get_attributes_all(
         &self,
         _class: u16,
         _instance: u16,
-        _attribute: Option<u16>,
     ) -> std::result::Result<CipDataOpt, ResponseStatusCode> {
         Ok(CipDataOpt::Raw(vec![0x2a]))
-    }
-
-    fn handle_set_attribute(
-        &self,
-        _class: u16,
-        _instance: u16,
-        _attribute: Option<u16>,
-        _data: &[u8],
-    ) -> std::result::Result<(), ResponseStatusCode> {
-        Ok(())
     }
 }
 

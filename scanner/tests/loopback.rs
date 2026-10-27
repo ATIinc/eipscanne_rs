@@ -9,7 +9,6 @@ use binrw::BinRead;
 use tokio::net::{TcpListener, UdpSocket};
 
 use adapter::packet::{read_packet, request_of, write_packet};
-use adapter::reply;
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -21,7 +20,10 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
-use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, ResponseData, ResponseStatusCode,
+};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
@@ -89,11 +91,17 @@ fn connection_manager_reply(
     data: impl CipData + 'static,
     socket_addr_info_items: SocketAddrInfoItems,
 ) -> EnIpPacket {
-    let mut reply = EnIpPacket::new_send_rr_data(
-        SESSION_HANDLE,
-        NO_ENCAPSULATION_TIMEOUT,
-        reply::success(service, CipDataOpt::Typed(Box::new(data))),
-    );
+    let response = MessageRouterResponse {
+        service_container: ServiceContainer::new_response(service),
+        response_data: ResponseData {
+            status: ResponseStatusCode::Success,
+            additional_status_size: 0,
+            additional_status: vec![],
+            data: CipDataOpt::Typed(Box::new(data)),
+        },
+    };
+    let mut reply =
+        EnIpPacket::new_send_rr_data(SESSION_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
     let CommandSpecificData::SendRrData(rr_data) = &mut reply.command_specific_data else {
         unreachable!("a Send RR Data packet");
     };

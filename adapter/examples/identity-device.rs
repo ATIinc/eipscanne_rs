@@ -59,14 +59,13 @@ struct IdentityDevice {
 }
 
 impl Handler for IdentityDevice {
-    fn handle_get_attribute(
+    fn handle_get_attributes_all(
         &self,
         class: u16,
         instance: u16,
-        attribute: Option<u16>,
     ) -> Result<CipDataOpt, ResponseStatusCode> {
-        match (class, instance, attribute) {
-            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID, None) => {
+        match (class, instance) {
+            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
                 Ok(CipDataOpt::Typed(Box::new(IdentityResponse {
                     vendor_id: VendorId::TeknicInc,
                     device_type: DeviceType::GenericDevice,
@@ -77,29 +76,38 @@ impl Handler for IdentityDevice {
                     product_name: CipShortString::from(self.product_name.clone()),
                 })))
             }
-            (ASSEMBLY_CLASS, OUTPUT_INSTANCE, Some(DATA_ATTRIBUTE)) => {
-                Ok(CipDataOpt::Typed(Box::new(
-                    *self
-                        .outputs
-                        .lock()
-                        .expect("nothing panics while holding the outputs lock"),
-                )))
-            }
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }
 
-    fn handle_set_attribute(
+    fn handle_get_attribute_single(
         &self,
         class: u16,
         instance: u16,
-        attribute: Option<u16>,
+        attribute: u16,
+    ) -> Result<CipDataOpt, ResponseStatusCode> {
+        match (class, instance, attribute) {
+            (ASSEMBLY_CLASS, OUTPUT_INSTANCE, DATA_ATTRIBUTE) => Ok(CipDataOpt::Typed(Box::new(
+                *self
+                    .outputs
+                    .lock()
+                    .expect("nothing panics while holding the outputs lock"),
+            ))),
+            _ => Err(ResponseStatusCode::ObjectDoesNotExist),
+        }
+    }
+
+    fn handle_set_attribute_single(
+        &self,
+        class: u16,
+        instance: u16,
+        attribute: u16,
         data: &[u8],
     ) -> Result<(), ResponseStatusCode> {
         match (class, instance, attribute) {
-            (ASSEMBLY_CLASS, OUTPUT_INSTANCE, Some(DATA_ATTRIBUTE)) => {
+            (ASSEMBLY_CLASS, OUTPUT_INSTANCE, DATA_ATTRIBUTE) => {
                 let outputs: Outputs = decode(data)?;
-                println!("  outputs set to {:#010x}", outputs.word);
+                tracing::info!("outputs set to {:#010x}", outputs.word);
                 *self
                     .outputs
                     .lock()
@@ -113,10 +121,11 @@ impl Handler for IdentityDevice {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     let listener = TcpListener::bind((args.host, ETHERNET_IP_TCP_PORT)).await?;
-    println!("SERVING on {}", listener.local_addr()?);
+    tracing::info!("serving on {}", listener.local_addr()?);
     let device = IdentityDevice {
         product_name: args.product_name,
         outputs: Mutex::new(Outputs { word: 0 }),
@@ -126,7 +135,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         served = serve(listener, Arc::new(device)) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
-    println!("STOPPED");
+    tracing::info!("stopped");
 
     Ok(())
 }

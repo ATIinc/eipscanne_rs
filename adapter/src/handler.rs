@@ -7,24 +7,47 @@ use binrw::BinRead;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
 
-/// A device behind [`crate::server::serve`]; calls can overlap
+/// A device behind [`crate::server::serve`]; calls can overlap, and a service it leaves out is not supported
 pub trait Handler: Send + Sync {
-    /// Get_Attribute_Single when `attribute` is `Some`, Get_Attributes_All when `None`
-    fn handle_get_attribute(
+    /// Get_Attributes_All
+    fn handle_get_attributes_all(
         &self,
-        class: u16,
-        instance: u16,
-        attribute: Option<u16>,
-    ) -> Result<CipDataOpt, ResponseStatusCode>;
+        _class: u16,
+        _instance: u16,
+    ) -> Result<CipDataOpt, ResponseStatusCode> {
+        Err(ResponseStatusCode::ServiceNotSupported)
+    }
 
-    /// Set_Attribute_Single when `attribute` is `Some`, Set_Attributes_All when `None`
-    fn handle_set_attribute(
+    /// Get_Attribute_Single
+    fn handle_get_attribute_single(
         &self,
-        class: u16,
-        instance: u16,
-        attribute: Option<u16>,
-        data: &[u8],
-    ) -> Result<(), ResponseStatusCode>;
+        _class: u16,
+        _instance: u16,
+        _attribute: u16,
+    ) -> Result<CipDataOpt, ResponseStatusCode> {
+        Err(ResponseStatusCode::ServiceNotSupported)
+    }
+
+    /// Set_Attributes_All
+    fn handle_set_attributes_all(
+        &self,
+        _class: u16,
+        _instance: u16,
+        _data: &[u8],
+    ) -> Result<(), ResponseStatusCode> {
+        Err(ResponseStatusCode::ServiceNotSupported)
+    }
+
+    /// Set_Attribute_Single
+    fn handle_set_attribute_single(
+        &self,
+        _class: u16,
+        _instance: u16,
+        _attribute: u16,
+        _data: &[u8],
+    ) -> Result<(), ResponseStatusCode> {
+        Err(ResponseStatusCode::ServiceNotSupported)
+    }
 }
 
 /// The data of a Set as `T`, refused with the General Status the scanner receives
