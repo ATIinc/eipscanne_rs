@@ -82,6 +82,7 @@ struct CliArgs {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let cli_args = CliArgs::parse();
 
     // The three assemblies this example talks to

@@ -28,11 +28,13 @@ const MAX_UDP_PAYLOAD: usize = 65_535;
 /// soon as they reply. One socket carries both directions: the Forward_Open names no T->O address,
 /// so the adapter sends the inputs to this host on 2222, and the outputs leave from it.
 pub async fn bind_io_socket() -> Result<UdpSocket> {
-    Ok(UdpSocket::bind(SocketAddrV4::new(
+    let socket = UdpSocket::bind(SocketAddrV4::new(
         Ipv4Addr::UNSPECIFIED,
         ETHERNET_IP_IO_UDP_PORT,
     ))
-    .await?)
+    .await?;
+    tracing::debug!(local = %socket.local_addr()?, "I/O socket bound");
+    Ok(socket)
 }
 
 /// Receives one I/O packet and its sender. Cancel safe.

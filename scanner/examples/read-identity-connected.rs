@@ -114,6 +114,7 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= Register the session ============

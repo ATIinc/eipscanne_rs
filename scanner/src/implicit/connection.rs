@@ -56,8 +56,17 @@ pub async fn forward_open_implicit(
     let response: ForwardOpenResponse = decode_reply(&reply)?;
 
     let target_ip: Ipv4Addr = session.peer_ip();
+    let o2t_endpoint: SocketAddrV4 = o2t_endpoint(&reply, target_ip);
+    tracing::info!(
+        o2t_id = format_args!("{:#010x}", response.o2t_network_connection_id),
+        t2o_id = format_args!("{:#010x}", response.t2o_network_connection_id),
+        o2t_api_us = response.o2t_actual_packet_interval,
+        t2o_api_us = response.t2o_actual_packet_interval,
+        %o2t_endpoint,
+        "class 1 connection opened"
+    );
     Ok(ImplicitConnection {
-        o2t_endpoint: o2t_endpoint(&reply, target_ip),
+        o2t_endpoint,
         request,
         response,
         o2t_real_time_format,
@@ -86,7 +95,12 @@ pub async fn forward_close(
             close_request,
         ))
         .await?;
-    decode_reply(&reply)
+    let response: ForwardCloseResponse = decode_reply(&reply)?;
+    tracing::info!(
+        connection_serial_number = request.connection_triad.connection_serial_number,
+        "connection closed"
+    );
+    Ok(response)
 }
 
 /// Where the outputs go: the reply's O->T Socket Address Info address (`0.0.0.0` meaning the

@@ -2,6 +2,7 @@
 
 The examples of the [`scanner`](../) crate, each a single file. Run one from the
 repository root: `cargo run --example <name>`; `-- --help` lists its flags.
+`RUST_LOG=scanner=debug` shows the scanner's log lines.
 
 | Example | Device | Messaging | Moves hardware |
 |---|---|---|---|

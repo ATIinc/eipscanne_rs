@@ -89,6 +89,11 @@ impl Session {
             .await?;
         let reply = session.read_reply().await?;
         session.session_handle = reply.header.session_handle;
+        tracing::info!(
+            session_handle = format_args!("{:#010x}", session.session_handle),
+            %peer_ip,
+            "session registered"
+        );
 
         Ok(session)
     }
@@ -103,7 +108,13 @@ impl Session {
         let mut attempt = 1;
         loop {
             match Session::register(address.clone(), config).await {
-                Err(_) if attempt < attempts.get() => {
+                Err(error) if attempt < attempts.get() => {
+                    tracing::warn!(
+                        %error,
+                        attempt,
+                        ?delay,
+                        "session registration failed; retrying"
+                    );
                     attempt += 1;
                     sleep(delay).await;
                 }
@@ -147,6 +158,7 @@ impl Session {
         timeout(reply_timeout, self.read_packet())
             .await
             .map_err(|_| {
+                tracing::debug!(?reply_timeout, "reply timed out; session poisoned");
                 self.poisoned = true;
                 Error::Timeout {
                     waiting_for: "a reply",
@@ -207,8 +219,13 @@ impl Session {
         self.send(&RequestObjectAssembly::new_unregistration(
             self.session_handle,
         ))
-        .await
+        .await?;
+        tracing::info!(
+            session_handle = format_args!("{:#010x}", self.session_handle),
+            "session unregistered"
+        );
         // The stream is dropped, which closes it
+        Ok(())
     }
 }
 
