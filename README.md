@@ -3,6 +3,7 @@
 `eipscanne_rs` reads and writes EtherNet/IP packets with [`binrw`](https://docs.rs/binrw) and [`bilge`](https://docs.rs/bilge); its types follow Wireshark's names for the same bytes, and its [tests](./tests/) check them against known packet bytes.
 
 * [`scanner`](./scanner/): sessions, explicit and implicit messaging on top of the library, and the examples.
+* [`adapter`](./adapter/): an explicit messaging server that hands Get and Set requests to a device's handler.
 * [`eds_parser`](./eds_parser/): reads a device's EDS file into its params, assemblies and connections.
 * [`eds_parser_derive`](./eds_parser_derive/): the derives of `eds_parser`'s entry structs and fields.
 * [`hex_assert`](./hex_assert/): hex assertions for the byte-exact tests.

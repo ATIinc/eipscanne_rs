@@ -1,0 +1,19 @@
+[package]
+name = "adapter"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "MIT OR Apache-2.0"
+description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device"
+
+[dependencies]
+eipscanne_rs = { path = ".." }
+binrw = "0.15.2"
+tokio = { version = "1", features = ["net", "io-util", "rt"] }
+tracing = "0.1"
+
+[dev-dependencies]
+bilge = "0.5.0"
+clap = { version = "4.6.7", features = ["derive"] }
+tokio = { version = "1", features = ["net", "io-util", "rt-multi-thread", "macros", "signal"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

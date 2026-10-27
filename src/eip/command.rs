@@ -204,8 +204,9 @@ pub struct RegisterData {
 #[derive(Debug, PartialEq)]
 #[br(import(command_type: EnIpCommand))]
 pub enum CommandSpecificData {
-    #[br(pre_assert(command_type == EnIpCommand::UnRegisterSession))]
-    UnregisterSession,
+    /// No data, Length 0
+    #[br(pre_assert(matches!(command_type, EnIpCommand::UnRegisterSession | EnIpCommand::NOP)))]
+    NoData,
 
     #[br(pre_assert(command_type == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),

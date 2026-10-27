@@ -1,7 +1,7 @@
 [workspace]
-members = ["hex_assert", "scanner", "eds_parser", "eds_parser_derive"]
-# `cargo run --example`, `cargo test` and friends cover the library, the scanner and the EDS parser without `-p`
-default-members = [".", "scanner", "eds_parser"]
+members = ["hex_assert", "scanner", "adapter", "eds_parser", "eds_parser_derive"]
+# `cargo run --example`, `cargo test` and friends cover the library, the scanner, the adapter and the EDS parser without `-p`
+default-members = [".", "scanner", "adapter", "eds_parser"]
 
 [package]
 name = "eipscanne_rs"
