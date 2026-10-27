@@ -24,6 +24,7 @@ pub async fn send_request(
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket> {
+    tracing::debug!(?service, "sent a request");
     session
         .request(&RequestObjectAssembly::new_service_request(
             session.session_handle(),

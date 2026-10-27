@@ -12,6 +12,7 @@ eds_parser = { path = "../eds_parser", optional = true }
 bilge = "0.5.0"
 binrw = "0.15.2"
 tokio = { version = "1", features = ["net", "io-util", "time"] }
+tracing = "0.1"
 
 [features]
 default = ["eds"]
@@ -25,6 +26,7 @@ rand = "0.9"
 hex-assert = { version = "0.2.0", path = "../hex_assert" }
 pretty_assertions = "1.4.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [[example]]
 name = "io-hub-eds-implicit"

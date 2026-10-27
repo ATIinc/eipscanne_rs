@@ -53,6 +53,13 @@ pub async fn forward_open_explicit(
         ))
         .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;
+    tracing::info!(
+        o2t_id = format_args!("{:#010x}", response.o2t_network_connection_id),
+        t2o_id = format_args!("{:#010x}", response.t2o_network_connection_id),
+        o2t_api_us = response.o2t_actual_packet_interval,
+        t2o_api_us = response.t2o_actual_packet_interval,
+        "class 3 connection opened"
+    );
     Ok(ExplicitConnection { request, response })
 }
 
@@ -66,6 +73,7 @@ pub async fn send_connected_request(
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket> {
+    tracing::debug!(?service, cip_sequence_count, "sent a connected request");
     session
         .request(&EnIpPacket::new_send_unit_data(
             session.session_handle(),
