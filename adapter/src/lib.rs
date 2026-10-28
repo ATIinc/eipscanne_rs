@@ -2,5 +2,6 @@
 
 pub mod device;
 pub mod error;
+pub mod explicit;
 pub mod packet;
 pub mod server;
