@@ -1,10 +1,12 @@
-//! One connection served over an in-memory stream.
+//! One connection served on the loopback interface.
 
 use std::io::Cursor;
+use std::net::Ipv4Addr;
+use std::sync::Arc;
 
 use binrw::BinRead;
-use tokio::io::{AsyncReadExt, DuplexStream, duplex};
-use tokio::task::JoinHandle;
+use tokio::io::AsyncReadExt;
+use tokio::net::{TcpListener, TcpStream};
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
@@ -18,11 +20,12 @@ use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use adapter::device::Device;
-use adapter::error::{Error, Result};
+use adapter::error::Error;
 use adapter::packet::{read_packet, write_packet};
-use adapter::server::serve_connection;
+use adapter::server::serve;
 
-const SESSION_HANDLE: CipUdint = 0x10;
+/// The handle of the first session a server grants
+const SESSION_HANDLE: CipUdint = 1;
 
 /// Answers Get_Attributes_All with one byte
 struct SampleDevice;
@@ -37,11 +40,18 @@ impl Device for SampleDevice {
     }
 }
 
-/// Serves `SampleDevice` on one end of an in-memory stream and returns the other
-fn connect() -> (DuplexStream, JoinHandle<Result<()>>) {
-    let (scanner, adapter) = duplex(1024);
-    let connection = tokio::spawn(serve_connection(adapter, SESSION_HANDLE, &SampleDevice));
-    (scanner, connection)
+/// Serves `SampleDevice` on the loopback interface and connects to it
+async fn connect() -> TcpStream {
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let address = listener
+        .local_addr()
+        .expect("a bound listener has a local address");
+    tokio::spawn(serve(Arc::new(SampleDevice), listener));
+    TcpStream::connect(address)
+        .await
+        .expect("the server accepts on its bound port")
 }
 
 /// A `command` packet without data
@@ -61,7 +71,7 @@ fn no_data(command: EnIpCommand) -> EnIpPacket {
 
 #[tokio::test]
 async fn register_get_unregister() {
-    let (mut stream, connection) = connect();
+    let mut stream = connect().await;
 
     write_packet(&mut stream, &RequestObjectAssembly::new_registration())
         .await
@@ -93,15 +103,16 @@ async fn register_get_unregister() {
     )
     .await
     .expect("the adapter keeps the stream open until Unregister Session");
-    connection
+    let read = stream
+        .read(&mut [0u8; 1])
         .await
-        .expect("serving a stream does not panic")
         .expect("Unregister Session ends the stream cleanly");
+    assert_eq!(read, 0, "the adapter closes the stream");
 }
 
 #[tokio::test]
 async fn register_session_refuses_another_protocol_version_with_ours() {
-    let (mut stream, _connection) = connect();
+    let mut stream = connect().await;
 
     let mut request = RequestObjectAssembly::new_registration();
     let CommandSpecificData::RegisterSession(register_data) = &mut request.command_specific_data
@@ -135,7 +146,7 @@ async fn register_session_refuses_another_protocol_version_with_ours() {
 
 #[tokio::test]
 async fn a_refused_packet_keeps_the_stream() {
-    let (mut stream, _connection) = connect();
+    let mut stream = connect().await;
 
     // A request before Register Session
     write_packet(
@@ -164,7 +175,7 @@ async fn a_refused_packet_keeps_the_stream() {
 
 #[tokio::test]
 async fn nop_and_a_request_with_a_status_have_no_reply() {
-    let (mut stream, _connection) = connect();
+    let mut stream = connect().await;
 
     let mut request_with_status = RequestObjectAssembly::new_identity(SESSION_HANDLE);
     request_with_status.header.status_code = EncapsStatusCode::InsufficientMemory;
@@ -187,7 +198,7 @@ async fn nop_and_a_request_with_a_status_have_no_reply() {
 
 #[tokio::test]
 async fn a_packet_that_does_not_decode_is_refused() {
-    let (mut stream, _connection) = connect();
+    let mut stream = connect().await;
 
     write_packet(&mut stream, &no_data(EnIpCommand::RegisterSession))
         .await

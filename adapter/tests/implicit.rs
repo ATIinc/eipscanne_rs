@@ -1,0 +1,399 @@
+//! One class 1 connection opened and exchanged on the loopback interface.
+
+use std::io::Cursor;
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use bilge::prelude::{u2, u4, u9};
+use binrw::{BinRead, BinWrite};
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
+use tokio::time::timeout;
+
+use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
+use eipscanne_rs::cip::connection_manager::forward_open::{
+    ForwardOpenRequest, ForwardOpenResponse,
+};
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
+    NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RealTimeFormat,
+    RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
+};
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
+use eipscanne_rs::cip::message::data::CipDataOpt;
+use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
+use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::cip::types::CipUdint;
+use eipscanne_rs::eip::command::CommandSpecificData;
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
+use eipscanne_rs::eip::packet::EnIpPacket;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
+use eipscanne_rs::object_assembly::RequestObjectAssembly;
+
+use adapter::device::{Device, ImplicitDevice};
+use adapter::packet::{read_packet, write_packet};
+use adapter::server::serve;
+
+/// The handle of the first session a server grants
+const SESSION_HANDLE: CipUdint = 1;
+const T2O_NETWORK_CONNECTION_ID: CipUdint = 0x1234_5678;
+const OUTPUT_INSTANCE: u8 = 150;
+const INPUT_INSTANCE: u8 = 100;
+/// Data bytes of each assembly; 10 and 6 bytes with the overhead of each direction
+const DATA_SIZE: u16 = 4;
+const O2T_CONNECTION_SIZE: u16 = 10;
+const T2O_CONNECTION_SIZE: u16 = 6;
+/// How long a test waits for a packet that is due
+const PACKET_WAIT: Duration = Duration::from_secs(2);
+
+/// Implicit messaging only: echoes its outputs as its inputs
+struct EchoDevice {
+    outputs: Mutex<Vec<u8>>,
+}
+
+impl Device for EchoDevice {
+    fn as_implicit_device(&self) -> Option<&dyn ImplicitDevice> {
+        Some(self)
+    }
+}
+
+impl ImplicitDevice for EchoDevice {
+    /// Any free port
+    fn io_port(&self) -> u16 {
+        0
+    }
+
+    fn implicit_assembly(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
+        match u8::try_from(instance) {
+            Ok(OUTPUT_INSTANCE) => Some((DATA_SIZE, RealTimeFormat::Header32Bit)),
+            Ok(INPUT_INSTANCE) => Some((DATA_SIZE, RealTimeFormat::Modeless)),
+            _ => None,
+        }
+    }
+
+    fn consume_outputs(&self, _instance: u16, data: &[u8]) {
+        *self
+            .outputs
+            .lock()
+            .expect("nothing panics while holding the outputs lock") = data.to_vec();
+    }
+
+    fn produce_inputs(&self, _instance: u16) -> CipDataOpt {
+        CipDataOpt::Raw(
+            self.outputs
+                .lock()
+                .expect("nothing panics while holding the outputs lock")
+                .clone(),
+        )
+    }
+}
+
+/// A registered session to an `EchoDevice`, and the scanner's I/O socket
+struct Scanner {
+    stream: TcpStream,
+    io_socket: UdpSocket,
+}
+
+impl Scanner {
+    /// Serves an `EchoDevice` on the loopback interface and registers a session with it
+    async fn connect() -> Self {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("port 0 lets the OS pick a free loopback port");
+        let address = listener
+            .local_addr()
+            .expect("a bound listener has a local address");
+        let device = EchoDevice {
+            outputs: Mutex::new(vec![0; usize::from(DATA_SIZE)]),
+        };
+        tokio::spawn(serve(Arc::new(device), listener));
+
+        let mut stream = TcpStream::connect(address)
+            .await
+            .expect("the server accepts on its bound port");
+        write_packet(&mut stream, &RequestObjectAssembly::new_registration())
+            .await
+            .expect("the adapter keeps the stream open until Unregister Session");
+        read_packet(&mut stream)
+            .await
+            .expect("the adapter answers Register Session");
+
+        let io_socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("port 0 lets the OS pick a free loopback port");
+        Scanner { stream, io_socket }
+    }
+
+    /// Sends `request` and reads the reply
+    async fn request(&mut self, request: &EnIpPacket) -> EnIpPacket {
+        write_packet(&mut self.stream, request)
+            .await
+            .expect("the adapter keeps the stream open until Unregister Session");
+        read_packet(&mut self.stream)
+            .await
+            .expect("the adapter answers Send RR Data")
+    }
+
+    /// Sends a Forward_Open whose T->O Socket Address Info names this scanner's I/O socket
+    async fn forward_open(&mut self, request: ForwardOpenRequest) -> EnIpPacket {
+        let mut packet = RequestObjectAssembly::new_forward_open(SESSION_HANDLE, request);
+        let CommandSpecificData::SendRrData(rr_data) = &mut packet.command_specific_data else {
+            unreachable!("a Forward_Open is a Send RR Data packet");
+        };
+        let SocketAddr::V4(local) = self
+            .io_socket
+            .local_addr()
+            .expect("a bound socket has a local address")
+        else {
+            unreachable!("the socket is bound to an IPv4 address");
+        };
+        rr_data.socket_addr_info_items.t2o = Some(SocketAddrInfo::from(local));
+        self.request(&packet).await
+    }
+
+    /// Receives T->O packets until one carries `inputs`
+    async fn recv_inputs(&self, inputs: &[u8]) {
+        let mut bytes = vec![0u8; 512];
+        loop {
+            let len = timeout(PACKET_WAIT, self.io_socket.recv(&mut bytes))
+                .await
+                .expect("the adapter sends inputs every packet interval")
+                .expect("receiving on a bound socket succeeds");
+            let packet = EnIpIoPacket::read(&mut Cursor::new(&bytes[..len]))
+                .expect("the adapter sends I/O packets");
+            assert_eq!(
+                packet.sequenced_address.connection_id,
+                T2O_NETWORK_CONNECTION_ID
+            );
+            let CipDataOpt::Raw(data) = &packet.connected_data else {
+                unreachable!("data read from the wire is raw");
+            };
+            // The sequence count precedes the inputs
+            if &data[2..] == inputs {
+                return;
+            }
+        }
+    }
+}
+
+/// The 16-bit parameter word of a point-to-point, exclusive-owner, fixed-size direction
+fn parameters(connection_size: u16) -> NetworkConnectionParameters {
+    NetworkConnectionParameters::Standard(
+        StandardNetworkConnectionParameters::builder()
+            .connection_size(u9::new(connection_size))
+            .connection_size_type(ConnectionSizeType::Fixed)
+            .priority(ConnectionPriority::Scheduled)
+            .connection_type(ConnectionType::PointToPoint)
+            .redundant_owner(RedundantOwner::Exclusive)
+            .build(),
+    )
+}
+
+/// A Forward_Open of assemblies 151/150/100 every 10 ms, named by `connection_serial_number`
+fn forward_open_request(connection_serial_number: u16) -> ForwardOpenRequest {
+    ForwardOpenRequest {
+        priority_time_tick: PriorityTimeTick::builder()
+            .tick_time(u4::new(10))
+            .priority(false)
+            .build(),
+        timeout_ticks: 5,
+        o2t_network_connection_id: 0,
+        t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
+        connection_triad: ConnectionTriad {
+            connection_serial_number,
+            originator_vendor_id: 342,
+            originator_serial_number: 0x0001_2345,
+        },
+        connection_timeout_multiplier: ConnectionTimeoutMultiplier::X4,
+        o2t_requested_packet_interval: 10_000,
+        o2t_network_connection_parameters: parameters(O2T_CONNECTION_SIZE),
+        t2o_requested_packet_interval: 10_000,
+        t2o_network_connection_parameters: parameters(T2O_CONNECTION_SIZE),
+        transport_type_trigger: TransportTypeTrigger::builder()
+            .transport_class(TransportClass::Class1)
+            .production_trigger(ProductionTrigger::Cyclic)
+            .direction(Direction::Client)
+            .build(),
+        connection_path: CipPath::new_assembly_connection(151, OUTPUT_INSTANCE, INPUT_INSTANCE),
+    }
+}
+
+/// The Forward_Close of the connection `request` opened
+fn forward_close(request: &ForwardOpenRequest) -> EnIpPacket {
+    RequestObjectAssembly::new_forward_close(
+        SESSION_HANDLE,
+        ForwardCloseRequest {
+            priority_time_tick: request.priority_time_tick,
+            timeout_ticks: request.timeout_ticks,
+            connection_triad: request.connection_triad,
+            connection_path: request.connection_path.clone(),
+        },
+    )
+}
+
+/// The Forward_Open response a reply carries
+fn forward_open_response(reply: &EnIpPacket) -> ForwardOpenResponse {
+    let response = reply
+        .response()
+        .expect("a Send RR Data reply carries a Message Router response");
+    assert_eq!(Rejection::from_response(response), None);
+    let CipDataOpt::Raw(data) = &response.response_data.data else {
+        unreachable!("data read from the wire is raw");
+    };
+    ForwardOpenResponse::read_le(&mut Cursor::new(data))
+        .expect("a successful Forward_Open reply carries its response")
+}
+
+/// The extended status a refused Connection Manager reply carries
+fn extended_status(reply: &EnIpPacket) -> Option<ConnectionManagerExtendedStatus> {
+    let response = reply
+        .response()
+        .expect("a Send RR Data reply carries a Message Router response");
+    let rejection = Rejection::from_response(response).expect("the request is refused");
+    assert_eq!(
+        rejection.general_status,
+        ResponseStatusCode::ConnectionFailure
+    );
+    rejection.extended_status()
+}
+
+/// The bytes of a run O->T packet of connection `o2t_id` carrying `outputs`
+fn output_packet(o2t_id: CipUdint, sequence_number: CipUdint, outputs: &[u8]) -> Vec<u8> {
+    let packet = EnIpIoPacket::new(
+        o2t_id,
+        sequence_number,
+        CipDataOpt::Typed(Box::new(CipIoData {
+            cip_sequence_count: Some(sequence_number as u16),
+            run_idle_header: Some(
+                RunIdleHeader::builder()
+                    .run_idle(true)
+                    .claim_output_ownership(false)
+                    .ready_for_ownership_of_outputs(u2::new(0))
+                    .build(),
+            ),
+            data: CipDataOpt::Raw(outputs.to_vec()),
+        })),
+    );
+    let mut bytes = Cursor::new(Vec::new());
+    packet
+        .write(&mut bytes)
+        .expect("writing to memory does not fail");
+    bytes.into_inner()
+}
+
+#[tokio::test]
+async fn open_echo_and_close() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request(1);
+
+    let reply = scanner.forward_open(request.clone()).await;
+    let response = forward_open_response(&reply);
+    assert_eq!(
+        response.t2o_network_connection_id,
+        T2O_NETWORK_CONNECTION_ID
+    );
+    assert_eq!(response.o2t_actual_packet_interval, 10_000);
+    let CommandSpecificData::SendRrData(rr_data) = &reply.command_specific_data else {
+        unreachable!("a Send RR Data reply");
+    };
+    let o2t = rr_data
+        .socket_addr_info_items
+        .o2t
+        .expect("the adapter names its I/O port, which is not 2222")
+        .socket_address();
+    assert_eq!(o2t.ip(), &Ipv4Addr::UNSPECIFIED);
+    let o2t_endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, o2t.port());
+
+    // Inputs from the start, then the outputs echoed
+    scanner.recv_inputs(&[0; 4]).await;
+    let outputs = [0xde, 0xad, 0xbe, 0xef];
+    scanner
+        .io_socket
+        .send_to(
+            &output_packet(response.o2t_network_connection_id, 1, &outputs),
+            o2t_endpoint,
+        )
+        .await
+        .expect("UDP sends to the adapter's bound loopback port");
+    scanner.recv_inputs(&outputs).await;
+
+    let reply = scanner.request(&forward_close(&request)).await;
+    assert!(
+        reply
+            .response()
+            .expect("a Send RR Data reply carries a Message Router response")
+            .is_success()
+    );
+    // The Connection Manager takes another connection
+    forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+}
+
+#[tokio::test]
+async fn a_second_forward_open_is_refused() {
+    let mut scanner = Scanner::connect().await;
+    forward_open_response(&scanner.forward_open(forward_open_request(1)).await);
+
+    assert_eq!(
+        extended_status(&scanner.forward_open(forward_open_request(1)).await),
+        Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
+    );
+    assert_eq!(
+        extended_status(&scanner.forward_open(forward_open_request(2)).await),
+        Some(ConnectionManagerExtendedStatus::OutOfConnections)
+    );
+}
+
+#[tokio::test]
+async fn a_forward_open_the_device_cannot_serve_is_refused() {
+    let mut scanner = Scanner::connect().await;
+
+    let mut wrong_size = forward_open_request(1);
+    wrong_size.o2t_network_connection_parameters = parameters(O2T_CONNECTION_SIZE + 1);
+    assert_eq!(
+        extended_status(&scanner.forward_open(wrong_size).await),
+        Some(ConnectionManagerExtendedStatus::InvalidConnectionSize)
+    );
+
+    let mut unknown_assembly = forward_open_request(1);
+    unknown_assembly.connection_path = CipPath::new_assembly_connection(151, 1, INPUT_INSTANCE);
+    assert_eq!(
+        extended_status(&scanner.forward_open(unknown_assembly).await),
+        Some(ConnectionManagerExtendedStatus::InvalidProducedOrConsumedApplicationPath)
+    );
+
+    let mut change_of_state = forward_open_request(1);
+    change_of_state.transport_type_trigger = TransportTypeTrigger::builder()
+        .transport_class(TransportClass::Class1)
+        .production_trigger(ProductionTrigger::ChangeOfState)
+        .direction(Direction::Client)
+        .build();
+    assert_eq!(
+        extended_status(&scanner.forward_open(change_of_state).await),
+        Some(ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported)
+    );
+}
+
+#[tokio::test]
+async fn forward_close_of_no_connection_is_refused() {
+    let mut scanner = Scanner::connect().await;
+
+    let reply = scanner
+        .request(&forward_close(&forward_open_request(1)))
+        .await;
+    assert_eq!(
+        extended_status(&reply),
+        Some(ConnectionManagerExtendedStatus::TargetConnectionNotFound)
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_connection_without_outputs_times_out_and_frees_the_connection_manager() {
+    let mut scanner = Scanner::connect().await;
+    forward_open_response(&scanner.forward_open(forward_open_request(1)).await);
+
+    // Past the grace for the first output packet
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+}

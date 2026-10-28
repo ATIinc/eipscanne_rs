@@ -18,6 +18,8 @@ pub enum Error {
         header: EncapsulationHeader,
         error: binrw::Error,
     },
+    /// An I/O packet that is not the next output of the connection; it is skipped
+    UnexpectedPacket(String),
 }
 
 // ======= Start of Error impl ========
@@ -30,6 +32,7 @@ impl fmt::Display for Error {
             Error::Undecodable { header, error } => {
                 write!(f, "a {:?} packet did not decode: {error}", header.command)
             }
+            Error::UnexpectedPacket(what) => write!(f, "unexpected packet: {what}"),
         }
     }
 }
@@ -40,6 +43,7 @@ impl std::error::Error for Error {
             Error::Io(error) => Some(error),
             Error::Parse(error) => Some(error),
             Error::Undecodable { error, .. } => Some(error),
+            Error::UnexpectedPacket(_) => None,
         }
     }
 }

@@ -197,7 +197,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     tokio::select! {
-        served = serve(listener, Arc::new(adapter)) => served?,
+        served = serve(Arc::new(adapter), listener) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");
