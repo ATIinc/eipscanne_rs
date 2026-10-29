@@ -23,6 +23,7 @@ use std::time::{Duration, Instant};
 
 use bilge::prelude::u4;
 use clap::Parser;
+use clap::builder::{BoolishValueParser, TypedValueParser};
 use tokio::signal::ctrl_c;
 use tokio::time::{interval, sleep_until};
 
@@ -82,8 +83,13 @@ struct Args {
     large: Option<bool>,
 
     /// Send the outputs with the run flag set instead of idle
-    #[arg(long)]
-    run: bool,
+    #[arg(
+        long = "run",
+        action = clap::ArgAction::SetTrue,
+        value_parser = BoolishValueParser::new()
+            .map(|run| if run { RunOrIdle::Run } else { RunOrIdle::Idle }),
+    )]
+    run_or_idle: RunOrIdle,
 }
 
 #[tokio::main]
@@ -134,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{request:#?}");
 
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
-    if !args.run && o2t_real_time_format != RealTimeFormat::Header32Bit {
+    if args.run_or_idle == RunOrIdle::Idle && o2t_real_time_format != RealTimeFormat::Header32Bit {
         return Err(
             "the O->T direction has no run/idle header, so idle cannot be signalled: pass --run to send the outputs as real"
                 .into(),
@@ -182,11 +188,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
     let cip_sequence_count: u16 = 1;
-    let run_or_idle = if args.run {
-        RunOrIdle::Run
-    } else {
-        RunOrIdle::Idle
-    };
 
     let timeout = input_timeout(&connection);
     let mut last_sequence_number = None;
@@ -210,11 +211,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    run_or_idle,
+                    args.run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {} ({run_or_idle:?})", hex(&outputs));
+                println!("[{cycle:>3}] SENT     {} ({:?})", hex(&outputs), args.run_or_idle);
             }
 
             received = recv_io_packet(&socket) => {
