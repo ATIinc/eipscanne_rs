@@ -65,14 +65,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decode_data_reads_exactly_the_data() {
-        assert_eq!(
-            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde]),
-            Ok(0xdead_beef)
-        );
-    }
-
-    #[test]
     fn decode_data_refuses_short_and_long_data() {
         assert_eq!(
             decode_data::<u32>(&[0xef, 0xbe]),

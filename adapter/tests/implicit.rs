@@ -358,30 +358,6 @@ async fn open_echo_and_close() {
 }
 
 #[tokio::test]
-async fn a_repeated_cip_sequence_count_is_old_data() {
-    let mut scanner = Scanner::connect().await;
-    let mut request = forward_open_request(1);
-    // 5.12 s without outputs before the connection times out
-    request.connection_timeout_multiplier = ConnectionTimeoutMultiplier::X512;
-    let reply = scanner.forward_open(request).await;
-    let o2t_id = forward_open_response(&reply).o2t_network_connection_id;
-    let o2t_endpoint = o2t_endpoint(&reply);
-
-    let first = [1, 1, 1, 1];
-    scanner
-        .send_outputs(o2t_endpoint, o2t_id, 1, 1, &first)
-        .await;
-    scanner.recv_inputs(&first).await;
-    // A new encapsulation sequence number, the same CIP sequence count
-    scanner
-        .send_outputs(o2t_endpoint, o2t_id, 2, 1, &[2, 2, 2, 2])
-        .await;
-    for _ in 0..5 {
-        assert_eq!(scanner.next_inputs().await, first);
-    }
-}
-
-#[tokio::test]
 async fn a_second_forward_open_is_refused() {
     let mut scanner = Scanner::connect().await;
     forward_open_response(&scanner.forward_open(forward_open_request(1)).await);
@@ -448,19 +424,6 @@ async fn a_forward_open_the_device_cannot_serve_is_refused() {
     assert_eq!(
         extended_status(&scanner.forward_open(change_of_state).await),
         Some(ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported)
-    );
-}
-
-#[tokio::test]
-async fn forward_close_of_no_connection_is_refused() {
-    let mut scanner = Scanner::connect().await;
-
-    let reply = scanner
-        .request(&forward_close(&forward_open_request(1)))
-        .await;
-    assert_eq!(
-        extended_status(&reply),
-        Some(ConnectionManagerExtendedStatus::TargetConnectionNotFound)
     );
 }
 

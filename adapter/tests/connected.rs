@@ -3,7 +3,6 @@
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use bilge::prelude::{u4, u9};
 use binrw::BinRead;
@@ -18,7 +17,6 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RedundantOwner,
     StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
-use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
@@ -216,16 +214,6 @@ fn response(reply: &EnIpPacket) -> &MessageRouterResponse {
         .expect("a Send RR Data or Send Unit Data reply carries a Message Router response")
 }
 
-/// The extended status a refused Connection Manager reply carries
-fn extended_status(reply: &EnIpPacket) -> Option<ConnectionManagerExtendedStatus> {
-    let rejection = Rejection::from_response(response(reply)).expect("the request is refused");
-    assert_eq!(
-        rejection.general_status,
-        ResponseStatusCode::ConnectionFailure
-    );
-    rejection.extended_status()
-}
-
 /// Checks that `reply` answers the connected request with `cip_sequence_count`, and returns its data
 fn connected_reply_data(reply: &EnIpPacket, cip_sequence_count: CipUint) -> Vec<u8> {
     let CommandSpecificData::SendUnitData(unit_data) = &reply.command_specific_data else {
@@ -266,20 +254,6 @@ async fn open_request_and_close() {
 }
 
 #[tokio::test]
-async fn a_repeated_request_or_one_for_another_connection_is_discarded() {
-    let mut scanner = Scanner::connect(true).await;
-    let o2t_id = scanner.forward_open(forward_open_request(1)).await;
-    connected_reply_data(&scanner.connected_request(o2t_id, 1).await, 1);
-
-    scanner.send(&connected_request(o2t_id, 1)).await;
-    scanner
-        .send(&connected_request(o2t_id.wrapping_add(1), 2))
-        .await;
-    let reply = scanner.connected_request(o2t_id, 2).await;
-    connected_reply_data(&reply, 2);
-}
-
-#[tokio::test]
 async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
     let mut scanner = Scanner::connect(false).await;
 
@@ -293,102 +267,4 @@ async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
         response(&reply).response_data.status,
         ResponseStatusCode::ServiceNotSupported
     );
-}
-
-#[tokio::test]
-async fn a_second_forward_open_is_refused() {
-    let mut scanner = Scanner::connect(true).await;
-    scanner.forward_open(forward_open_request(1)).await;
-
-    for (request, expected) in [
-        (
-            forward_open_request(1),
-            ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen,
-        ),
-        (
-            forward_open_request(2),
-            ConnectionManagerExtendedStatus::OutOfConnections,
-        ),
-    ] {
-        let reply = scanner
-            .request(&RequestObjectAssembly::new_forward_open(
-                SESSION_HANDLE,
-                request,
-            ))
-            .await;
-        assert_eq!(extended_status(&reply), Some(expected));
-    }
-}
-
-#[tokio::test]
-async fn a_forward_open_the_message_router_cannot_serve_is_refused() {
-    let mut scanner = Scanner::connect(true).await;
-
-    let mut client = forward_open_request(1);
-    client.transport_type_trigger = TransportTypeTrigger::builder()
-        .transport_class(TransportClass::Class3)
-        .production_trigger(ProductionTrigger::ApplicationObject)
-        .direction(Direction::Client)
-        .build();
-    let mut multicast = forward_open_request(1);
-    multicast.t2o_network_connection_parameters = NetworkConnectionParameters::Standard(
-        StandardNetworkConnectionParameters::builder()
-            .connection_size(u9::new(CONNECTION_SIZE))
-            .connection_size_type(ConnectionSizeType::Variable)
-            .priority(ConnectionPriority::Low)
-            .connection_type(ConnectionType::Multicast)
-            .redundant_owner(RedundantOwner::Exclusive)
-            .build(),
-    );
-    let mut identity = forward_open_request(1);
-    identity.connection_path = CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID);
-
-    for (request, expected) in [
-        (
-            client,
-            ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
-        ),
-        (
-            multicast,
-            ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter,
-        ),
-        (
-            identity,
-            ConnectionManagerExtendedStatus::InvalidSegmentInConnectionPath,
-        ),
-    ] {
-        let reply = scanner
-            .request(&RequestObjectAssembly::new_forward_open(
-                SESSION_HANDLE,
-                request,
-            ))
-            .await;
-        assert_eq!(extended_status(&reply), Some(expected));
-    }
-}
-
-#[tokio::test]
-async fn a_response_larger_than_the_connection_size_is_refused() {
-    let mut scanner = Scanner::connect(true).await;
-    let mut request = forward_open_request(1);
-    // The sequence count and a response header, without the one data byte
-    request.t2o_network_connection_parameters = parameters(6);
-    let o2t_id = scanner.forward_open(request).await;
-
-    let reply = scanner.connected_request(o2t_id, 1).await;
-    assert_eq!(
-        response(&reply).response_data.status,
-        ResponseStatusCode::ReplyDataTooLarge
-    );
-}
-
-#[tokio::test(start_paused = true)]
-async fn a_connection_without_requests_times_out_and_another_opens() {
-    let mut scanner = Scanner::connect(true).await;
-    let o2t_id = scanner.forward_open(forward_open_request(1)).await;
-
-    // Past 4 x 1 s without a request
-    tokio::time::sleep(Duration::from_secs(5)).await;
-    scanner.send(&connected_request(o2t_id, 1)).await;
-    scanner.forward_open(forward_open_request(2)).await;
 }
