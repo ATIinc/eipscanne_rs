@@ -1,28 +1,25 @@
 //! A class 1 connection: what a Forward_Open asks for, checked against the device's assemblies.
 
-use std::io::Cursor;
 use std::net::{IpAddr, SocketAddr};
-
-use binrw::BinWrite;
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionSizeType, ConnectionType, NetworkConnectionParameters, ProductionTrigger,
-    RealTimeFormat, TransportClass, connection_size,
+    ConnectionSizeType, ConnectionType, ProductionTrigger, RealTimeFormat, TransportClass,
+    connection_size,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
-use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
-use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::message::response::Rejection;
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
 use eipscanne_rs::cip::path::{CipPath, LogicalSegmentType};
-use eipscanne_rs::cip::types::{CipInt, CipUint};
+use eipscanne_rs::cip::types::CipInt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 
-use crate::explicit::segment_id;
+use crate::explicit::{segment_id, size_and_types};
 use crate::implicit::ImplicitDevice;
+use crate::message_router::connection_failure;
 
 /// `sin_family` of an IPv4 Socket Address Info
 const AF_INET: CipInt = 2;
@@ -173,44 +170,4 @@ fn output_and_input_instances(path: &CipPath) -> Option<(u16, u16)> {
         segment_id(output, LogicalSegmentType::ConnectionPoint)?,
         segment_id(input, LogicalSegmentType::ConnectionPoint)?,
     ))
-}
-
-/// The connection size, its type and the connection type of a direction
-fn size_and_types(
-    parameters: &NetworkConnectionParameters,
-) -> (u16, ConnectionSizeType, ConnectionType) {
-    match parameters {
-        NetworkConnectionParameters::Standard(parameters) => (
-            parameters.connection_size().value(),
-            parameters.connection_size_type(),
-            parameters.connection_type(),
-        ),
-        NetworkConnectionParameters::Large(parameters) => (
-            parameters.connection_size(),
-            parameters.connection_size_type(),
-            parameters.connection_type(),
-        ),
-    }
-}
-
-/// A Connection Manager refusal: Connection Failure with `extended_status` as the Additional Status
-pub(crate) fn connection_failure(
-    service: ServiceCode,
-    extended_status: ConnectionManagerExtendedStatus,
-) -> Rejection {
-    let mut bytes = Cursor::new(Vec::new());
-    extended_status
-        .write_le(&mut bytes)
-        .expect("writing to memory does not fail");
-    let word = CipUint::from_le_bytes(
-        bytes
-            .into_inner()
-            .try_into()
-            .expect("an extended status is one word"),
-    );
-    Rejection {
-        service,
-        general_status: ResponseStatusCode::ConnectionFailure,
-        additional_status: vec![word],
-    }
 }

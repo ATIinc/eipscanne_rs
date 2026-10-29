@@ -1,10 +1,15 @@
 //! The Message Router a device implements: the services a scanner's requests reach.
 
+use std::io::Cursor;
 use std::net::IpAddr;
 
+use binrw::BinWrite;
+
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{
-    MessageRouterResponse, ResponseData, ResponseStatusCode,
+    MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::CipUint;
@@ -51,6 +56,11 @@ pub trait MessageRouter: Send + Sync + 'static {
         _data: &[u8],
     ) -> Result<(), ResponseStatusCode> {
         Err(ResponseStatusCode::ServiceNotSupported)
+    }
+
+    /// Explicit messaging only: whether a class 3 Forward_Open opens a connection
+    fn accepts_explicit_connections(&self) -> bool {
+        false
     }
 
     /// Implicit messaging only: Forward_Open and Large_Forward_Open, and the reply's Socket Address
@@ -107,4 +117,60 @@ pub(crate) fn message_router_response(
             data,
         },
     }
+}
+
+/// The response carrying `rejection` and the triad of the request it refuses
+pub(crate) fn rejection_response(
+    rejection: Rejection,
+    triad: ConnectionTriad,
+) -> MessageRouterResponse {
+    tracing::warn!(
+        service = ?rejection.service,
+        general_status = ?rejection.general_status,
+        extended_status = ?rejection.extended_status(),
+        "refused a Connection Manager request"
+    );
+    message_router_response(
+        rejection.service,
+        rejection.general_status,
+        rejection.additional_status,
+        CipDataOpt::Typed(Box::new(triad)),
+    )
+}
+
+/// A Connection Manager refusal: Connection Failure with `extended_status` as the Additional Status
+pub(crate) fn connection_failure(
+    service: ServiceCode,
+    extended_status: ConnectionManagerExtendedStatus,
+) -> Rejection {
+    let mut bytes = Cursor::new(Vec::new());
+    extended_status
+        .write_le(&mut bytes)
+        .expect("writing to memory does not fail");
+    let word = CipUint::from_le_bytes(
+        bytes
+            .into_inner()
+            .try_into()
+            .expect("an extended status is one word"),
+    );
+    Rejection {
+        service,
+        general_status: ResponseStatusCode::ConnectionFailure,
+        additional_status: vec![word],
+    }
+}
+
+/// The refusal of a Connection Manager request that does not decode
+pub(crate) fn decode_failure(service: ServiceCode, error: &binrw::Error) -> MessageRouterResponse {
+    let general_status = if error.is_eof() {
+        ResponseStatusCode::NotEnoughData
+    } else {
+        ResponseStatusCode::InvalidParameterValue
+    };
+    tracing::warn!(
+        ?service,
+        ?general_status,
+        "refused a Connection Manager request"
+    );
+    message_router_response(service, general_status, vec![], CipDataOpt::Raw(vec![]))
 }

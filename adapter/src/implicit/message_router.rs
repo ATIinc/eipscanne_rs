@@ -23,10 +23,12 @@ use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
 use crate::error::Result;
 use crate::implicit::ImplicitDevice;
-use crate::implicit::connection::{connection_failure, connection_from_forward_open};
+use crate::implicit::connection::connection_from_forward_open;
 use crate::implicit::o2t::receive_outputs;
 use crate::implicit::t2o::send_inputs;
-use crate::message_router::{MessageRouter, message_router_response};
+use crate::message_router::{
+    MessageRouter, connection_failure, decode_failure, message_router_response, rejection_response,
+};
 
 /// The Message Router of an [`ImplicitDevice`]: its Get and Set, plus Forward_Open and
 /// Forward_Close
@@ -58,7 +60,7 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
 }
 
 impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
-    // The device's Get and Set
+    // The device's Get and Set, and whether it accepts class 3 connections
     fn handle_get_attributes_all(
         &self,
         class: u16,
@@ -95,6 +97,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
     ) -> Result<(), ResponseStatusCode> {
         self.device
             .handle_set_attribute_single(class, instance, attribute, data)
+    }
+
+    fn accepts_explicit_connections(&self) -> bool {
+        self.device.accepts_explicit_connections()
     }
 
     /// Opens the one connection `forward_open_data` asks for
@@ -247,37 +253,6 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             triad,
         )
     }
-}
-
-/// The refusal of a Connection Manager request that does not decode
-fn decode_failure(service: ServiceCode, error: &binrw::Error) -> MessageRouterResponse {
-    let general_status = if error.is_eof() {
-        ResponseStatusCode::NotEnoughData
-    } else {
-        ResponseStatusCode::InvalidParameterValue
-    };
-    tracing::warn!(
-        ?service,
-        ?general_status,
-        "refused a Connection Manager request"
-    );
-    message_router_response(service, general_status, vec![], CipDataOpt::Raw(vec![]))
-}
-
-/// The response carrying `rejection` and the triad of the request it refuses
-fn rejection_response(rejection: Rejection, triad: ConnectionTriad) -> MessageRouterResponse {
-    tracing::warn!(
-        service = ?rejection.service,
-        general_status = ?rejection.general_status,
-        extended_status = ?rejection.extended_status(),
-        "refused a Connection Manager request"
-    );
-    message_router_response(
-        rejection.service,
-        rejection.general_status,
-        rejection.additional_status,
-        CipDataOpt::Typed(Box::new(triad)),
-    )
 }
 
 /// The open connection: its triad names it in a Forward_Close, from the IP address that opened it;

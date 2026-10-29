@@ -1,0 +1,57 @@
+//! Unconnected explicit messaging: each Send RR Data request answered, by the session's class 3
+//! connection when it opens or closes it, otherwise by the Message Router.
+
+use std::net::IpAddr;
+
+use eipscanne_rs::cip::message::CipMessage;
+use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode, RRPacketData};
+use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
+use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
+
+use crate::explicit::connected::{ExplicitConnection, handle_connection_request};
+use crate::explicit::handle_request;
+use crate::message_router::MessageRouter;
+
+/// The Send RR Data reply carrying the response to the request inside: the class 3 connection's
+/// when it opens or closes it, otherwise the Message Router's; the Status refusing a packet
+/// without a request
+pub(crate) fn handle_send_rr_data(
+    message_router: &impl MessageRouter,
+    explicit_connection: &mut Option<ExplicitConnection>,
+    header: &EncapsulationHeader,
+    command_specific_data: Option<&CommandSpecificData>,
+    originator_ip: IpAddr,
+) -> Result<EnIpPacket, EncapsStatusCode> {
+    let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
+        return Err(EncapsStatusCode::InvalidFormatOrData);
+    };
+    let CipMessage::Request(request) = &request_rr_data.cip_message else {
+        return Err(EncapsStatusCode::InvalidFormatOrData);
+    };
+
+    let (response, socket_addr_info_items) = if message_router.accepts_explicit_connections()
+        && let Some(response) = handle_connection_request(explicit_connection, request)
+    {
+        // A class 3 connection has no Socket Address Info
+        (response, SocketAddrInfoItems::empty())
+    } else {
+        handle_request(
+            message_router,
+            request,
+            originator_ip,
+            request_rr_data.socket_addr_info_items.t2o,
+        )
+    };
+
+    let mut reply_rr_data =
+        RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
+    reply_rr_data.socket_addr_info_items = socket_addr_info_items;
+    Ok(EnIpPacket {
+        header: EncapsulationHeader {
+            length: None,
+            ..*header
+        },
+        command_specific_data: CommandSpecificData::SendRrData(reply_rr_data),
+    })
+}

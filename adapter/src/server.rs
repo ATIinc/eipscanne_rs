@@ -1,5 +1,5 @@
-//! The server: one task and one session per TCP connection, handing every Send RR Data request
-//! to a Message Router.
+//! The server: one task and one encapsulation session per TCP connection, handing Send RR Data to
+//! unconnected and Send Unit Data to connected explicit messaging.
 
 use std::io::ErrorKind;
 use std::net::IpAddr;
@@ -10,18 +10,14 @@ use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use tracing::Instrument;
 
-use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData,
-};
-use eipscanne_rs::eip::constants::{
-    CIP_INTERFACE_HANDLE, ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT,
-};
+use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
+use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
-use crate::explicit::handle_request;
+use crate::explicit::connected::{ExplicitConnection, handle_send_unit_data};
+use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::ImplicitDevice;
 use crate::implicit::message_router::ImplicitMessageRouter;
 use crate::message_router::MessageRouter;
@@ -58,7 +54,7 @@ pub async fn serve_implicit(device: Arc<impl ImplicitDevice>, listener: TcpListe
 }
 
 /// Answers the packets of the scanner at `originator_ip` as session `session_handle` until it
-/// unregisters or closes the stream
+/// unregisters or closes the stream; its class 3 connection ends with it
 #[tracing::instrument(skip(message_router, stream))]
 async fn serve_session(
     message_router: Arc<impl MessageRouter>,
@@ -67,6 +63,7 @@ async fn serve_session(
     originator_ip: IpAddr,
 ) -> Result<()> {
     let mut registered = false;
+    let mut explicit_connection: Option<ExplicitConnection> = None;
     loop {
         let (header, command_specific_data) = match read_packet(&mut stream).await {
             Ok(packet) => (packet.header, Some(packet.command_specific_data)),
@@ -110,10 +107,29 @@ async fn serve_session(
                 if registered && header.session_handle == session_handle {
                     handle_send_rr_data(
                         message_router.as_ref(),
+                        &mut explicit_connection,
                         &header,
                         command_specific_data.as_ref(),
                         originator_ip,
                     )
+                    .unwrap_or_else(|status_code| error_reply(&header, status_code))
+                } else {
+                    error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
+                }
+            }
+            EnIpCommand::SendUnitData => {
+                if registered && header.session_handle == session_handle {
+                    // A discarded request has no reply
+                    let Some(reply) = handle_send_unit_data(
+                        message_router.as_ref(),
+                        &mut explicit_connection,
+                        &header,
+                        command_specific_data.as_ref(),
+                        originator_ip,
+                    ) else {
+                        continue;
+                    };
+                    reply
                 } else {
                     error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
                 }
@@ -145,39 +161,6 @@ fn handle_register_session(
     }
     reply.header.session_handle = session_handle;
     reply
-}
-
-/// The Send RR Data reply carrying the Message Router's response to the request inside
-fn handle_send_rr_data(
-    message_router: &impl MessageRouter,
-    header: &EncapsulationHeader,
-    command_specific_data: Option<&CommandSpecificData>,
-    originator_ip: IpAddr,
-) -> EnIpPacket {
-    let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
-        return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
-    };
-    let CipMessage::Request(request) = &request_rr_data.cip_message else {
-        return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
-    };
-
-    let (response, socket_addr_info_items) = handle_request(
-        message_router,
-        request,
-        originator_ip,
-        request_rr_data.socket_addr_info_items.t2o,
-    );
-
-    let mut reply_rr_data =
-        RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
-    reply_rr_data.socket_addr_info_items = socket_addr_info_items;
-    EnIpPacket {
-        header: EncapsulationHeader {
-            length: None,
-            ..*header
-        },
-        command_specific_data: CommandSpecificData::SendRrData(reply_rr_data),
-    }
 }
 
 /// The reply refusing the packet with `header`

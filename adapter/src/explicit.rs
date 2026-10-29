@@ -1,10 +1,14 @@
-//! Explicit messaging: each request a session receives, decoded for its handler and answered.
+//! Explicit messaging: each unconnected or connected request, decoded for its handler and
+//! answered.
 
 use std::io::Cursor;
 use std::net::IpAddr;
 
 use binrw::BinRead;
 
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
+};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
@@ -13,6 +17,9 @@ use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, P
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
 use crate::message_router::{MessageRouter, message_router_response};
+
+pub(crate) mod connected;
+pub(crate) mod unconnected;
 
 /// The data of a Set, or a connection's outputs, as `T`, or the General Status refusing it; mirrors
 /// the scanner's `decode_reply`
@@ -136,6 +143,24 @@ pub(crate) fn segment_id(
         PathData::FormatAsU8(value) => Some(value.into()),
         PathData::FormatAsU16(value) => Some(value),
         PathData::ElectronicKey(_) => None,
+    }
+}
+
+/// The connection size, its type and the connection type of a direction
+pub(crate) fn size_and_types(
+    parameters: &NetworkConnectionParameters,
+) -> (u16, ConnectionSizeType, ConnectionType) {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => (
+            parameters.connection_size().value(),
+            parameters.connection_size_type(),
+            parameters.connection_type(),
+        ),
+        NetworkConnectionParameters::Large(parameters) => (
+            parameters.connection_size(),
+            parameters.connection_size_type(),
+            parameters.connection_type(),
+        ),
     }
 }
 
