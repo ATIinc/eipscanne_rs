@@ -4,7 +4,7 @@
 //! motor's status is printed whenever it changes.
 //!
 //! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
-//! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
+//! sent in run mode unless `--idle` is given. `--host` has no default on purpose.
 //!
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
 
@@ -83,12 +83,16 @@ struct Args {
     #[arg(long, default_value_t = 1000)]
     cycles: u32,
 
-    /// Send the outputs with the run flag set instead of idle
+    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    ///
+    /// Without it, every O->T packet is in run mode and the hub applies the outputs. With it, the
+    /// Run/Idle bit of the 32-bit header is cleared: the connection stays open and the hub holds
+    /// its outputs in their idle state.
     #[arg(
-        long = "run",
+        long = "idle",
         action = clap::ArgAction::SetTrue,
         value_parser = BoolishValueParser::new()
-            .map(|run| if run { RunOrIdle::Run } else { RunOrIdle::Idle }),
+            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
     )]
     run_or_idle: RunOrIdle,
 }

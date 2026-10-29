@@ -36,7 +36,7 @@ In the devcontainer; every example that can talk to OpENer defaults to `172.28.0
   `--toggle-every N` to switch between run and idle every N cycles (OpENer still echoes idle
   outputs)
 * `cargo run --example opener-eds-implicit`: the same connection, read from the scanner's
-  `sample_adapter.eds` fixture. Without `--run` the outputs are sent idle (run flag cleared);
+  `sample_adapter.eds` fixture. `--idle` sends the outputs idle (Run/Idle bit cleared);
   OpENer still echoes them
 
 In Wireshark: a Forward Open request and reply on TCP 44818, Connected Data Items on UDP 2222 in
