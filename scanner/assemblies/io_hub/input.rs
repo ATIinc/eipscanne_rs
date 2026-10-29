@@ -354,10 +354,10 @@ pub struct EncoderInputData {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct InputAssemblyHub4E {
     pub io_input_data: IoInputData,
-    motor0_input_data: MotorInputData,
-    motor1_input_data: MotorInputData,
-    motor2_input_data: MotorInputData,
-    motor3_input_data: MotorInputData,
+    pub motor0_input_data: MotorInputData,
+    pub motor1_input_data: MotorInputData,
+    pub motor2_input_data: MotorInputData,
+    pub motor3_input_data: MotorInputData,
     pub encoder_input_data: EncoderInputData,
 }
 
@@ -371,17 +371,6 @@ impl InputAssemblyHub4E {
             1 => &self.motor1_input_data,
             2 => &self.motor2_input_data,
             3 => &self.motor3_input_data,
-            _ => panic!("motor index must be 0-3, got {index}"),
-        }
-    }
-
-    /// The inputs of motor port `index` (0 = M0 ... 3 = M3), to change
-    pub fn motor_input_mut(&mut self, index: u8) -> &mut MotorInputData {
-        match index {
-            0 => &mut self.motor0_input_data,
-            1 => &mut self.motor1_input_data,
-            2 => &mut self.motor2_input_data,
-            3 => &mut self.motor3_input_data,
             _ => panic!("motor index must be 0-3, got {index}"),
         }
     }

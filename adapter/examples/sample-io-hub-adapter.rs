@@ -46,7 +46,9 @@ mod assemblies {
     pub mod io_hub;
 }
 
-use assemblies::io_hub::input::{INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E};
+use assemblies::io_hub::input::{
+    INPUT_ASSEMBLY_INSTANCE, InputAssemblyHub4E, MotorInputData, MotorStatusword,
+};
 use assemblies::io_hub::output::{MoveType, OUTPUT_ASSEMBLY_INSTANCE, OutputAssemblyHub4E};
 
 const ASSEMBLY_CLASS: u16 = ASSEMBLY_CLASS_ID as u16;
@@ -143,33 +145,44 @@ impl SampleIoHubAdapter {
         hub.outputs = outputs;
     }
 
-    /// The input assembly; `moving` reports the spurt velocity
+    /// The input assembly, built anew from the motors; `moving` reports the spurt velocity
     fn inputs(hub: &mut Hub, moving: bool) -> InputAssemblyHub4E {
-        let mut inputs = InputAssemblyHub4E::default();
-        for (index, motor) in (0..).zip(hub.motors.iter_mut()) {
-            if motor
-                .homing_since
-                .is_some_and(|since| since.elapsed() >= HOMING_TIME)
-            {
-                motor.homing_since = None;
-                motor.has_homed = true;
-            }
-            let homing = motor.homing_since.is_some();
-            let input = inputs.motor_input_mut(index);
-            input.statusword.set_motor_connected(true);
-            input.statusword.set_enabled(motor.enabled);
-            input.statusword.set_ready_for_command(motor.enabled);
-            input.statusword.set_homing(homing);
-            input.statusword.set_has_homed(motor.has_homed);
-            input
-                .statusword
-                .set_command_complete(motor.enabled && !homing && !moving);
-            input.position_measured = motor.position;
-            input.velocity_measured = if moving { SPURT_VELOCITY } else { 0 };
-            input.move_number_ack = motor.move_number_ack;
-            input.move_type_ack = motor.move_type_ack;
+        let [motor0, motor1, motor2, motor3] = &mut hub.motors;
+        InputAssemblyHub4E {
+            motor0_input_data: Self::motor_input(motor0, moving),
+            motor1_input_data: Self::motor_input(motor1, moving),
+            motor2_input_data: Self::motor_input(motor2, moving),
+            motor3_input_data: Self::motor_input(motor3, moving),
+            ..Default::default()
         }
-        inputs
+    }
+
+    /// The inputs of one motor; a homing move finishes after `HOMING_TIME`
+    fn motor_input(motor: &mut Motor, moving: bool) -> MotorInputData {
+        if motor
+            .homing_since
+            .is_some_and(|since| since.elapsed() >= HOMING_TIME)
+        {
+            motor.homing_since = None;
+            motor.has_homed = true;
+        }
+        let homing = motor.homing_since.is_some();
+        let mut statusword = MotorStatusword::default();
+        statusword.set_motor_connected(true);
+        statusword.set_enabled(motor.enabled);
+        statusword.set_ready_for_command(motor.enabled);
+        statusword.set_homing(homing);
+        statusword.set_has_homed(motor.has_homed);
+        statusword.set_command_complete(motor.enabled && !homing && !moving);
+        MotorInputData {
+            statusword,
+            position_measured: motor.position,
+            velocity_measured: if moving { SPURT_VELOCITY } else { 0 },
+            position_target: motor.position,
+            move_type_ack: motor.move_type_ack,
+            move_number_ack: motor.move_number_ack,
+            ..Default::default()
+        }
     }
 }
 
