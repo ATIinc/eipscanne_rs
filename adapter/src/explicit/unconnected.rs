@@ -17,7 +17,7 @@ use crate::message_router::MessageRouter;
 /// without a request
 pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
-    explicit_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Option<ExplicitConnection>,
     header: &EncapsulationHeader,
     command_specific_data: Option<&CommandSpecificData>,
     originator_ip: IpAddr,
@@ -31,7 +31,7 @@ pub(crate) fn handle_send_rr_data(
 
     let (response, socket_addr_info_items) = handle_request(
         message_router,
-        Some(explicit_connection),
+        Some(class_3_connection),
         request,
         originator_ip,
         request_rr_data.socket_addr_info_items.t2o,

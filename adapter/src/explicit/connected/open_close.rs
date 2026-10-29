@@ -23,15 +23,15 @@ use crate::message_router::{
 
 /// Opens the connection `forward_open` asks for, unless the session has one
 pub(crate) fn handle_connected_forward_open(
-    explicit_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Option<ExplicitConnection>,
     forward_open: ForwardOpenRequest,
 ) -> MessageRouterResponse {
     let service = forward_open.service_code();
     let triad = forward_open.connection_triad;
-    delete_timed_out_connection(explicit_connection);
+    delete_timed_out_connection(class_3_connection);
     // While the session's connection is established, every Forward_Open is refused before it is
     // checked
-    if let Some(current) = explicit_connection.as_ref() {
+    if let Some(current) = class_3_connection.as_ref() {
         let extended_status = if current.request.connection_triad == triad {
             ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen
         } else {
@@ -74,7 +74,7 @@ pub(crate) fn handle_connected_forward_open(
     };
     // The timer starts once the connection is established
     connection.restart_inactivity_timer();
-    *explicit_connection = Some(connection);
+    *class_3_connection = Some(connection);
     message_router_response(
         service,
         ResponseStatusCode::Success,
@@ -122,16 +122,16 @@ fn unsupported_parameter_status(
 /// Closes the session's connection when `forward_close` names it; `None` leaves any other
 /// connection to the Message Router
 pub(crate) fn handle_connected_forward_close(
-    explicit_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Option<ExplicitConnection>,
     forward_close: &ForwardCloseRequest,
 ) -> Option<MessageRouterResponse> {
     let triad = forward_close.connection_triad;
-    delete_timed_out_connection(explicit_connection);
+    delete_timed_out_connection(class_3_connection);
     // Any other connection is the Message Router's
-    if explicit_connection.as_ref()?.request.connection_triad != triad {
+    if class_3_connection.as_ref()?.request.connection_triad != triad {
         return None;
     }
-    *explicit_connection = None;
+    *class_3_connection = None;
     tracing::info!(
         connection_serial_number = triad.connection_serial_number,
         "class 3 connection closed"

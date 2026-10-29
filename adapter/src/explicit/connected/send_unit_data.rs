@@ -24,7 +24,7 @@ const CIP_SEQUENCE_COUNT_LEN: usize = 2;
 /// inside; `None` when the request is discarded
 pub(crate) fn handle_send_unit_data(
     message_router: &impl MessageRouter,
-    explicit_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Option<ExplicitConnection>,
     header: &EncapsulationHeader,
     command_specific_data: Option<&CommandSpecificData>,
     originator_ip: IpAddr,
@@ -39,7 +39,7 @@ pub(crate) fn handle_send_unit_data(
     };
     let cip_sequence_count = request_unit_data.cip_sequence_count;
     let connection = consume_request(
-        explicit_connection,
+        class_3_connection,
         request_unit_data.connection_id,
         cip_sequence_count,
     )?;
@@ -63,12 +63,12 @@ pub(crate) fn handle_send_unit_data(
 /// connection, or `None` when the request is discarded because no established connection has
 /// that O->T ID or `cip_sequence_count` repeats the last one
 fn consume_request(
-    explicit_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Option<ExplicitConnection>,
     connection_id: CipUdint,
     cip_sequence_count: CipUint,
 ) -> Option<&ExplicitConnection> {
-    delete_timed_out_connection(explicit_connection);
-    let Some(connection) = explicit_connection.as_mut() else {
+    delete_timed_out_connection(class_3_connection);
+    let Some(connection) = class_3_connection.as_mut() else {
         tracing::debug!("discarded a request: no class 3 connection");
         return None;
     };

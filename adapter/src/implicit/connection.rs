@@ -23,8 +23,8 @@ use crate::message_router::{connection_failure_rejection, segment_id, size_and_t
 /// `sin_family` of an IPv4 Socket Address Info
 const AF_INET: CipInt = 2;
 
-/// An open connection: the Forward_Open received, the reply sent, each direction's assembly (from
-/// the device) and where the I/O goes
+/// An open class 1 connection: the Forward_Open received, the reply sent, each direction's
+/// assembly (from the device) and where the I/O goes
 #[derive(Debug)]
 pub(crate) struct ImplicitConnection {
     pub request: ForwardOpenRequest,

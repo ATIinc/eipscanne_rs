@@ -49,9 +49,9 @@ impl ExplicitConnection {
 }
 
 /// Deletes the connection once no request has come within its timeout
-fn delete_timed_out_connection(explicit_connection: &mut Option<ExplicitConnection>) {
+fn delete_timed_out_connection(class_3_connection: &mut Option<ExplicitConnection>) {
     if let Some(connection) =
-        explicit_connection.take_if(|connection| connection.deadline <= Instant::now())
+        class_3_connection.take_if(|connection| connection.deadline <= Instant::now())
     {
         tracing::warn!(
             connection_serial_number = connection.request.connection_triad.connection_serial_number,

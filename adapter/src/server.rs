@@ -64,7 +64,7 @@ async fn serve_session(
     originator_ip: IpAddr,
 ) -> Result<()> {
     let mut registered = false;
-    let mut explicit_connection: Option<ExplicitConnection> = None;
+    let mut class_3_connection: Option<ExplicitConnection> = None;
     loop {
         let (header, command_specific_data) = match read_packet(&mut stream).await {
             Ok(packet) => (packet.header, Some(packet.command_specific_data)),
@@ -108,7 +108,7 @@ async fn serve_session(
                 if registered && header.session_handle == session_handle {
                     handle_send_rr_data(
                         message_router.as_ref(),
-                        &mut explicit_connection,
+                        &mut class_3_connection,
                         &header,
                         command_specific_data.as_ref(),
                         originator_ip,
@@ -123,7 +123,7 @@ async fn serve_session(
                     // A discarded request has no reply
                     let Some(reply) = handle_send_unit_data(
                         message_router.as_ref(),
-                        &mut explicit_connection,
+                        &mut class_3_connection,
                         &header,
                         command_specific_data.as_ref(),
                         originator_ip,
