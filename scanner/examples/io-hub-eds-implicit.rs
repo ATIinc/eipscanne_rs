@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
+use clap::builder::{BoolishValueParser, TypedValueParser};
 use tokio::net::UdpSocket;
 use tokio::signal::ctrl_c;
 use tokio::time::{interval, sleep_until};
@@ -83,8 +84,13 @@ struct Args {
     cycles: u32,
 
     /// Send the outputs with the run flag set instead of idle
-    #[arg(long)]
-    run: bool,
+    #[arg(
+        long = "run",
+        action = clap::ArgAction::SetTrue,
+        value_parser = BoolishValueParser::new()
+            .map(|run| if run { RunOrIdle::Run } else { RunOrIdle::Idle }),
+    )]
+    run_or_idle: RunOrIdle,
 }
 
 #[tokio::main]
@@ -169,11 +175,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
     let cip_sequence_count: u16 = 1;
-    let run_or_idle = if args.run {
-        RunOrIdle::Run
-    } else {
-        RunOrIdle::Idle
-    };
 
     let timeout: Duration = input_timeout(&connection);
     let mut last_sequence_number: Option<u32> = None;
@@ -197,7 +198,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default())),
-                    run_or_idle,
+                    args.run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
