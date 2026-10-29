@@ -8,11 +8,11 @@
 //! Close    SendRRData(Forward_Close) -> the reply                           open_close
 //! ```
 //!
-//! Only a [`MessageRouter`] that accepts explicit connections opens one. A request whose CIP
-//! sequence count repeats the last one is discarded; the connection is deleted when no request
+//! Only a server whose [`ExplicitOptions`] accept explicit connections opens one. A request whose
+//! CIP sequence count repeats the last one is discarded; the connection is deleted when no request
 //! comes within its timeout, and when its session ends.
 //!
-//! [`MessageRouter`]: crate::message_router::MessageRouter
+//! [`ExplicitOptions`]: crate::message_router::ExplicitOptions
 
 use std::time::Duration;
 
@@ -21,7 +21,9 @@ use tokio::time::Instant;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
-use eipscanne_rs::cip::types::CipUint;
+use eipscanne_rs::cip::types::{CipUdint, CipUint};
+
+use crate::error::{Error, Result};
 
 pub(crate) mod open_close;
 pub(crate) mod send_unit_data;
@@ -59,20 +61,29 @@ impl ExplicitConnection {
         self.deadline
     }
 
-    /// Restarts the inactivity timer
-    fn restart_inactivity_timer(&mut self) {
-        self.deadline = Instant::now() + self.inactivity_timeout;
-    }
-}
+    /// Consumes a connected request on `connection_id`: restarts the inactivity timer;
+    /// `Error::UnexpectedPacket` when the connection has another O->T ID or `cip_sequence_count`
+    /// repeats the last one
+    fn consume_request(
+        &mut self,
+        connection_id: CipUdint,
+        cip_sequence_count: CipUint,
+    ) -> Result<()> {
+        if self.response.o2t_network_connection_id != connection_id {
+            return Err(Error::UnexpectedPacket(format!(
+                "request for another connection ({connection_id:#010x})"
+            )));
+        }
 
-/// Deletes the connection once no request has come within its timeout
-fn delete_timed_out_connection(class_3_connection: &mut Option<ExplicitConnection>) {
-    if let Some(connection) =
-        class_3_connection.take_if(|connection| connection.deadline <= Instant::now())
-    {
-        tracing::warn!(
-            connection_serial_number = connection.request.connection_triad.connection_serial_number,
-            "class 3 connection timed out: no request in time"
-        );
+        self.deadline = Instant::now() + self.inactivity_timeout;
+
+        if self.last_cip_sequence_count == Some(cip_sequence_count) {
+            return Err(Error::UnexpectedPacket(format!(
+                "repeated CIP sequence count {cip_sequence_count}"
+            )));
+        }
+
+        self.last_cip_sequence_count = Some(cip_sequence_count);
+        Ok(())
     }
 }

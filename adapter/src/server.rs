@@ -23,7 +23,7 @@ use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::message_router::ImplicitMessageRouter;
 use crate::implicit::{ImplicitDevice, ImplicitOptions};
 use crate::message_router::{ExplicitOptions, MessageRouter};
-use crate::packet::{read_packet, write_packet};
+use crate::packet::{error_reply, read_packet, write_packet};
 
 /// [`serve`], plus the class 1 connections `implicit_options` allows on an I/O socket at the
 /// listener's address
@@ -133,39 +133,40 @@ async fn serve_session(
                 }
                 reply
             }
+            // Send RR Data and Send Unit Data need the registered session
+            EnIpCommand::SendRrData | EnIpCommand::SendUnitData
+                if !registered || header.session_handle != session_handle =>
+            {
+                error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
+            }
             EnIpCommand::SendRrData => {
-                if registered && header.session_handle == session_handle {
-                    handle_send_rr_data(
-                        message_router.as_ref(),
-                        &header,
-                        originator_ip,
-                        command_specific_data.as_ref(),
-                        // Without it, a class 3 Forward_Open is the Message Router's
-                        options
-                            .accepts_explicit_connections
-                            .then_some(&mut class_3_connection),
-                    )
-                    .unwrap_or_else(|status_code| error_reply(&header, status_code))
-                } else {
-                    error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
-                }
+                // The session keeps its class 3 connection only until it times out
+                class_3_connection =
+                    class_3_connection.filter(|connection| connection.deadline() > Instant::now());
+                handle_send_rr_data(
+                    message_router.as_ref(),
+                    options,
+                    &header,
+                    originator_ip,
+                    command_specific_data.as_ref(),
+                    &mut class_3_connection,
+                )
             }
             EnIpCommand::SendUnitData => {
-                if registered && header.session_handle == session_handle {
-                    let Some(reply) = handle_send_unit_data(
-                        message_router.as_ref(),
-                        &mut class_3_connection,
-                        &header,
-                        originator_ip,
-                        command_specific_data.as_ref(),
-                    ) else {
-                        // A discarded request has no reply
-                        continue;
-                    };
-                    reply
-                } else {
-                    error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
-                }
+                class_3_connection =
+                    class_3_connection.filter(|connection| connection.deadline() > Instant::now());
+                let Some(reply) = handle_send_unit_data(
+                    message_router.as_ref(),
+                    options,
+                    &header,
+                    originator_ip,
+                    command_specific_data.as_ref(),
+                    &mut class_3_connection,
+                ) else {
+                    // A discarded request has no reply
+                    continue;
+                };
+                reply
             }
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
@@ -194,17 +195,4 @@ fn handle_register_session(
     }
     reply.header.session_handle = session_handle;
     reply
-}
-
-/// The reply refusing the packet with `header`
-fn error_reply(header: &EncapsulationHeader, status_code: EncapsStatusCode) -> EnIpPacket {
-    tracing::warn!(command = ?header.command, status = ?status_code, "refused a packet");
-    EnIpPacket {
-        header: EncapsulationHeader {
-            length: None,
-            status_code,
-            ..*header
-        },
-        command_specific_data: CommandSpecificData::NoData,
-    }
 }

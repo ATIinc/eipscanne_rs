@@ -1,5 +1,5 @@
-//! Bytes on the wire: encapsulation packets on a stream, read whole however the bytes arrive, and
-//! the data a request or an I/O packet carries.
+//! Bytes on the wire: encapsulation packets on a stream, read whole however the bytes arrive, the
+//! bare reply refusing one, and the data a request or an I/O packet carries.
 
 use std::io::Cursor;
 
@@ -7,6 +7,7 @@ use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
+use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
@@ -38,6 +39,22 @@ pub async fn write_packet(
     packet.write(&mut bytes)?;
     stream.write_all(bytes.get_ref()).await?;
     Ok(())
+}
+
+/// The reply refusing the packet with `header`
+pub(crate) fn error_reply(
+    header: &EncapsulationHeader,
+    status_code: EncapsStatusCode,
+) -> EnIpPacket {
+    tracing::warn!(command = ?header.command, status = ?status_code, "refused a packet");
+    EnIpPacket {
+        header: EncapsulationHeader {
+            length: None,
+            status_code,
+            ..*header
+        },
+        command_specific_data: CommandSpecificData::NoData,
+    }
 }
 
 /// The data of a Set, or a connection's outputs, as `T`, or the General Status refusing it; mirrors

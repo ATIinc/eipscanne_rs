@@ -6,7 +6,7 @@ The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging ove
 * `message_router`: the `MessageRouter` trait, the services a scanner's requests reach, and the paths, connection parameters and responses of those services.
 * `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the session's class 3 connection.
 * `implicit`: the `ImplicitDevice` trait, and the opening, exchange and closing of the class 1 connections.
-* `packet`: reads and writes one encapsulation packet on a stream; `decode_data` decodes the data of a Set or a connection's outputs.
+* `packet`: reads and writes one encapsulation packet on a stream; `error_reply` refuses one; `decode_data` decodes the data of a Set or a connection's outputs.
 * `error`: the one error type of every fallible call.
 
 [src/README.md](src/README.md) follows a packet through these modules.

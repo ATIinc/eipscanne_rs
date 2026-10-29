@@ -19,20 +19,23 @@ use crate::explicit::connected::ExplicitConnection;
 use crate::explicit::connected::open_close::{
     handle_connected_forward_close, handle_connected_forward_open,
 };
-use crate::message_router::{MessageRouter, class_instance_and_attribute, message_router_response};
+use crate::message_router::{
+    ExplicitOptions, MessageRouter, class_instance_and_attribute, message_router_response,
+};
 
 pub(crate) mod connected;
 pub(crate) mod unconnected;
 
-/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items;
-/// `class_3_connection` (`None` on a connected request, or when class 3 is off) takes class 3
-/// Forward_Open and Forward_Close. Single services need an attribute, All services none
+/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items; a
+/// class 3 Forward_Open and Forward_Close open and close `class_3_connection` when `options` accept
+/// explicit connections. Single services need an attribute, All services none
 pub(crate) fn handle_request(
     message_router: &impl MessageRouter,
+    options: ExplicitOptions,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
-    class_3_connection: Option<&mut Option<ExplicitConnection>>,
+    class_3_connection: &mut Option<ExplicitConnection>,
 ) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
     let path_ids = class_instance_and_attribute(&request.request_data.cip_path);
@@ -84,20 +87,21 @@ pub(crate) fn handle_request(
                     );
                 }
             };
-            // Class 3 opens the session's connection
-            if let Some(class_3_connection) = class_3_connection
+
+            // Class 3 opens the session's connection, when the options accept it
+            if options.accepts_explicit_connections
                 && forward_open_request
                     .transport_type_trigger
                     .transport_class()
                     == TransportClass::Class3
             {
-                // A class 3 connection has no Socket Address Info
                 return (
-                    handle_connected_forward_open(class_3_connection, forward_open_request),
+                    handle_connected_forward_open(forward_open_request, class_3_connection),
                     SocketAddrInfoItems::empty(),
                 );
             }
-            // Any other Forward_Open is the Message Router's
+
+            // Every non-class-3 Forward_Open goes to the Message Router
             return message_router.handle_forward_open(
                 forward_open_request,
                 originator_ip,
@@ -116,13 +120,14 @@ pub(crate) fn handle_request(
                         );
                     }
                 };
-            // The session's class 3 connection first; any other is the Message Router's
-            if let Some(class_3_connection) = class_3_connection
-                && let Some(response) =
-                    handle_connected_forward_close(class_3_connection, &forward_close_request)
+            // The session's class 3 connection first
+            if let Some(response) =
+                handle_connected_forward_close(&forward_close_request, class_3_connection.as_ref())
             {
+                *class_3_connection = None;
                 return (response, SocketAddrInfoItems::empty());
             }
+            // Every non-class-3 Forward_Close goes to the Message Router
             return (
                 message_router.handle_forward_close(forward_close_request, originator_ip),
                 SocketAddrInfoItems::empty(),

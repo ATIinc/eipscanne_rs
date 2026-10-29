@@ -9,36 +9,58 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
 use eipscanne_rs::cip::connection_manager::parameters::{ConnectionType, Direction};
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
+use eipscanne_rs::cip::message::response::{MessageRouterResponse, Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INSTANCE_ID};
 
-use crate::explicit::connected::{ExplicitConnection, delete_timed_out_connection};
+use crate::explicit::connected::ExplicitConnection;
 use crate::message_router::{
     class_instance_and_attribute, connection_failure_rejection, message_router_response,
     network_connection_type, rejection_response,
 };
 
-/// Opens the connection `forward_open` asks for, unless the session has one
+/// The response to `forward_open`; the connection it opens becomes the session's
 pub(crate) fn handle_connected_forward_open(
-    class_3_connection: &mut Option<ExplicitConnection>,
     forward_open: ForwardOpenRequest,
+    class_3_connection: &mut Option<ExplicitConnection>,
 ) -> MessageRouterResponse {
     let service = forward_open.service_code();
     let triad = forward_open.connection_triad;
-    delete_timed_out_connection(class_3_connection);
+    match explicit_connection_from_forward_open(forward_open, class_3_connection.as_ref()) {
+        Ok(opened_connection) => {
+            let forward_open_response = opened_connection.response.clone();
+            *class_3_connection = Some(opened_connection);
+            message_router_response(
+                service,
+                ResponseStatusCode::Success,
+                vec![],
+                CipDataOpt::Typed(Box::new(forward_open_response)),
+            )
+        }
+        Err(rejection) => rejection_response(rejection, triad),
+    }
+}
+
+/// The connection `forward_open` asks for, unless the session's connection is established or it
+/// asks for more than a point-to-point connection to the Message Router
+fn explicit_connection_from_forward_open(
+    forward_open: ForwardOpenRequest,
+    class_3_connection: Option<&ExplicitConnection>,
+) -> Result<ExplicitConnection, Rejection> {
+    let service = forward_open.service_code();
+    let triad = forward_open.connection_triad;
     // While the session's connection is established, every Forward_Open is refused before it is
     // checked
-    if let Some(current) = class_3_connection.as_ref() {
-        let refusal_status = if current.request.connection_triad == triad {
+    if let Some(established_connection) = class_3_connection {
+        let refusal_status = if established_connection.request.connection_triad == triad {
             ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen
         } else {
             ConnectionManagerExtendedStatus::OutOfConnections
         };
-        return rejection_response(connection_failure_rejection(service, refusal_status), triad);
+        return Err(connection_failure_rejection(service, refusal_status));
     }
     if let Some(refusal_status) = unsupported_parameter_status(&forward_open) {
-        return rejection_response(connection_failure_rejection(service, refusal_status), triad);
+        return Err(connection_failure_rejection(service, refusal_status));
     }
 
     let forward_open_response = ForwardOpenResponse {
@@ -58,16 +80,7 @@ pub(crate) fn handle_connected_forward_open(
         o2t_api_us = forward_open_response.o2t_actual_packet_interval,
         "class 3 connection opened"
     );
-    *class_3_connection = Some(ExplicitConnection::new(
-        forward_open,
-        forward_open_response.clone(),
-    ));
-    message_router_response(
-        service,
-        ResponseStatusCode::Success,
-        vec![],
-        CipDataOpt::Typed(Box::new(forward_open_response)),
-    )
+    Ok(ExplicitConnection::new(forward_open, forward_open_response))
 }
 
 /// The extended status refusing what `forward_open` asks for beyond a point-to-point connection
@@ -104,19 +117,17 @@ fn unsupported_parameter_status(
     None
 }
 
-/// Closes the session's connection when `forward_close` names it; `None` leaves any other
+/// The response to `forward_close` when it names the session's connection; `None` leaves any other
 /// connection to the Message Router
 pub(crate) fn handle_connected_forward_close(
-    class_3_connection: &mut Option<ExplicitConnection>,
     forward_close: &ForwardCloseRequest,
+    class_3_connection: Option<&ExplicitConnection>,
 ) -> Option<MessageRouterResponse> {
     let triad = forward_close.connection_triad;
-    delete_timed_out_connection(class_3_connection);
     // Any other connection is the Message Router's
-    if class_3_connection.as_ref()?.request.connection_triad != triad {
+    if class_3_connection?.request.connection_triad != triad {
         return None;
     }
-    *class_3_connection = None;
     tracing::info!(
         connection_serial_number = triad.connection_serial_number,
         "class 3 connection closed"

@@ -15,17 +15,19 @@ server::serve
    │     └─ explicit::handle_request
    │        ├─ Get, Set
    │        │  └─ MessageRouter::handle_get_* / handle_set_*
-   │        ├─ class 3 Forward_Open, Forward_Close
-   │        │  └─ explicit::connected::open_close::handle_connected_forward_open / _close
+   │        ├─ class 3 Forward_Open
+   │        │  └─ explicit::connected::open_close::handle_connected_forward_open
+   │        ├─ class 3 Forward_Close
+   │        │  └─ explicit::connected::open_close::handle_connected_forward_close
    │        └─ any other Forward_Open, Forward_Close
    │           └─ MessageRouter::handle_forward_open / _close
    ├─ Send Unit Data
    │  └─ explicit::connected::send_unit_data::handle_send_unit_data
    │     ├─ consume_request                  a discarded request has no reply
-   │     ├─ explicit::handle_request         as above, without class 3 Forward_Open, Forward_Close
+   │     ├─ explicit::handle_request         as above
    │     └─ reply_unit_data
    ├─ any other command
-   │  └─ server::error_reply
+   │  └─ packet::error_reply
    └─ packet::write_packet
 ```
 
