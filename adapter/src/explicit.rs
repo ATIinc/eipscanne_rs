@@ -41,6 +41,35 @@ pub(crate) fn handle_request(
     };
 
     let data_or_status = match (service, path_ids) {
+        (ServiceCode::GetAttributeAll, Some((class, instance, None))) => {
+            message_router.handle_get_attributes_all(class, instance)
+        }
+        (ServiceCode::GetAttributeSingle, Some((class, instance, Some(attribute)))) => {
+            message_router.handle_get_attribute_single(class, instance, attribute)
+        }
+        (ServiceCode::SetAttributeAll, Some((class, instance, None))) => message_router
+            .handle_set_attributes_all(class, instance, request_data)
+            .map(|()| CipDataOpt::Raw(vec![])),
+        (ServiceCode::SetAttributeSingle, Some((class, instance, Some(attribute)))) => {
+            message_router
+                .handle_set_attribute_single(class, instance, attribute, request_data)
+                .map(|()| CipDataOpt::Raw(vec![]))
+        }
+        (
+            ServiceCode::GetAttributeAll
+            | ServiceCode::GetAttributeSingle
+            | ServiceCode::SetAttributeAll
+            | ServiceCode::SetAttributeSingle,
+            Some(_),
+        ) => Err(ResponseStatusCode::PathDestinationUnknown),
+        (
+            ServiceCode::GetAttributeAll
+            | ServiceCode::GetAttributeSingle
+            | ServiceCode::SetAttributeAll
+            | ServiceCode::SetAttributeSingle,
+            None,
+        ) => Err(ResponseStatusCode::PathSegmentError),
+        // Connection Manager: opens a class 3 connection, or a class 1 one for implicit I/O
         (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, _) => {
             let forward_open = match ForwardOpenRequest::read_le_args(
                 &mut Cursor::new(request_data),
@@ -72,6 +101,7 @@ pub(crate) fn handle_request(
                 t2o_socket_addr_info,
             );
         }
+        // Connection Manager: closes a class 3 connection, or a class 1 one and its implicit I/O
         (ServiceCode::ForwardClose, _) => {
             let forward_close = match ForwardCloseRequest::read_le(&mut Cursor::new(request_data)) {
                 Ok(forward_close) => forward_close,
@@ -94,34 +124,6 @@ pub(crate) fn handle_request(
                 SocketAddrInfoItems::empty(),
             );
         }
-        (ServiceCode::GetAttributeAll, Some((class, instance, None))) => {
-            message_router.handle_get_attributes_all(class, instance)
-        }
-        (ServiceCode::GetAttributeSingle, Some((class, instance, Some(attribute)))) => {
-            message_router.handle_get_attribute_single(class, instance, attribute)
-        }
-        (ServiceCode::SetAttributeAll, Some((class, instance, None))) => message_router
-            .handle_set_attributes_all(class, instance, request_data)
-            .map(|()| CipDataOpt::Raw(vec![])),
-        (ServiceCode::SetAttributeSingle, Some((class, instance, Some(attribute)))) => {
-            message_router
-                .handle_set_attribute_single(class, instance, attribute, request_data)
-                .map(|()| CipDataOpt::Raw(vec![]))
-        }
-        (
-            ServiceCode::GetAttributeAll
-            | ServiceCode::GetAttributeSingle
-            | ServiceCode::SetAttributeAll
-            | ServiceCode::SetAttributeSingle,
-            Some(_),
-        ) => Err(ResponseStatusCode::PathDestinationUnknown),
-        (
-            ServiceCode::GetAttributeAll
-            | ServiceCode::GetAttributeSingle
-            | ServiceCode::SetAttributeAll
-            | ServiceCode::SetAttributeSingle,
-            None,
-        ) => Err(ResponseStatusCode::PathSegmentError),
         _ => Err(ResponseStatusCode::ServiceNotSupported),
     };
 
