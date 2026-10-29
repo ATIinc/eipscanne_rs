@@ -120,7 +120,6 @@ async fn serve_session(
             }
             EnIpCommand::SendUnitData => {
                 if registered && header.session_handle == session_handle {
-                    // A discarded request has no reply
                     let Some(reply) = handle_send_unit_data(
                         message_router.as_ref(),
                         &mut class_3_connection,
@@ -128,6 +127,7 @@ async fn serve_session(
                         command_specific_data.as_ref(),
                         originator_ip,
                     ) else {
+                        // A discarded request has no reply
                         continue;
                     };
                     reply
