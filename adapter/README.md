@@ -27,7 +27,7 @@ cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
 
 ## Sample implicit adapter
 
-`examples/sample-implicit-adapter` serves an Identity object and the OpENer sample's assemblies on `127.0.0.1:44818`: configuration 151, output 150 and input 100, 32 bytes each. Its inputs echo the last outputs, and it accepts a class 3 connection. The scanner binds UDP 2222, so the adapter takes its outputs on 2223 and names that port in the Forward_Open reply:
+`examples/sample-implicit-adapter` serves an Identity object and the OpENer sample's assemblies on `127.0.0.1:44818`: configuration 151, output 150 and input 100, 32 bytes each. Its inputs echo the last run outputs, and it accepts a class 3 connection. The scanner binds UDP 2222, so the adapter takes its outputs on 2223 and names that port in the Forward_Open reply:
 
 ```text
 cargo run --example sample-implicit-adapter
@@ -37,4 +37,4 @@ cargo run --example opener-implicit -- --host 127.0.0.1
 cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
 ```
 
-Both OpENer examples print their outputs echoed back as `RECEIVED` lines. Without `--run`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them.
+Both OpENer examples print their outputs echoed back as `RECEIVED` lines. Without `--run`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them. `opener-implicit --toggle-every 3` switches between run and idle every three cycles: while idle the echo holds the last run outputs and the adapter logs `outputs idle`.

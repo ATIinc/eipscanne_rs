@@ -32,7 +32,9 @@ In the devcontainer; every example that can talk to OpENer defaults to `172.28.0
 * `cargo run --example opener-implicit`: opens a class 1 connection (configuration assembly 151,
   output 150, input 100, 32 bytes each, a 1 s packet interval), prints a `SENT` line per cycle and
   a `RECEIVED` line per input packet carrying the same bytes, then closes the connection and
-  unregisters. `--rpi 100 --cycles 50` for a faster exchange, `--large` for a Large_Forward_Open
+  unregisters. `--rpi 100 --cycles 50` for a faster exchange, `--large` for a Large_Forward_Open,
+  `--toggle-every N` to switch between run and idle every N cycles (OpENer still echoes idle
+  outputs)
 * `cargo run --example opener-eds-implicit`: the same connection, read from the scanner's
   `sample_adapter.eds` fixture. Without `--run` the outputs are sent idle (run flag cleared);
   OpENer still echoes them

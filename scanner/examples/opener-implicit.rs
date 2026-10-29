@@ -1,6 +1,6 @@
 //! Opens a class 1 connection to the OpENer sample, exchanges cyclic I/O for a number of cycles
 //! and closes it; `main` is the five stages in order. OpENer echoes the outputs of assembly 150 as
-//! the inputs of assembly 100.
+//! the inputs of assembly 100, idle ones too; the adapter crate's sample echoes run outputs only.
 //!
 //! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
 //!
@@ -14,6 +14,7 @@
 //! ```text
 //! cargo run --example sample-implicit-adapter
 //! cargo run --example opener-implicit -- --host 127.0.0.1
+//! cargo run --example opener-implicit -- --host 127.0.0.1 --toggle-every 3
 //! ```
 
 use std::net::SocketAddr;
@@ -81,6 +82,10 @@ struct Args {
     /// Open with a Large_Forward_Open (32-bit connection parameters)
     #[arg(long)]
     large: bool,
+
+    /// Switch the outputs between run and idle every this many cycles, starting in run
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    toggle_every: Option<u32>,
 }
 
 impl Args {
@@ -228,16 +233,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
+                let run = args
+                    .toggle_every
+                    .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2));
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    true,
+                    run,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {}", hex(&outputs));
+                println!("[{cycle:>3}] SENT     {} ({})", hex(&outputs), if run { "run" } else { "idle" });
             }
 
             received = recv_io_packet(&socket) => {
