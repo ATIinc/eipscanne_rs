@@ -1,7 +1,7 @@
 //! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection opened from the hub's EDS, decoding
 //! each input packet as the `InputAssemblyHub4E` that `io-hub-explicit-homing` reads, and prints
 //! one motor's status whenever it changes. The outputs are `OutputAssemblyHub4E::default()`,
-//! sent idle unless `--run` is given.
+//! sent in run mode unless `--idle` is given.
 //!
 //! `--host` has no default:
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
@@ -88,12 +88,16 @@ struct Args {
     #[arg(long, default_value_t = 1000)]
     cycles: u32,
 
-    /// Send the outputs with the run flag set instead of idle
+    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    ///
+    /// Without it, every O->T packet is in run mode and the hub applies the outputs. With it, the
+    /// Run/Idle bit of the 32-bit header is cleared: the connection stays open and the hub holds
+    /// its outputs in their idle state.
     #[arg(
-        long = "run",
+        long = "idle",
         action = clap::ArgAction::SetTrue,
         value_parser = BoolishValueParser::new()
-            .map(|run| if run { RunOrIdle::Run } else { RunOrIdle::Idle }),
+            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
     )]
     run_or_idle: RunOrIdle,
 }
