@@ -42,6 +42,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     connection_size,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
 use eipscanne_rs::cip::path::{
@@ -366,7 +367,7 @@ fn count(step: u8) -> [u8; OUTPUT_SIZE as usize] {
     })
 }
 
-/// Sends the outputs in one packet with the run flag set, so the device applies them instead of
+/// Sends the outputs in one packet in run mode, so the device applies them instead of
 /// idling; the encapsulation sequence number advances every packet
 async fn send_outputs(
     socket: &UdpSocket,
@@ -380,7 +381,7 @@ async fn send_outputs(
         *encapsulation_sequence_number,
         cip_sequence_count,
         CipDataOpt::Raw(outputs.to_vec()),
-        true,
+        RunOrIdle::Run,
     )?;
     *encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
     send_io_packet(socket, &packet, connection.o2t_endpoint).await

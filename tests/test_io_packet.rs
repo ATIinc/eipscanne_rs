@@ -8,7 +8,7 @@ use binrw::{BinRead, BinWrite};
 use hex_assert::prelude::*;
 
 use eipscanne_rs::cip::connection_manager::parameters::{RealTimeFormat, TransportClass};
-use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
@@ -23,9 +23,9 @@ use common::{
 fn o2t_sample_io_data() -> CipIoData {
     CipIoData {
         cip_sequence_count: Some(1),
-        run_idle_header: Some(
-            RunIdleHeader::builder()
-                .run_idle(true)
+        output_control_header: Some(
+            OutputControlHeader::builder()
+                .run_or_idle(RunOrIdle::Run)
                 .claim_output_ownership(false)
                 .ready_for_ownership_of_outputs(u2::new(0))
                 .build(),
@@ -39,7 +39,7 @@ fn o2t_sample_io_data() -> CipIoData {
 fn t2o_sample_io_data() -> CipIoData {
     CipIoData {
         cip_sequence_count: Some(1),
-        run_idle_header: None,
+        output_control_header: None,
         data: CipDataOpt::Raw((0..IO_DATA_SIZE as u8).rev().collect()),
     }
 }

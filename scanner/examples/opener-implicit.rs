@@ -34,6 +34,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     TransportClass, TransportTypeTrigger, connection_size,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
@@ -233,19 +234,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
-                let run = args
+                let run_or_idle = if args
                     .toggle_every
-                    .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2));
+                    .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
+                {
+                    RunOrIdle::Run
+                } else {
+                    RunOrIdle::Idle
+                };
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    run,
+                    run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {} ({})", hex(&outputs), if run { "run" } else { "idle" });
+                println!("[{cycle:>3}] SENT     {} ({run_or_idle:?})", hex(&outputs));
             }
 
             received = recv_io_packet(&socket) => {

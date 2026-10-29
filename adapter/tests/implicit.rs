@@ -22,7 +22,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
-use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::path::CipPath;
@@ -195,7 +195,7 @@ impl Scanner {
         o2t_id: CipUdint,
         sequence_number: CipUdint,
         cip_sequence_count: u16,
-        run: bool,
+        run_or_idle: RunOrIdle,
         outputs: &[u8],
     ) {
         let packet = EnIpIoPacket::new(
@@ -203,9 +203,9 @@ impl Scanner {
             sequence_number,
             CipDataOpt::Typed(Box::new(CipIoData {
                 cip_sequence_count: Some(cip_sequence_count),
-                run_idle_header: Some(
-                    RunIdleHeader::builder()
-                        .run_idle(run)
+                output_control_header: Some(
+                    OutputControlHeader::builder()
+                        .run_or_idle(run_or_idle)
                         .claim_output_ownership(false)
                         .ready_for_ownership_of_outputs(u2::new(0))
                         .build(),
@@ -354,7 +354,7 @@ async fn open_echo_and_close() {
             response.o2t_network_connection_id,
             1,
             1,
-            true,
+            RunOrIdle::Run,
             &outputs,
         )
         .await;
@@ -383,15 +383,15 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
 
     let running = [1, 1, 1, 1];
     scanner
-        .send_outputs(o2t_endpoint, o2t_id, 1, 1, true, &running)
+        .send_outputs(o2t_endpoint, o2t_id, 1, 1, RunOrIdle::Run, &running)
         .await;
     scanner.recv_inputs(&running).await;
     // Idle with the same CIP sequence count, then new idle data
     scanner
-        .send_outputs(o2t_endpoint, o2t_id, 2, 1, false, &running)
+        .send_outputs(o2t_endpoint, o2t_id, 2, 1, RunOrIdle::Idle, &running)
         .await;
     scanner
-        .send_outputs(o2t_endpoint, o2t_id, 3, 2, false, &[2, 2, 2, 2])
+        .send_outputs(o2t_endpoint, o2t_id, 3, 2, RunOrIdle::Idle, &[2, 2, 2, 2])
         .await;
     for _ in 0..5 {
         assert_eq!(scanner.next_inputs().await, running);
@@ -399,7 +399,7 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
     // Run with the same CIP sequence count
     let resumed = [2, 2, 2, 2];
     scanner
-        .send_outputs(o2t_endpoint, o2t_id, 4, 2, true, &resumed)
+        .send_outputs(o2t_endpoint, o2t_id, 4, 2, RunOrIdle::Run, &resumed)
         .await;
     scanner.recv_inputs(&resumed).await;
     assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);

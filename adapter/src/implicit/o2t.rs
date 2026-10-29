@@ -10,7 +10,7 @@ use tokio::net::UdpSocket;
 use tokio::time::{Instant, timeout_at};
 
 use eipscanne_rs::cip::connection_manager::parameters::{TransportClass, connection_size};
-use eipscanne_rs::cip::io_data::CipIoData;
+use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
@@ -80,8 +80,8 @@ pub(crate) async fn receive_outputs(
         deadline = Instant::now() + timeout;
 
         let run = cip_io_data
-            .run_idle_header
-            .is_none_or(|header| header.run_idle());
+            .output_control_header
+            .is_none_or(|header| header.run_or_idle() == RunOrIdle::Run);
         // The same CIP sequence count in the same mode is old data
         let repeated = cip_io_data.cip_sequence_count == last_cip_sequence_count && run == running;
         last_cip_sequence_count = cip_io_data.cip_sequence_count;

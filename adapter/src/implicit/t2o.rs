@@ -10,7 +10,7 @@ use tokio::net::UdpSocket;
 use tokio::time::interval;
 
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
-use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
@@ -33,10 +33,10 @@ pub(crate) async fn send_inputs(
     let mut cip_sequence_count: CipUint = 0;
     let mut last_inputs: Option<Vec<u8>> = None;
     // Always run mode
-    let run_idle_header = match connection.t2o_real_time_format {
+    let output_control_header = match connection.t2o_real_time_format {
         RealTimeFormat::Header32Bit => Some(
-            RunIdleHeader::builder()
-                .run_idle(true)
+            OutputControlHeader::builder()
+                .run_or_idle(RunOrIdle::Run)
                 .claim_output_ownership(false)
                 .ready_for_ownership_of_outputs(u2::new(0))
                 .build(),
@@ -73,7 +73,7 @@ pub(crate) async fn send_inputs(
             encapsulation_sequence_number,
             CipDataOpt::Typed(Box::new(CipIoData {
                 cip_sequence_count: Some(cip_sequence_count),
-                run_idle_header,
+                output_control_header,
                 data: CipDataOpt::Raw(inputs),
             })),
         );

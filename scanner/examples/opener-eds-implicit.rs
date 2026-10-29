@@ -34,6 +34,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::error::Error;
@@ -181,6 +182,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
     let cip_sequence_count: u16 = 1;
+    let run_or_idle = if args.run {
+        RunOrIdle::Run
+    } else {
+        RunOrIdle::Idle
+    };
 
     let timeout = input_timeout(&connection);
     let mut last_sequence_number = None;
@@ -204,11 +210,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    args.run,
+                    run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {} ({})", hex(&outputs), if args.run { "run" } else { "idle" });
+                println!("[{cycle:>3}] SENT     {} ({run_or_idle:?})", hex(&outputs));
             }
 
             received = recv_io_packet(&socket) => {

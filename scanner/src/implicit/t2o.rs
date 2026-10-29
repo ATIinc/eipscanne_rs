@@ -153,7 +153,7 @@ mod tests {
     use eipscanne_rs::cip::connection_manager::parameters::{
         ConnectionSizeType, ConnectionTimeoutMultiplier, RealTimeFormat,
     };
-    use eipscanne_rs::cip::io_data::RunIdleHeader;
+    use eipscanne_rs::cip::io_data::{OutputControlHeader, RunOrIdle};
     use eipscanne_rs::cip::types::CipUint;
 
     use crate::implicit::connection::test_support::{
@@ -226,7 +226,7 @@ mod tests {
             inputs,
             CipIoData {
                 cip_sequence_count: Some(7),
-                run_idle_header: None,
+                output_control_header: None,
                 data: CipDataOpt::Raw(data),
             }
         );
@@ -244,13 +244,13 @@ mod tests {
         .unwrap();
         assert_eq!(inputs.data, CipDataOpt::Raw(vec![7; 3]));
 
-        // A run/idle header: the same 32 bytes of data behind it
+        // A 32-bit header: the same 32 bytes of data behind it
         let mut header = sample_connection();
         header.t2o_real_time_format = RealTimeFormat::Header32Bit;
         header.request.t2o_network_connection_parameters =
             standard_parameters(38, ConnectionSizeType::Fixed);
-        let idle_header = RunIdleHeader::builder()
-            .run_idle(false)
+        let idle_header = OutputControlHeader::builder()
+            .run_or_idle(RunOrIdle::Idle)
             .claim_output_ownership(false)
             .ready_for_ownership_of_outputs(u2::new(0))
             .build();
@@ -262,7 +262,7 @@ mod tests {
             inputs,
             CipIoData {
                 cip_sequence_count: Some(1),
-                run_idle_header: Some(idle_header),
+                output_control_header: Some(idle_header),
                 data: CipDataOpt::Raw(vec![0; 32]),
             }
         );
