@@ -19,8 +19,8 @@ use eipscanne_rs::eip::constants::{
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use adapter::device::Device;
 use adapter::error::Error;
+use adapter::message_router::MessageRouter;
 use adapter::packet::{read_packet, write_packet};
 use adapter::server::serve;
 
@@ -30,7 +30,7 @@ const SESSION_HANDLE: CipUdint = 1;
 /// Answers Get_Attributes_All with one byte
 struct SampleDevice;
 
-impl Device for SampleDevice {
+impl MessageRouter for SampleDevice {
     fn handle_get_attributes_all(
         &self,
         _class: u16,

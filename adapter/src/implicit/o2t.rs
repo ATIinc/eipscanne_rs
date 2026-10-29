@@ -1,5 +1,5 @@
-//! O->T: the outputs, always as bytes. The I/O task passes every packet to [`accept_o2t_packet`]
-//! and keeps the deadline.
+//! O->T: the outputs, always as bytes. [`receive_outputs`] checks every packet and keeps the
+//! deadline.
 
 use std::io::Cursor;
 use std::net::SocketAddr;
@@ -7,49 +7,104 @@ use std::time::Duration;
 
 use binrw::BinRead;
 use tokio::net::UdpSocket;
+use tokio::time::{Instant, timeout_at};
 
 use eipscanne_rs::cip::connection_manager::parameters::{TransportClass, connection_size};
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::types::CipUdint;
+use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
-use crate::implicit::connection::{ImplicitConnection, data_len_matches_connection, data_size};
+use crate::explicit::decode_data;
+use crate::implicit::ImplicitDevice;
+use crate::implicit::connection::ImplicitConnection;
 
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
 
 /// The least time the scanner gets for its first packet
-pub(crate) const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);
+const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);
 /// The smallest allowed sequence number gap
 const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 
-/// Receives one I/O packet and its sender. Cancel safe.
-pub(crate) async fn recv_io_packet(socket: &UdpSocket) -> Result<(EnIpIoPacket, SocketAddr)> {
+/// Hands the device the new run mode outputs of `connection` until no packet comes in time
+pub(crate) async fn receive_outputs(
+    device: &impl ImplicitDevice,
+    connection: &ImplicitConnection,
+    io_socket: &UdpSocket,
+) {
+    // The timeout multiplier times the O->T actual packet interval; x512 on a 10 s interval
+    // overflows 32-bit microseconds
+    let timeout = Duration::from_micros(
+        u64::from(
+            connection
+                .request
+                .connection_timeout_multiplier
+                .multiplier(),
+        ) * u64::from(connection.response.o2t_actual_packet_interval),
+    );
+    let mut deadline = Instant::now() + FIRST_PACKET_GRACE.max(timeout);
+    // None until the first accepted packet
+    let mut last_sequence_number: Option<CipUdint> = None;
+    let mut last_cip_sequence_count: Option<CipUint> = None;
     let mut bytes = vec![0u8; MAX_UDP_PAYLOAD];
-    let (len, from): (usize, SocketAddr) = socket.recv_from(&mut bytes).await?;
-    bytes.truncate(len);
 
-    let packet = EnIpIoPacket::read(&mut Cursor::new(&bytes))?;
-    Ok((packet, from))
+    loop {
+        let Ok(received) = timeout_at(deadline, io_socket.recv_from(&mut bytes)).await else {
+            tracing::warn!("the connection timed out: no output packet in time");
+            return;
+        };
+        let checked = received.map_err(Error::from).and_then(|(len, from)| {
+            check_output_packet(connection, last_sequence_number, &bytes[..len], from)
+        });
+        let (sequenced_address, cip_io_data) = match checked {
+            Ok(checked) => checked,
+            Err(error) => {
+                tracing::debug!(%error, "discarded an output packet");
+                continue;
+            }
+        };
+        last_sequence_number = Some(sequenced_address.encapsulation_sequence_number);
+        // Each accepted packet restarts the timeout
+        deadline = Instant::now() + timeout;
+
+        // The same CIP sequence count is old data
+        let repeated = cip_io_data.cip_sequence_count == last_cip_sequence_count;
+        last_cip_sequence_count = cip_io_data.cip_sequence_count;
+        // Idle outputs keep the connection open but are not applied
+        let idle = cip_io_data
+            .run_idle_header
+            .is_some_and(|header| !header.run_idle());
+        let CipDataOpt::Raw(data) = &cip_io_data.data else {
+            unreachable!("data read from the wire is always raw");
+        };
+        if repeated || idle || data.is_empty() {
+            continue;
+        }
+        match decode_data(data) {
+            Ok(outputs) => device.consume_outputs(connection.output_instance, outputs),
+            Err(status) => tracing::warn!(?status, "outputs not consumed"),
+        }
+    }
 }
 
-/// Screens a packet of `connection` from `from`, given the last accepted encapsulation sequence
-/// number (`None` before the first). Returns its Sequenced Address and Connected Data Item, or
-/// `Error::UnexpectedPacket` saying why it was discarded.
-pub(crate) fn accept_o2t_packet(
+/// Checks the `bytes` of a packet of `connection` from `from`, given the last accepted
+/// encapsulation sequence number (`None` before the first). Returns its Sequenced Address and
+/// Connected Data Item, or `Error::UnexpectedPacket` saying why it was discarded.
+fn check_output_packet(
     connection: &ImplicitConnection,
     last_sequence_number: Option<CipUdint>,
-    packet: &EnIpIoPacket,
+    bytes: &[u8],
     from: SocketAddr,
 ) -> Result<(SequencedAddress, CipIoData)> {
-    // 1. It is for this connection
-    let address: SequencedAddress = packet.sequenced_address;
-    if address.connection_id != connection.response.o2t_network_connection_id {
+    // 1. It is an I/O packet for this connection
+    let packet = EnIpIoPacket::read(&mut Cursor::new(bytes))?;
+    let sequenced_address: SequencedAddress = packet.sequenced_address;
+    if sequenced_address.connection_id != connection.response.o2t_network_connection_id {
         return Err(Error::UnexpectedPacket(format!(
             "packet for another connection ({:#010x})",
-            address.connection_id
+            sequenced_address.connection_id
         )));
     }
 
@@ -60,14 +115,14 @@ pub(crate) fn accept_o2t_packet(
         )));
     }
 
-    // 3. It is newer than the last accepted one (distance modulo 2^32 in 1..2^31), by at most
+    // 3. It is newer than the last accepted one (gap modulo 2^32 in 1..2^31), by at most
     //    the timeout multiplier plus one (never under 16). Any first number is accepted
     if let Some(last) = last_sequence_number {
-        let received: CipUdint = address.encapsulation_sequence_number;
-        let distance: u32 = received.wrapping_sub(last);
-        if distance == 0 || distance >= 1 << 31 {
+        let sequence_number: CipUdint = sequenced_address.encapsulation_sequence_number;
+        let gap: u32 = sequence_number.wrapping_sub(last);
+        if gap == 0 || gap >= 1 << 31 {
             return Err(Error::UnexpectedPacket(format!(
-                "stale sequence number {received} (last accepted {last})"
+                "stale sequence number {sequence_number} (last accepted {last})"
             )));
         }
         // The timeout multiplier as a factor: 4, 8, ... 512
@@ -75,38 +130,36 @@ pub(crate) fn accept_o2t_packet(
             .request
             .connection_timeout_multiplier
             .multiplier();
-        let allowed: u32 = MIN_ALLOWED_SEQUENCE_GAP.max(multiplier.saturating_add(1));
-        if distance > allowed {
+        let max_gap: u32 = MIN_ALLOWED_SEQUENCE_GAP.max(multiplier.saturating_add(1));
+        if gap > max_gap {
             return Err(Error::UnexpectedPacket(format!(
-                "sequence number {received} is more than {allowed} ahead of the last accepted {last}"
+                "sequence number {sequence_number} is more than {max_gap} ahead of the last accepted {last}"
             )));
         }
     }
 
-    // 4. Its data has the agreed size and decodes in this direction's shape
-    let CipDataOpt::Raw(bytes) = &packet.connected_data else {
+    // 4. It carries the output assembly after the sequence count and real-time header
+    let CipDataOpt::Raw(connected_data) = &packet.connected_data else {
         return Err(Error::UnexpectedPacket(
             "packet whose Connected Data Item is not raw".to_string(),
         ));
     };
     let real_time_format = connection.o2t_real_time_format;
-    let (expected, size_type) = data_size(
-        &connection.request.o2t_network_connection_parameters,
+    let carried = connection_size(
+        connection.output_size,
+        TransportClass::Class1,
         real_time_format,
     );
-    // The sequence count and header precede the data
-    let overhead = usize::from(connection_size(0, TransportClass::Class1, real_time_format));
-    let data_len = bytes.len().saturating_sub(overhead);
-    if bytes.len() < overhead || !data_len_matches_connection(data_len, expected, size_type) {
+    if connected_data.len() != usize::from(carried) {
         return Err(Error::UnexpectedPacket(format!(
-            "{data_len} output bytes, the connection carries {expected}"
+            "{} connected data bytes, the connection carries {carried}",
+            connected_data.len()
         )));
     }
-    // A Connected Data Item's length is a 16-bit field on the wire
-    let outputs = CipIoData::read_le_args(
-        &mut Cursor::new(bytes),
-        (bytes.len() as u16, TransportClass::Class1, real_time_format),
+    let cip_io_data = CipIoData::read_le_args(
+        &mut Cursor::new(connected_data),
+        (carried, TransportClass::Class1, real_time_format),
     )?;
 
-    Ok((address, outputs))
+    Ok((sequenced_address, cip_io_data))
 }

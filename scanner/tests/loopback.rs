@@ -8,7 +8,7 @@ use bilge::prelude::{u4, u9};
 use binrw::BinRead;
 use tokio::net::{TcpListener, UdpSocket};
 
-use adapter::packet::{message_router_request, read_packet, write_packet};
+use adapter::packet::{read_packet, write_packet};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -19,7 +19,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
+use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
@@ -84,6 +86,17 @@ fn request() -> ForwardOpenRequest {
 }
 
 // ======= The fake adapter ========
+
+/// The Message Router request a Send RR Data packet carries
+fn message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
+    let CommandSpecificData::SendRrData(rr_data) = &packet.command_specific_data else {
+        return None;
+    };
+    match &rr_data.cip_message {
+        CipMessage::Request(request) => Some(request),
+        CipMessage::Response(_) => None,
+    }
+}
 
 /// A successful Connection Manager reply carrying `data` and `socket_addr_info_items`
 fn connection_manager_reply(

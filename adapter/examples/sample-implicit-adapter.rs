@@ -28,8 +28,9 @@ use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::device::{Device, ImplicitDevice};
-use adapter::server::serve;
+use adapter::implicit::ImplicitDevice;
+use adapter::message_router::MessageRouter;
+use adapter::server::serve_implicit;
 
 const OUTPUT_INSTANCE: u16 = 150;
 const INPUT_INSTANCE: u16 = 100;
@@ -55,7 +56,7 @@ struct SampleImplicitAdapter {
     outputs: Mutex<[u8; DATA_SIZE]>,
 }
 
-impl Device for SampleImplicitAdapter {
+impl MessageRouter for SampleImplicitAdapter {
     fn handle_get_attributes_all(
         &self,
         class: u16,
@@ -76,18 +77,17 @@ impl Device for SampleImplicitAdapter {
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }
-
-    fn as_implicit_device(&self) -> Option<&dyn ImplicitDevice> {
-        Some(self)
-    }
 }
 
 impl ImplicitDevice for SampleImplicitAdapter {
+    type Outputs = [u8; DATA_SIZE];
+    type Inputs = [u8; DATA_SIZE];
+
     fn io_port(&self) -> u16 {
         self.io_port
     }
 
-    fn implicit_assembly(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
+    fn assembly_layout(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
         match instance {
             // A run/idle header on the outputs only, like OpENer
             OUTPUT_INSTANCE => Some((DATA_SIZE as u16, RealTimeFormat::Header32Bit)),
@@ -96,21 +96,19 @@ impl ImplicitDevice for SampleImplicitAdapter {
         }
     }
 
-    fn consume_outputs(&self, _instance: u16, data: &[u8]) {
-        tracing::debug!(?data, "outputs consumed");
-        self.outputs
+    fn consume_outputs(&self, _instance: u16, outputs: [u8; DATA_SIZE]) {
+        tracing::debug!(?outputs, "outputs consumed");
+        *self
+            .outputs
             .lock()
-            .expect("nothing panics while holding the outputs lock")
-            .copy_from_slice(data);
+            .expect("nothing panics while holding the outputs lock") = outputs;
     }
 
-    fn produce_inputs(&self, _instance: u16) -> CipDataOpt {
-        CipDataOpt::Raw(
-            self.outputs
-                .lock()
-                .expect("nothing panics while holding the outputs lock")
-                .to_vec(),
-        )
+    fn produce_inputs(&self, _instance: u16) -> [u8; DATA_SIZE] {
+        *self
+            .outputs
+            .lock()
+            .expect("nothing panics while holding the outputs lock")
     }
 }
 
@@ -138,7 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     tokio::select! {
-        served = serve(Arc::new(adapter), listener) => served?,
+        served = serve_implicit(Arc::new(adapter), listener) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");

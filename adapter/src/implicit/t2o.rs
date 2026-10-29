@@ -1,12 +1,13 @@
-//! T->O: the inputs. The I/O task sends one packet every T->O actual packet interval and owns the
-//! sequence numbers.
+//! T->O: the inputs. [`send_inputs`] sends one packet every T->O actual packet interval and owns
+//! the sequence numbers.
 
 use std::io::Cursor;
-use std::net::SocketAddr;
+use std::time::Duration;
 
 use bilge::prelude::u2;
 use binrw::BinWrite;
 use tokio::net::UdpSocket;
+use tokio::time::interval;
 
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
 use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
@@ -14,28 +15,25 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 
-use crate::error::{Error, Result};
-use crate::implicit::connection::{ImplicitConnection, data_len_matches_connection, data_size};
+use crate::implicit::ImplicitDevice;
+use crate::implicit::connection::ImplicitConnection;
 
-/// The T->O packet of `connection` carrying `inputs`, always in run mode
-pub(crate) fn build_t2o_packet(
+/// Sends the device's inputs on `connection` every T->O actual packet interval; never returns
+pub(crate) async fn send_inputs(
+    device: &impl ImplicitDevice,
     connection: &ImplicitConnection,
-    encapsulation_sequence_number: CipUdint,
-    cip_sequence_count: CipUint,
-    inputs: Vec<u8>,
-) -> Result<EnIpIoPacket> {
-    let (data_size, size_type) = data_size(
-        &connection.request.t2o_network_connection_parameters,
-        connection.t2o_real_time_format,
-    );
-    if !data_len_matches_connection(inputs.len(), data_size, size_type) {
-        return Err(Error::UnexpectedPacket(format!(
-            "{} input bytes, the connection carries {data_size}",
-            inputs.len()
-        )));
-    }
-
-    let run_idle_header: Option<RunIdleHeader> = match connection.t2o_real_time_format {
+    io_socket: &UdpSocket,
+) {
+    let mut t2o_interval = interval(Duration::from_micros(u64::from(
+        connection.response.t2o_actual_packet_interval,
+    )));
+    // Starts at random and advances every packet
+    let mut encapsulation_sequence_number: CipUdint = rand::random();
+    // Advances when the inputs change
+    let mut cip_sequence_count: CipUint = 0;
+    let mut last_inputs: Option<Vec<u8>> = None;
+    // Always run mode
+    let run_idle_header = match connection.t2o_real_time_format {
         RealTimeFormat::Header32Bit => Some(
             RunIdleHeader::builder()
                 .run_idle(true)
@@ -45,34 +43,51 @@ pub(crate) fn build_t2o_packet(
         ),
         RealTimeFormat::Modeless | RealTimeFormat::ZeroLength | RealTimeFormat::Heartbeat => None,
     };
-    let cip_io_data = CipIoData {
-        cip_sequence_count: Some(cip_sequence_count),
-        run_idle_header,
-        data: CipDataOpt::Raw(inputs),
-    };
-    Ok(EnIpIoPacket::new(
-        connection.response.t2o_network_connection_id,
-        encapsulation_sequence_number,
-        CipDataOpt::Typed(Box::new(cip_io_data)),
-    ))
-}
 
-/// The bytes of `inputs`, written once: the size check needs them, and a typed assembly's size is
-/// only known once written
-pub(crate) fn to_bytes(inputs: &CipDataOpt) -> Result<Vec<u8>> {
-    let mut bytes = Cursor::new(Vec::new());
-    inputs.write_le_args(&mut bytes, (0,))?;
-    Ok(bytes.into_inner())
-}
+    loop {
+        t2o_interval.tick().await;
+        let mut inputs = Cursor::new(Vec::new());
+        if let Err(error) =
+            CipDataOpt::Typed(Box::new(device.produce_inputs(connection.input_instance)))
+                .write_le_args(&mut inputs, (0,))
+        {
+            tracing::warn!(%error, "inputs not sent");
+            continue;
+        }
+        let inputs = inputs.into_inner();
+        // Only inputs of the input assembly's size are sent
+        if inputs.len() != usize::from(connection.input_size) {
+            tracing::warn!(
+                len = inputs.len(),
+                input_size = connection.input_size,
+                "inputs not sent: not the size of the input assembly"
+            );
+            continue;
+        }
+        if last_inputs.as_ref() != Some(&inputs) {
+            cip_sequence_count = cip_sequence_count.wrapping_add(1);
+            last_inputs = Some(inputs.clone());
+        }
 
-/// Sends one I/O packet to `to`
-pub(crate) async fn send_io_packet(
-    socket: &UdpSocket,
-    packet: &EnIpIoPacket,
-    to: SocketAddr,
-) -> Result<()> {
-    let mut bytes = Cursor::new(Vec::new());
-    packet.write(&mut bytes)?;
-    socket.send_to(bytes.get_ref(), to).await?;
-    Ok(())
+        let packet = EnIpIoPacket::new(
+            connection.response.t2o_network_connection_id,
+            encapsulation_sequence_number,
+            CipDataOpt::Typed(Box::new(CipIoData {
+                cip_sequence_count: Some(cip_sequence_count),
+                run_idle_header,
+                data: CipDataOpt::Raw(inputs),
+            })),
+        );
+        encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
+        let mut bytes = Cursor::new(Vec::new());
+        packet
+            .write(&mut bytes)
+            .expect("an I/O packet of raw inputs writes to memory");
+        if let Err(error) = io_socket
+            .send_to(bytes.get_ref(), connection.t2o_endpoint)
+            .await
+        {
+            tracing::warn!(%error, "inputs not sent");
+        }
+    }
 }

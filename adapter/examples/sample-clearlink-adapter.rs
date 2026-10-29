@@ -30,7 +30,8 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::device::{Device, decode_request};
+use adapter::explicit::decode_data;
+use adapter::message_router::MessageRouter;
 use adapter::server::serve;
 
 // The ClearLink assemblies the scanner's examples use, in scanner/assemblies/
@@ -97,7 +98,7 @@ impl SampleClearlinkAdapter {
     }
 }
 
-impl Device for SampleClearlinkAdapter {
+impl MessageRouter for SampleClearlinkAdapter {
     fn handle_get_attributes_all(
         &self,
         class: u16,
@@ -150,7 +151,7 @@ impl Device for SampleClearlinkAdapter {
             // The configuration changes nothing here
             (ASSEMBLY_CLASS, CONFIG_INSTANCE, DATA_ATTRIBUTE) => Ok(()),
             (ASSEMBLY_CLASS, OUTPUT_INSTANCE, DATA_ATTRIBUTE) => {
-                let outputs: OutputAssemblyObject = decode_request(data)?;
+                let outputs: OutputAssemblyObject = decode_data(data)?;
                 tracing::info!(
                     dop_value = ?outputs.io_output_data.dop_value,
                     dop_pwm = ?outputs.io_output_data.dop_pwm,

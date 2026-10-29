@@ -32,7 +32,7 @@ impl fmt::Display for Error {
             Error::Undecodable { header, error } => {
                 write!(f, "a {:?} packet did not decode: {error}", header.command)
             }
-            Error::UnexpectedPacket(what) => write!(f, "unexpected packet: {what}"),
+            Error::UnexpectedPacket(reason) => write!(f, "unexpected packet: {reason}"),
         }
     }
 }

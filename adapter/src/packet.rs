@@ -5,9 +5,6 @@ use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use eipscanne_rs::cip::message::CipMessage;
-use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
@@ -39,17 +36,4 @@ pub async fn write_packet(
     packet.write(&mut bytes)?;
     stream.write_all(bytes.get_ref()).await?;
     Ok(())
-}
-
-/// The Message Router request a Send RR Data or Send Unit Data packet carries
-pub fn message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
-    let cip_message = match &packet.command_specific_data {
-        CommandSpecificData::SendRrData(rr_data) => &rr_data.cip_message,
-        CommandSpecificData::SendUnitData(unit_data) => &unit_data.cip_message,
-        _ => return None,
-    };
-    match cip_message {
-        CipMessage::Request(request) => Some(request),
-        CipMessage::Response(_) => None,
-    }
 }

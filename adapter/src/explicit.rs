@@ -1,86 +1,82 @@
-//! Explicit messaging: the Message Router, which answers every request a Send RR Data packet
-//! carries.
+//! Explicit messaging: each request a session receives, decoded for its handler and answered.
 
+use std::io::Cursor;
 use std::net::IpAddr;
-use std::sync::Arc;
 
-use eipscanne_rs::cip::message::CipMessage;
+use binrw::BinRead;
+
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::cip::message::response::{
-    MessageRouterResponse, ResponseData, ResponseStatusCode,
-};
-use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
+use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
-use eipscanne_rs::cip::types::CipUint;
-use eipscanne_rs::eip::command::{EncapsStatusCode, RRPacketData};
-use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::device::Device;
-use crate::implicit::connection::ConnectionManager;
+use crate::message_router::{MessageRouter, message_router_response};
 
-/// The reply to the unconnected message `rr_data` carries: Forward_Open and Forward_Close go to the
-/// Connection Manager, Get and Set to the device
-pub(crate) fn handle_unconnected_message(
-    device: &Arc<dyn Device>,
-    rr_data: &RRPacketData,
-    originator_ip: IpAddr,
-    connection_manager: Option<&ConnectionManager>,
-) -> Result<RRPacketData, EncapsStatusCode> {
-    let CipMessage::Request(request) = &rr_data.cip_message else {
-        return Err(EncapsStatusCode::InvalidFormatOrData);
-    };
-
-    let response = match (request.service_container.service(), connection_manager) {
-        (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, Some(connection_manager)) => {
-            connection_manager.handle_forward_open(
-                device,
-                request,
-                originator_ip,
-                // Only a Forward_Open request carries a T->O item
-                rr_data.socket_addr_info_items.t2o,
-            )
+/// The data of a Set, or a connection's outputs, as `T`, or the General Status refusing it; mirrors
+/// the scanner's `decode_reply`
+pub fn decode_data<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
+where
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
+    let mut reader = Cursor::new(data);
+    let value = T::read_le(&mut reader).map_err(|error| {
+        if error.is_eof() {
+            ResponseStatusCode::NotEnoughData
+        } else {
+            ResponseStatusCode::InvalidAttributeValue
         }
-        (ServiceCode::ForwardClose, Some(connection_manager)) => {
-            connection_manager.handle_forward_close(request)
-        }
-        _ => handle_device_request(device.as_ref(), request),
-    };
-
-    let mut reply =
-        RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
-    // Only a device with implicit messaging adds Socket Address Info
-    if let Some(connection_manager) = connection_manager {
-        reply.socket_addr_info_items =
-            connection_manager.socket_addr_info_items(&reply.cip_message);
+    })?;
+    if reader.position() < data.len() as u64 {
+        return Err(ResponseStatusCode::TooMuchData);
     }
-    Ok(reply)
+    Ok(value)
 }
 
-/// The device's response to a Get or Set; Single services need an attribute, All services none
-fn handle_device_request(
-    device: &dyn Device,
+/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items;
+/// Single services need an attribute, All services none
+pub(crate) fn handle_request(
+    message_router: &impl MessageRouter,
     request: &MessageRouterRequest,
-) -> MessageRouterResponse {
+    originator_ip: IpAddr,
+    t2o_socket_addr_info: Option<SocketAddrInfo>,
+) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
-    let ids = cip_path_ids(&request.request_data.cip_path);
-    let CipDataOpt::Raw(data) = &request.request_data.additional_data else {
+    let path_ids = class_instance_and_attribute(&request.request_data.cip_path);
+    let CipDataOpt::Raw(request_data) = &request.request_data.additional_data else {
         unreachable!("data read from the wire is always raw");
     };
 
-    let reply = match (service, ids) {
+    let data_or_status = match (service, path_ids) {
+        (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, _) => {
+            return message_router.handle_forward_open(
+                service,
+                request_data,
+                originator_ip,
+                t2o_socket_addr_info,
+            );
+        }
+        (ServiceCode::ForwardClose, _) => {
+            return (
+                message_router.handle_forward_close(request_data, originator_ip),
+                SocketAddrInfoItems::empty(),
+            );
+        }
         (ServiceCode::GetAttributeAll, Some((class, instance, None))) => {
-            device.handle_get_attributes_all(class, instance)
+            message_router.handle_get_attributes_all(class, instance)
         }
         (ServiceCode::GetAttributeSingle, Some((class, instance, Some(attribute)))) => {
-            device.handle_get_attribute_single(class, instance, attribute)
+            message_router.handle_get_attribute_single(class, instance, attribute)
         }
-        (ServiceCode::SetAttributeAll, Some((class, instance, None))) => device
-            .handle_set_attributes_all(class, instance, data)
+        (ServiceCode::SetAttributeAll, Some((class, instance, None))) => message_router
+            .handle_set_attributes_all(class, instance, request_data)
             .map(|()| CipDataOpt::Raw(vec![])),
-        (ServiceCode::SetAttributeSingle, Some((class, instance, Some(attribute)))) => device
-            .handle_set_attribute_single(class, instance, attribute, data)
-            .map(|()| CipDataOpt::Raw(vec![])),
+        (ServiceCode::SetAttributeSingle, Some((class, instance, Some(attribute)))) => {
+            message_router
+                .handle_set_attribute_single(class, instance, attribute, request_data)
+                .map(|()| CipDataOpt::Raw(vec![]))
+        }
         (
             ServiceCode::GetAttributeAll
             | ServiceCode::GetAttributeSingle
@@ -98,38 +94,21 @@ fn handle_device_request(
         _ => Err(ResponseStatusCode::ServiceNotSupported),
     };
 
-    match reply {
-        Ok(data) => {
-            tracing::debug!(?service, ?ids, "answered a request");
-            message_router_response(service, ResponseStatusCode::Success, vec![], data)
+    let response = match data_or_status {
+        Ok(response_data) => {
+            tracing::debug!(?service, ?path_ids, "answered a request");
+            message_router_response(service, ResponseStatusCode::Success, vec![], response_data)
         }
         Err(status) => {
-            tracing::warn!(?service, ?ids, ?status, "refused a request");
+            tracing::warn!(?service, ?path_ids, ?status, "refused a request");
             message_router_response(service, status, vec![], CipDataOpt::Raw(vec![]))
         }
-    }
-}
-
-/// The response to a `service` request
-pub(crate) fn message_router_response(
-    service: ServiceCode,
-    status: ResponseStatusCode,
-    additional_status: Vec<CipUint>,
-    data: CipDataOpt,
-) -> MessageRouterResponse {
-    MessageRouterResponse {
-        service_container: ServiceContainer::new_response(service),
-        response_data: ResponseData {
-            status,
-            additional_status_size: additional_status.len() as u8,
-            additional_status,
-            data,
-        },
-    }
+    };
+    (response, SocketAddrInfoItems::empty())
 }
 
 /// The class, instance and optional attribute of a logical path
-fn cip_path_ids(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
+fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
     match path.segments.as_slice() {
         [class, instance] => Some((
             segment_id(class, LogicalSegmentType::ClassId)?,
@@ -157,5 +136,30 @@ pub(crate) fn segment_id(
         PathData::FormatAsU8(value) => Some(value.into()),
         PathData::FormatAsU16(value) => Some(value),
         PathData::ElectronicKey(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_data_reads_exactly_the_data() {
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde]),
+            Ok(0xdead_beef)
+        );
+    }
+
+    #[test]
+    fn decode_data_refuses_short_and_long_data() {
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe]),
+            Err(ResponseStatusCode::NotEnoughData)
+        );
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
+            Err(ResponseStatusCode::TooMuchData)
+        );
     }
 }
