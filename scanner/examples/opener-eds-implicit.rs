@@ -9,7 +9,7 @@
 //! ```
 //!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
-//! The outputs are zeros, sent idle (run flag cleared) unless `--run` is given.
+//! The outputs are zeros, sent in run mode unless `--idle` is given.
 
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
@@ -75,12 +75,16 @@ struct Args {
     #[arg(long)]
     large: Option<bool>,
 
-    /// Send the outputs with the run flag set instead of idle
+    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    ///
+    /// Without it, every O->T packet is in run mode and the adapter applies the outputs. With it,
+    /// the Run/Idle bit of the 32-bit header is cleared: the connection stays open, the adapter
+    /// holds its outputs in their idle state, and OpENer still echoes them.
     #[arg(
-        long = "run",
+        long = "idle",
         action = clap::ArgAction::SetTrue,
         value_parser = BoolishValueParser::new()
-            .map(|run| if run { RunOrIdle::Run } else { RunOrIdle::Idle }),
+            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
     )]
     run_or_idle: RunOrIdle,
 }
@@ -135,7 +139,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
     if args.run_or_idle == RunOrIdle::Idle && o2t_real_time_format != RealTimeFormat::Header32Bit {
         return Err(
-            "the O->T direction has no run/idle header, so idle cannot be signalled: pass --run to send the outputs as real"
+            "the O->T direction has no run/idle header, so idle cannot be signalled: drop --idle to send the outputs in run mode"
                 .into(),
         );
     }
