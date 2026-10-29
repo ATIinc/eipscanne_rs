@@ -4,14 +4,14 @@ version = "0.2.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device, unconnected or over a class 3 connection, and one class 1 connection exchanging its assemblies"
+description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device, unconnected or over a class 3 connection, and class 1 connections exchanging its assemblies"
 
 [dependencies]
 eipscanne_rs = { path = ".." }
 bilge = "0.5.0"
 binrw = "0.15.2"
 rand = "0.9"
-tokio = { version = "1", features = ["net", "io-util", "rt", "time", "macros"] }
+tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time", "macros"] }
 tracing = "0.1"
 
 [dev-dependencies]

@@ -5,7 +5,7 @@
 ```text
 server::serve
 └─ server::serve_session                     one task and one session per TCP connection
-   ├─ packet::read_packet
+   ├─ packet::read_packet                    none within the inactivity timeout: the session ends
    ├─ NOP, a request with a Status           no reply
    ├─ Unregister Session                     the session ends
    ├─ Register Session
@@ -34,13 +34,14 @@ server::serve
 ```text
 server::serve_implicit
 ├─ implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
+│  └─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
 └─ server::serve                                            the path above
 
 ImplicitMessageRouter                        the MessageRouter behind serve_implicit
 ├─ Get, Set                                  the device's
 ├─ handle_forward_open
 │  ├─ implicit::connection::connection_from_forward_open
-│  └─ the I/O exchange task
+│  └─ the I/O exchange task, one per connection
 │     ├─ O->T: implicit::o2t::receive_outputs
 │     │  ├─ check_output_packet, packet::decode_data, ImplicitDevice::consume_outputs
 │     │  └─ ImplicitDevice::idle_outputs     on a switch to idle and on the timeout

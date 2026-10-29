@@ -17,10 +17,10 @@ use crate::message_router::MessageRouter;
 /// without a request
 pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
-    class_3_connection: &mut Option<ExplicitConnection>,
     header: &EncapsulationHeader,
-    command_specific_data: Option<&CommandSpecificData>,
     originator_ip: IpAddr,
+    command_specific_data: Option<&CommandSpecificData>,
+    class_3_connection: Option<&mut Option<ExplicitConnection>>,
 ) -> Result<EnIpPacket, EncapsStatusCode> {
     let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
         return Err(EncapsStatusCode::InvalidFormatOrData);
@@ -31,10 +31,10 @@ pub(crate) fn handle_send_rr_data(
 
     let (response, socket_addr_info_items) = handle_request(
         message_router,
-        Some(class_3_connection),
         request,
         originator_ip,
         request_rr_data.socket_addr_info_items.t2o,
+        class_3_connection,
     );
 
     let mut reply_rr_data =

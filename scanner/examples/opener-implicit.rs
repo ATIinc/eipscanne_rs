@@ -264,7 +264,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok((address, inputs)) => {
                         last_sequence_number = Some(address.encapsulation_sequence_number);
                         deadline = Instant::now() + timeout;

@@ -1,7 +1,5 @@
 //! Open and Close: the Forward_Open and Forward_Close of the session's class 3 connection.
 
-use tokio::time::Instant;
-
 use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
 };
@@ -18,7 +16,7 @@ use eipscanne_rs::cip::object_ids::{MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INST
 use crate::explicit::connected::{ExplicitConnection, delete_timed_out_connection};
 use crate::message_router::{
     class_instance_and_attribute, connection_failure_rejection, message_router_response,
-    rejection_response, size_and_types,
+    network_connection_type, rejection_response,
 };
 
 /// Opens the connection `forward_open` asks for, unless the session has one
@@ -32,21 +30,15 @@ pub(crate) fn handle_connected_forward_open(
     // While the session's connection is established, every Forward_Open is refused before it is
     // checked
     if let Some(current) = class_3_connection.as_ref() {
-        let extended_status = if current.request.connection_triad == triad {
+        let refusal_status = if current.request.connection_triad == triad {
             ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen
         } else {
             ConnectionManagerExtendedStatus::OutOfConnections
         };
-        return rejection_response(
-            connection_failure_rejection(service, extended_status),
-            triad,
-        );
+        return rejection_response(connection_failure_rejection(service, refusal_status), triad);
     }
-    if let Some(extended_status) = unsupported_parameter_status(&forward_open) {
-        return rejection_response(
-            connection_failure_rejection(service, extended_status),
-            triad,
-        );
+    if let Some(refusal_status) = unsupported_parameter_status(&forward_open) {
+        return rejection_response(connection_failure_rejection(service, refusal_status), triad);
     }
 
     let forward_open_response = ForwardOpenResponse {
@@ -66,15 +58,10 @@ pub(crate) fn handle_connected_forward_open(
         o2t_api_us = forward_open_response.o2t_actual_packet_interval,
         "class 3 connection opened"
     );
-    let mut connection = ExplicitConnection {
-        request: forward_open,
-        response: forward_open_response.clone(),
-        deadline: Instant::now(),
-        last_cip_sequence_count: None,
-    };
-    // The timer starts once the connection is established
-    connection.restart_inactivity_timer();
-    *class_3_connection = Some(connection);
+    *class_3_connection = Some(ExplicitConnection::new(
+        forward_open,
+        forward_open_response.clone(),
+    ));
     message_router_response(
         service,
         ResponseStatusCode::Success,
@@ -94,12 +81,10 @@ fn unsupported_parameter_status(
             ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
         );
     }
-    if [
-        &forward_open.o2t_network_connection_parameters,
-        &forward_open.t2o_network_connection_parameters,
-    ]
-    .iter()
-    .any(|parameters| size_and_types(parameters).2 != ConnectionType::PointToPoint)
+    if (network_connection_type(&forward_open.o2t_network_connection_parameters)
+        != ConnectionType::PointToPoint)
+        || (network_connection_type(&forward_open.t2o_network_connection_parameters)
+            != ConnectionType::PointToPoint)
     {
         return Some(ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter);
     }

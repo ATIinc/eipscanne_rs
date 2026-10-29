@@ -324,7 +324,7 @@ async fn one_connection_against_a_fake_adapter() {
     let (packet, from) = recv_io_packet(&scanner_io_socket)
         .await
         .expect("the fake adapter echoes the outputs as one input packet");
-    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from)
+    let (address, inputs) = accept_t2o_packet(&connection, &packet, from, None)
         .expect("the fake adapter sends on the granted T->O connection ID");
     assert_eq!(address.encapsulation_sequence_number, 1);
     assert_eq!(inputs.cip_sequence_count, Some(1));

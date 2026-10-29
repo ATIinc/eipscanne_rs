@@ -33,8 +33,8 @@ use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use adapter::implicit::ImplicitDevice;
-use adapter::message_router::MessageRouter;
+use adapter::implicit::{ImplicitDevice, ImplicitOptions};
+use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::{read_packet, write_packet};
 use adapter::server::serve_implicit;
 
@@ -61,11 +61,6 @@ impl MessageRouter for EchoDevice {}
 impl ImplicitDevice for EchoDevice {
     type Outputs = [u8; DATA_SIZE as usize];
     type Inputs = [u8; DATA_SIZE as usize];
-
-    /// Any free port
-    fn io_port(&self) -> u16 {
-        0
-    }
 
     fn assembly_layout(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
         match u8::try_from(instance) {
@@ -114,7 +109,17 @@ impl Scanner {
             outputs: Mutex::new([0; DATA_SIZE as usize]),
             idle_count: AtomicUsize::new(0),
         });
-        tokio::spawn(serve_implicit(Arc::clone(&device), listener));
+        tokio::spawn(serve_implicit(
+            Arc::clone(&device),
+            listener,
+            ExplicitOptions::default(),
+            // Any free port, RPIs from 1 ms to 1 s
+            ImplicitOptions {
+                io_port: 0,
+                packet_interval: 1_000..=1_000_000,
+                ..Default::default()
+            },
+        ));
 
         let mut stream = TcpStream::connect(address)
             .await
@@ -481,6 +486,13 @@ async fn a_forward_open_the_device_cannot_serve_is_refused() {
     assert_eq!(
         extended_status(&scanner.forward_open(change_of_state).await),
         Some(ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported)
+    );
+
+    let mut too_fast = forward_open_request(1);
+    too_fast.t2o_requested_packet_interval = 500;
+    assert_eq!(
+        extended_status(&scanner.forward_open(too_fast).await),
+        Some(ConnectionManagerExtendedStatus::RequestedPacketIntervalNotSupported)
     );
 }
 

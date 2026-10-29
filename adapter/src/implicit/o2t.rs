@@ -1,12 +1,15 @@
-//! O->T: the outputs, always as bytes. [`receive_outputs`] checks every packet and keeps the
-//! deadline.
+//! O->T: the outputs, always as bytes. [`route_outputs`] hands each packet to its connection, and
+//! [`receive_outputs`] checks every packet of one connection and keeps the deadline.
 
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use binrw::BinRead;
 use tokio::net::UdpSocket;
+use tokio::sync::mpsc::Receiver;
 use tokio::time::{Instant, timeout_at};
 
 use eipscanne_rs::cip::connection_manager::parameters::{TransportClass, connection_size};
@@ -17,7 +20,7 @@ use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
 use crate::implicit::ImplicitDevice;
-use crate::implicit::connection::ImplicitConnection;
+use crate::implicit::connection::{ImplicitConnection, OpenConnection};
 use crate::packet::decode_data;
 
 /// The largest UDP payload, so no packet is cut short
@@ -28,12 +31,54 @@ const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);
 /// The smallest allowed sequence number gap
 const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 
+/// Hands each O->T packet on `io_socket` to the open connection its connection id names
+pub(crate) async fn route_outputs(
+    io_socket: Arc<UdpSocket>,
+    open_connections: Arc<Mutex<HashMap<CipUdint, OpenConnection>>>,
+) {
+    let mut receive_buffer = vec![0u8; MAX_UDP_PAYLOAD];
+    loop {
+        let (len, from) = match io_socket.recv_from(&mut receive_buffer).await {
+            Ok(received) => received,
+            Err(error) => {
+                tracing::debug!(%error, "no output packet received");
+                continue;
+            }
+        };
+        let packet = match EnIpIoPacket::read(&mut Cursor::new(&receive_buffer[..len])) {
+            Ok(packet) => packet,
+            Err(error) => {
+                tracing::debug!(%error, "discarded an output packet");
+                continue;
+            }
+        };
+        let connection_id = packet.sequenced_address.connection_id;
+        let open_connections = open_connections
+            .lock()
+            .expect("nothing panics while holding the connections lock");
+        let Some(open_connection) = open_connections.get(&connection_id) else {
+            tracing::debug!(
+                connection_id = format_args!("{connection_id:#010x}"),
+                "discarded an output packet for no open connection"
+            );
+            continue;
+        };
+        if open_connection
+            .output_packet_sender
+            .try_send((packet, from))
+            .is_err()
+        {
+            tracing::debug!("discarded an output packet: its connection is behind");
+        }
+    }
+}
+
 /// Hands the device the new run mode outputs of `connection` until no packet comes in time, and
 /// tells it when they switch to idle or time out
 pub(crate) async fn receive_outputs(
     device: &impl ImplicitDevice,
     connection: &ImplicitConnection,
-    io_socket: &UdpSocket,
+    output_packet_receiver: &mut Receiver<(EnIpIoPacket, SocketAddr)>,
 ) {
     // The timeout multiplier times the O->T actual packet interval; x512 on a 10 s interval
     // overflows 32-bit microseconds
@@ -51,30 +96,26 @@ pub(crate) async fn receive_outputs(
     let mut last_cip_sequence_count: Option<CipUint> = None;
     // Until the first idle packet
     let mut running = true;
-    let mut receive_buffer = vec![0u8; MAX_UDP_PAYLOAD];
 
     loop {
-        let Ok(received) = timeout_at(deadline, io_socket.recv_from(&mut receive_buffer)).await
-        else {
-            tracing::warn!("the connection timed out: no output packet in time");
-            device.idle_outputs(connection.output_instance);
-            return;
-        };
-        let checked = received.map_err(Error::from).and_then(|(len, from)| {
-            check_output_packet(
-                connection,
-                last_sequence_number,
-                &receive_buffer[..len],
-                from,
-            )
-        });
-        let (sequenced_address, cip_io_data) = match checked {
-            Ok(accepted) => accepted,
-            Err(error) => {
-                tracing::debug!(%error, "discarded an output packet");
-                continue;
+        let (packet, from) = match timeout_at(deadline, output_packet_receiver.recv()).await {
+            Ok(Some(received)) => received,
+            // The connection was closed
+            Ok(None) => return,
+            Err(_) => {
+                tracing::warn!("the connection timed out: no output packet in time");
+                device.idle_outputs(connection.output_instance);
+                return;
             }
         };
+        let (sequenced_address, cip_io_data) =
+            match check_output_packet(connection, packet, from, last_sequence_number) {
+                Ok(accepted) => accepted,
+                Err(error) => {
+                    tracing::debug!(%error, "discarded an output packet");
+                    continue;
+                }
+            };
         last_sequence_number = Some(sequenced_address.encapsulation_sequence_number);
         // Each accepted packet restarts the timeout
         deadline = Instant::now() + timeout;
@@ -106,33 +147,25 @@ pub(crate) async fn receive_outputs(
     }
 }
 
-/// Checks the `packet_bytes` of a packet of `connection` from `from`, given the last accepted
-/// encapsulation sequence number (`None` before the first). Returns its Sequenced Address and
-/// Connected Data Item, or `Error::UnexpectedPacket` saying why it was discarded.
+/// Checks a `packet` of `connection` from `from`, given the last accepted encapsulation sequence
+/// number (`None` before the first). Returns its Sequenced Address and Connected Data Item, or
+/// `Error::UnexpectedPacket` saying why it was discarded.
 fn check_output_packet(
     connection: &ImplicitConnection,
-    last_sequence_number: Option<CipUdint>,
-    packet_bytes: &[u8],
+    packet: EnIpIoPacket,
     from: SocketAddr,
+    last_sequence_number: Option<CipUdint>,
 ) -> Result<(SequencedAddress, CipIoData)> {
-    // 1. It is an I/O packet for this connection
-    let packet = EnIpIoPacket::read(&mut Cursor::new(packet_bytes))?;
     let sequenced_address: SequencedAddress = packet.sequenced_address;
-    if sequenced_address.connection_id != connection.response.o2t_network_connection_id {
-        return Err(Error::UnexpectedPacket(format!(
-            "packet for another connection ({:#010x})",
-            sequenced_address.connection_id
-        )));
-    }
 
-    // 2. It comes from the scanner (whatever port it chose)
+    // 1. It comes from the scanner (whatever port it chose)
     if from.ip() != connection.originator_ip {
         return Err(Error::UnexpectedPacket(format!(
             "packet from {from}, not the scanner"
         )));
     }
 
-    // 3. It is newer than the last accepted one (gap modulo 2^32 in 1..2^31), by at most
+    // 2. It is newer than the last accepted one (gap modulo 2^32 in 1..2^31), by at most
     //    the timeout multiplier plus one (never under 16). Any first number is accepted
     if let Some(last) = last_sequence_number {
         let sequence_number: CipUdint = sequenced_address.encapsulation_sequence_number;
@@ -155,7 +188,7 @@ fn check_output_packet(
         }
     }
 
-    // 4. It carries the output assembly after the sequence count and real-time header
+    // 3. It carries the output assembly after the sequence count and real-time header
     let CipDataOpt::Raw(connected_data) = &packet.connected_data else {
         unreachable!("data read from the wire is always raw");
     };

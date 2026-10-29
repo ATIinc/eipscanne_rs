@@ -34,8 +34,8 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipShortString, CipUsint};
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::implicit::ImplicitDevice;
-use adapter::message_router::MessageRouter;
+use adapter::implicit::{ImplicitDevice, ImplicitOptions};
+use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::decode_data;
 use adapter::server::serve_implicit;
 
@@ -107,7 +107,6 @@ struct Hub {
 
 /// An Identity object and the IO-HUB's assemblies; the inputs follow the motors
 struct SampleIoHubAdapter {
-    io_port: u16,
     started: Instant,
     hub: Mutex<Hub>,
 }
@@ -244,19 +243,11 @@ impl MessageRouter for SampleIoHubAdapter {
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }
-
-    fn accepts_explicit_connections(&self) -> bool {
-        true
-    }
 }
 
 impl ImplicitDevice for SampleIoHubAdapter {
     type Outputs = OutputAssemblyHub4E;
     type Inputs = InputAssemblyHub4E;
-
-    fn io_port(&self) -> u16 {
-        self.io_port
-    }
 
     fn assembly_layout(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
         match instance {
@@ -316,13 +307,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.host
     );
     let adapter = SampleIoHubAdapter {
-        io_port: args.io_port,
         started: Instant::now(),
         hub: Mutex::new(Hub::default()),
     };
 
     tokio::select! {
-        served = serve_implicit(Arc::new(adapter), listener) => served?,
+        served = serve_implicit(
+            Arc::new(adapter),
+            listener,
+            ExplicitOptions {
+                accepts_explicit_connections: false,
+                ..Default::default()
+            },
+            ImplicitOptions {
+                io_port: args.io_port,
+                ..Default::default()
+            },
+        ) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");

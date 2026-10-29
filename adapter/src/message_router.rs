@@ -1,8 +1,9 @@
-//! The Message Router a device implements: the services a scanner's requests reach, and the paths,
-//! connection parameters and responses of those services.
+//! The Message Router a device implements and its explicit messaging options: the services a
+//! scanner's requests reach, and the paths, connection parameters and responses of those services.
 
 use std::io::Cursor;
 use std::net::IpAddr;
+use std::time::Duration;
 
 use binrw::BinWrite;
 
@@ -65,11 +66,6 @@ pub trait MessageRouter: Send + Sync + 'static {
         Err(ResponseStatusCode::ServiceNotSupported)
     }
 
-    /// Explicit messaging only: whether a class 3 Forward_Open opens a connection
-    fn accepts_explicit_connections(&self) -> bool {
-        false
-    }
-
     /// Implicit messaging only: Forward_Open and Large_Forward_Open, and the reply's Socket Address
     /// Info items
     fn handle_forward_open(
@@ -105,6 +101,27 @@ pub trait MessageRouter: Send + Sync + 'static {
             vec![],
             CipDataOpt::Raw(vec![]),
         )
+    }
+}
+
+/// The device's explicit messaging, fixed for the server's life
+#[derive(Clone, Copy)]
+pub struct ExplicitOptions {
+    /// Whether a class 3 Forward_Open opens the session's connection
+    pub accepts_explicit_connections: bool,
+    /// The TCP/IP Interface object's Encapsulation Inactivity Timeout: a session without
+    /// encapsulation activity for this long closes, unless `None`. A Set of the attribute cannot
+    /// change it
+    pub encapsulation_inactivity_timeout: Option<Duration>,
+}
+
+impl Default for ExplicitOptions {
+    fn default() -> Self {
+        ExplicitOptions {
+            accepts_explicit_connections: false,
+            // The attribute's default
+            encapsulation_inactivity_timeout: Some(Duration::from_secs(120)),
+        }
     }
 }
 
@@ -199,20 +216,28 @@ pub(crate) fn segment_id(
     }
 }
 
-/// The connection size, its type and the connection type of a direction
-pub(crate) fn size_and_types(
-    parameters: &NetworkConnectionParameters,
-) -> (u16, ConnectionSizeType, ConnectionType) {
+/// The connection size of a direction
+pub(crate) fn network_connection_size(parameters: &NetworkConnectionParameters) -> u16 {
     match parameters {
-        NetworkConnectionParameters::Standard(parameters) => (
-            parameters.connection_size().value(),
-            parameters.connection_size_type(),
-            parameters.connection_type(),
-        ),
-        NetworkConnectionParameters::Large(parameters) => (
-            parameters.connection_size(),
-            parameters.connection_size_type(),
-            parameters.connection_type(),
-        ),
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size().value(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size(),
+    }
+}
+
+/// Whether the connection size of a direction is fixed or variable
+pub(crate) fn network_connection_size_type(
+    parameters: &NetworkConnectionParameters,
+) -> ConnectionSizeType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size_type(),
+    }
+}
+
+/// The connection type of a direction
+pub(crate) fn network_connection_type(parameters: &NetworkConnectionParameters) -> ConnectionType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_type(),
     }
 }

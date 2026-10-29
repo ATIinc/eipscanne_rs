@@ -30,8 +30,8 @@ use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::implicit::ImplicitDevice;
-use adapter::message_router::MessageRouter;
+use adapter::implicit::{ImplicitDevice, ImplicitOptions};
+use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::server::serve_implicit;
 
 const OUTPUT_INSTANCE: u16 = 150;
@@ -54,7 +54,6 @@ struct Args {
 
 /// An Identity object and the output assembly; the input assembly is the same bytes
 struct SampleImplicitAdapter {
-    io_port: u16,
     outputs: Mutex<[u8; DATA_SIZE]>,
 }
 
@@ -79,19 +78,11 @@ impl MessageRouter for SampleImplicitAdapter {
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }
-
-    fn accepts_explicit_connections(&self) -> bool {
-        true
-    }
 }
 
 impl ImplicitDevice for SampleImplicitAdapter {
     type Outputs = [u8; DATA_SIZE];
     type Inputs = [u8; DATA_SIZE];
-
-    fn io_port(&self) -> u16 {
-        self.io_port
-    }
 
     fn assembly_layout(&self, instance: u16) -> Option<(u16, RealTimeFormat)> {
         match instance {
@@ -149,12 +140,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.host
     );
     let adapter = SampleImplicitAdapter {
-        io_port: args.io_port,
         outputs: Mutex::new([0; DATA_SIZE]),
     };
 
     tokio::select! {
-        served = serve_implicit(Arc::new(adapter), listener) => served?,
+        served = serve_implicit(
+            Arc::new(adapter),
+            listener,
+            ExplicitOptions {
+                accepts_explicit_connections: true,
+                ..Default::default()
+            },
+            ImplicitOptions {
+                io_port: args.io_port,
+                ..Default::default()
+            },
+        ) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");

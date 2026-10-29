@@ -25,14 +25,14 @@ pub(crate) mod connected;
 pub(crate) mod unconnected;
 
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items;
-/// `class_3_connection` (`None` on a connected request) takes class 3 Forward_Open and
-/// Forward_Close. Single services need an attribute, All services none
+/// `class_3_connection` (`None` on a connected request, or when class 3 is off) takes class 3
+/// Forward_Open and Forward_Close. Single services need an attribute, All services none
 pub(crate) fn handle_request(
     message_router: &impl MessageRouter,
-    class_3_connection: Option<&mut Option<ExplicitConnection>>,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
+    class_3_connection: Option<&mut Option<ExplicitConnection>>,
 ) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
     let path_ids = class_instance_and_attribute(&request.request_data.cip_path);
@@ -84,9 +84,8 @@ pub(crate) fn handle_request(
                     );
                 }
             };
-            // Class 3 opens the session's connection when the Message Router accepts it
+            // Class 3 opens the session's connection
             if let Some(class_3_connection) = class_3_connection
-                && message_router.accepts_explicit_connections()
                 && forward_open_request
                     .transport_type_trigger
                     .transport_class()

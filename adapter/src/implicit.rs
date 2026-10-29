@@ -1,18 +1,21 @@
-//! Implicit messaging: the assemblies a device exchanges, and one class 1 I/O connection at a
-//! time.
+//! Implicit messaging: the assemblies a device exchanges, over up to `max_io_connections` class 1
+//! I/O connections.
 //!
 //! ```text
 //! Stage              What happens on the wire                                       Module
 //! -----------------  -------------------------------------------------------------  --------------
 //! Open               SendRRData(Forward_Open) -> the reply, the exchange starts     message_router
 //! Exchange           UDP, two independent directions:
-//!      O->T            the outputs: check, decode, hand to the device                o2t
+//!      O->T            the outputs: routed by connection id, checked, decoded,       o2t
+//!                      handed to the device
 //!      T->O            the inputs: one packet every T->O interval                    t2o
 //! Close              SendRRData(Forward_Close) -> the reply, the exchange stops     message_router
 //! ```
 //!
-//! A Forward_Open while a connection is open is refused; a connection whose outputs stop times
-//! out, and the next Forward_Open opens.
+//! A Forward_Open is refused when every place is taken or another connection owns its outputs; a
+//! connection whose outputs stop times out and frees its place.
+
+use std::ops::RangeInclusive;
 
 use binrw::{BinRead, BinWrite};
 
@@ -33,11 +36,6 @@ pub trait ImplicitDevice: MessageRouter {
     /// The inputs a T->O packet carries
     type Inputs: for<'a> BinWrite<Args<'a> = ()>;
 
-    /// UDP port of the I/O
-    fn io_port(&self) -> u16 {
-        ETHERNET_IP_IO_UDP_PORT
-    }
-
     /// Data size and real-time format of assembly `instance`; `None` when the device has no such
     /// assembly
     fn assembly_layout(&self, instance: u16) -> Option<(u16, RealTimeFormat)>;
@@ -50,4 +48,24 @@ pub trait ImplicitDevice: MessageRouter {
 
     /// The outputs of `instance` stopped: a switch to idle, a timeout or a Forward_Close
     fn idle_outputs(&self, _instance: u16) {}
+}
+
+/// The device's class 1 connections, as its EDS declares them, and the UDP port of their I/O
+pub struct ImplicitOptions {
+    /// UDP port of the I/O
+    pub io_port: u16,
+    /// How many class 1 connections can be open at once (EDS MaxIOConnections)
+    pub max_io_connections: usize,
+    /// The RPIs a Forward_Open may request, in µs
+    pub packet_interval: RangeInclusive<u32>,
+}
+
+impl Default for ImplicitOptions {
+    fn default() -> Self {
+        ImplicitOptions {
+            io_port: ETHERNET_IP_IO_UDP_PORT,
+            max_io_connections: 1,
+            packet_interval: 1..=u32::MAX,
+        }
+    }
 }

@@ -58,9 +58,9 @@ const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 /// decode).
 pub fn accept_t2o_packet(
     connection: &ImplicitConnection,
-    last_sequence_number: Option<CipUdint>,
     packet: &EnIpIoPacket,
     from: SocketAddr,
+    last_sequence_number: Option<CipUdint>,
 ) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is for this connection
     let address: SequencedAddress = packet.sequenced_address;
@@ -186,9 +186,9 @@ mod tests {
     ) -> Result<(SequencedAddress, CipIoData)> {
         accept_t2o_packet(
             connection,
-            Some(last),
             &input_packet(received, 1, &[0; 32]),
             from_adapter(),
+            Some(last),
         )
     }
 
@@ -210,9 +210,9 @@ mod tests {
         let any_port = SocketAddr::V4(SocketAddrV4::new(TARGET_IP, 49152));
         let (address, inputs) = accept_t2o_packet(
             &sample_connection(),
-            None,
             &input_packet(0xdead_beef, 7, &data),
             any_port,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -237,9 +237,9 @@ mod tests {
             standard_parameters(34, ConnectionSizeType::Variable);
         let (_, inputs) = accept_t2o_packet(
             &variable,
-            None,
             &input_packet(1, 1, &[7; 3]),
             from_adapter(),
+            None,
         )
         .unwrap();
         assert_eq!(inputs.data, CipDataOpt::Raw(vec![7; 3]));
@@ -257,7 +257,7 @@ mod tests {
         let mut bytes = u32::from(idle_header).to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 32]);
         let (_, inputs) =
-            accept_t2o_packet(&header, None, &input_packet(1, 1, &bytes), from_adapter()).unwrap();
+            accept_t2o_packet(&header, &input_packet(1, 1, &bytes), from_adapter(), None).unwrap();
         assert_eq!(
             inputs,
             CipIoData {
@@ -306,7 +306,7 @@ mod tests {
 
         for (packet, from, reason) in cases {
             assert_eq!(
-                accept_t2o_packet(&sample_connection(), None, &packet, from)
+                accept_t2o_packet(&sample_connection(), &packet, from, None)
                     .unwrap_err()
                     .to_string(),
                 format!("unexpected packet: {reason}")

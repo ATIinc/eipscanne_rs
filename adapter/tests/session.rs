@@ -1,12 +1,14 @@
-//! One connection served on the loopback interface.
+//! One encapsulation session on the loopback interface.
 
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use binrw::BinRead;
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::time::Instant;
 
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
@@ -18,7 +20,7 @@ use eipscanne_rs::eip::constants::{
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use adapter::message_router::MessageRouter;
+use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::{read_packet, write_packet};
 use adapter::server::serve;
 
@@ -46,7 +48,11 @@ async fn connect() -> TcpStream {
     let address = listener
         .local_addr()
         .expect("a bound listener has a local address");
-    tokio::spawn(serve(Arc::new(SampleDevice), listener));
+    tokio::spawn(serve(
+        Arc::new(SampleDevice),
+        listener,
+        ExplicitOptions::default(),
+    ));
     TcpStream::connect(address)
         .await
         .expect("the server accepts on its bound port")
@@ -158,4 +164,26 @@ async fn nop_and_a_request_with_a_status_have_no_reply() {
         .expect("the adapter answers Register Session");
     assert_eq!(reply.header.command, EnIpCommand::RegisterSession);
     assert_eq!(reply.header.status_code, EncapsStatusCode::Success);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_session_without_encapsulation_activity_closes() {
+    let mut stream = connect().await;
+    let start = Instant::now();
+
+    // A NOP is encapsulation activity
+    tokio::time::sleep(Duration::from_secs(100)).await;
+    write_packet(&mut stream, &no_data(EnIpCommand::NOP))
+        .await
+        .expect("the adapter keeps the stream open within the inactivity timeout");
+
+    let read = stream
+        .read(&mut [0u8; 1])
+        .await
+        .expect("the inactivity timeout ends the stream cleanly");
+    assert_eq!(read, 0, "the adapter closes the stream");
+    assert!(
+        start.elapsed() >= Duration::from_secs(220),
+        "the default 120 s count from the NOP"
+    );
 }

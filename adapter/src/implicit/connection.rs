@@ -1,6 +1,11 @@
-//! A class 1 connection: what a Forward_Open asks for, checked against the device's assemblies.
+//! A class 1 connection: what its I/O exchange task runs on, what the Message Router keeps while it
+//! is open, and the Forward_Open checks that make it.
 
 use std::net::{IpAddr, SocketAddr};
+use std::ops::RangeInclusive;
+
+use tokio::sync::mpsc::Sender;
+use tokio::task::AbortHandle;
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -10,20 +15,22 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     connection_size,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::response::Rejection;
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
 use eipscanne_rs::cip::path::{CipPath, LogicalSegmentType};
 use eipscanne_rs::cip::types::CipInt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 
 use crate::implicit::ImplicitDevice;
-use crate::message_router::{connection_failure_rejection, segment_id, size_and_types};
+use crate::message_router::{
+    connection_failure_rejection, network_connection_size, network_connection_size_type,
+    network_connection_type, segment_id,
+};
 
-/// `sin_family` of an IPv4 Socket Address Info
-const AF_INET: CipInt = 2;
-
-/// An open class 1 connection: the Forward_Open received, the reply sent, each direction's
+/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, each direction's
 /// assembly (from the device) and where the I/O goes
 #[derive(Debug)]
 pub(crate) struct ImplicitConnection {
@@ -47,11 +54,32 @@ pub(crate) struct ImplicitConnection {
     pub input_size: u16,
 }
 
+/// What the Message Router keeps of a connection: the triad a Forward_Close names, the IP address
+/// that opened it, and its I/O exchange task, which dropping it stops
+pub(crate) struct OpenConnection {
+    pub connection_triad: ConnectionTriad,
+    pub originator_ip: IpAddr,
+    pub output_instance: u16,
+    /// Where [`route_outputs`](crate::implicit::o2t::route_outputs) hands its O->T packets
+    pub output_packet_sender: Sender<(EnIpIoPacket, SocketAddr)>,
+    pub io_exchange_task: AbortHandle,
+}
+
+impl Drop for OpenConnection {
+    fn drop(&mut self) {
+        self.io_exchange_task.abort();
+    }
+}
+
+/// `sin_family` of an IPv4 Socket Address Info
+const AF_INET: CipInt = 2;
+
 /// The connection `forward_open` asks for: class 1, cyclic, point-to-point and fixed size both
-/// ways, between assemblies the device exchanges at those sizes
+/// ways, at RPIs within `packet_interval`, between assemblies the device exchanges at those sizes
 pub(crate) fn connection_from_forward_open(
     device: &impl ImplicitDevice,
     forward_open: ForwardOpenRequest,
+    packet_interval: &RangeInclusive<u32>,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
 ) -> Result<ImplicitConnection, Rejection> {
@@ -68,17 +96,21 @@ pub(crate) fn connection_from_forward_open(
     }
     let o2t_parameters = &forward_open.o2t_network_connection_parameters;
     let t2o_parameters = &forward_open.t2o_network_connection_parameters;
-    if [o2t_parameters, t2o_parameters].iter().any(|parameters| {
-        let (_, size_type, connection_type) = size_and_types(parameters);
-        size_type != ConnectionSizeType::Fixed || connection_type != ConnectionType::PointToPoint
-    }) {
+    if network_connection_size_type(o2t_parameters) != ConnectionSizeType::Fixed
+        || network_connection_size_type(t2o_parameters) != ConnectionSizeType::Fixed
+        || network_connection_type(o2t_parameters) != ConnectionType::PointToPoint
+        || network_connection_type(t2o_parameters) != ConnectionType::PointToPoint
+    {
         return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter,
         ));
     }
+    // Never 0, whatever `packet_interval` allows
     if forward_open.o2t_requested_packet_interval == 0
         || forward_open.t2o_requested_packet_interval == 0
+        || !packet_interval.contains(&forward_open.o2t_requested_packet_interval)
+        || !packet_interval.contains(&forward_open.t2o_requested_packet_interval)
     {
         return Err(connection_failure_rejection(
             service,
@@ -116,7 +148,7 @@ pub(crate) fn connection_from_forward_open(
     ] {
         let supported_size =
             connection_size(assembly_size, TransportClass::Class1, real_time_format);
-        if size_and_types(parameters).0 != supported_size {
+        if network_connection_size(parameters) != supported_size {
             let mut rejection = connection_failure_rejection(
                 service,
                 ConnectionManagerExtendedStatus::InvalidConnectionSize,

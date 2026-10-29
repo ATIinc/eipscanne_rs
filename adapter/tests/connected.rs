@@ -31,7 +31,7 @@ use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
-use adapter::message_router::MessageRouter;
+use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::{read_packet, write_packet};
 use adapter::server::serve;
 
@@ -42,9 +42,7 @@ const T2O_NETWORK_CONNECTION_ID: CipUdint = 0x1234_5679;
 const CONNECTION_SIZE: u16 = 504;
 
 /// Answers Get_Attributes_All with one byte
-struct SampleDevice {
-    accepts_explicit_connections: bool,
-}
+struct SampleDevice;
 
 impl MessageRouter for SampleDevice {
     fn handle_get_attributes_all(
@@ -53,10 +51,6 @@ impl MessageRouter for SampleDevice {
         _instance: u16,
     ) -> Result<CipDataOpt, ResponseStatusCode> {
         Ok(CipDataOpt::Raw(vec![0x2a]))
-    }
-
-    fn accepts_explicit_connections(&self) -> bool {
-        self.accepts_explicit_connections
     }
 }
 
@@ -74,10 +68,14 @@ impl Scanner {
         let address = listener
             .local_addr()
             .expect("a bound listener has a local address");
-        let device = SampleDevice {
-            accepts_explicit_connections,
-        };
-        tokio::spawn(serve(Arc::new(device), listener));
+        tokio::spawn(serve(
+            Arc::new(SampleDevice),
+            listener,
+            ExplicitOptions {
+                accepts_explicit_connections,
+                ..Default::default()
+            },
+        ));
 
         let mut scanner = Scanner {
             stream: TcpStream::connect(address)

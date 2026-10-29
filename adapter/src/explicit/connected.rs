@@ -31,6 +31,8 @@ pub(crate) mod send_unit_data;
 pub(crate) struct ExplicitConnection {
     request: ForwardOpenRequest,
     response: ForwardOpenResponse,
+    /// The timeout multiplier times the O->T actual packet interval
+    inactivity_timeout: Duration,
     /// When it times out unless a request comes first
     deadline: Instant,
     /// The CIP sequence count of the last request; `None` before the first
@@ -38,13 +40,28 @@ pub(crate) struct ExplicitConnection {
 }
 
 impl ExplicitConnection {
-    /// Restarts the inactivity timer: the timeout multiplier times the O->T actual packet interval
+    /// An established connection; its inactivity timer starts now
+    fn new(request: ForwardOpenRequest, response: ForwardOpenResponse) -> Self {
+        let inactivity_timeout = Duration::from_micros(
+            u64::from(request.connection_timeout_multiplier.multiplier())
+                * u64::from(response.o2t_actual_packet_interval),
+        );
+        ExplicitConnection {
+            request,
+            response,
+            inactivity_timeout,
+            deadline: Instant::now() + inactivity_timeout,
+            last_cip_sequence_count: None,
+        }
+    }
+
+    pub(crate) fn deadline(&self) -> Instant {
+        self.deadline
+    }
+
+    /// Restarts the inactivity timer
     fn restart_inactivity_timer(&mut self) {
-        self.deadline = Instant::now()
-            + Duration::from_micros(
-                u64::from(self.request.connection_timeout_multiplier.multiplier())
-                    * u64::from(self.response.o2t_actual_packet_interval),
-            );
+        self.deadline = Instant::now() + self.inactivity_timeout;
     }
 }
 

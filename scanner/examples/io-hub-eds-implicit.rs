@@ -218,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok(accepted) => accepted,
                     Err(discarded) => {
                         eprintln!("[{cycle:>4}] DISCARDED {discarded}");

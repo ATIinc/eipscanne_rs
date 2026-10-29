@@ -15,7 +15,7 @@ use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::explicit::connected::{ExplicitConnection, delete_timed_out_connection};
 use crate::explicit::handle_request;
-use crate::message_router::{MessageRouter, message_router_response, size_and_types};
+use crate::message_router::{MessageRouter, message_router_response, network_connection_size};
 
 /// Bytes of the CIP sequence count in front of each message
 const CIP_SEQUENCE_COUNT_LEN: usize = 2;
@@ -26,8 +26,8 @@ pub(crate) fn handle_send_unit_data(
     message_router: &impl MessageRouter,
     class_3_connection: &mut Option<ExplicitConnection>,
     header: &EncapsulationHeader,
-    command_specific_data: Option<&CommandSpecificData>,
     originator_ip: IpAddr,
+    command_specific_data: Option<&CommandSpecificData>,
 ) -> Option<EnIpPacket> {
     let Some(CommandSpecificData::SendUnitData(request_unit_data)) = command_specific_data else {
         tracing::warn!("discarded a Send Unit Data packet that did not decode");
@@ -45,7 +45,7 @@ pub(crate) fn handle_send_unit_data(
     )?;
 
     // Over a connection: no class 3 open or close, no Socket Address Info
-    let (response, _) = handle_request(message_router, None, request, originator_ip, None);
+    let (response, _) = handle_request(message_router, request, originator_ip, None, None);
     Some(EnIpPacket {
         header: EncapsulationHeader {
             length: None,
@@ -99,8 +99,8 @@ fn reply_unit_data(
     response
         .write_le(&mut Cursor::new(&mut response_bytes))
         .expect("a Message Router response writes to memory");
-    let (t2o_connection_size, _, _) =
-        size_and_types(&connection.request.t2o_network_connection_parameters);
+    let t2o_connection_size =
+        network_connection_size(&connection.request.t2o_network_connection_parameters);
     if CIP_SEQUENCE_COUNT_LEN + response_bytes.len() > usize::from(t2o_connection_size) {
         let service = response.service_container.service();
         tracing::warn!(?service, t2o_connection_size, "reply data too large");
