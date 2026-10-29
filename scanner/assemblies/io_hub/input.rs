@@ -5,7 +5,9 @@
 //! Written from that table. Where the hub's EDS declares another type, the original line is
 //! commented out above the one that follows the EDS.
 
-use bilge::prelude::{DebugBits, FromBits, TryFromBits, bitsize, u2, u3, u4, u10, u56};
+use bilge::prelude::{
+    DebugBits, DefaultBits, FromBits, TryFromBits, bitsize, u2, u3, u4, u10, u56,
+};
 use binrw::{BinRead, BinWrite, binrw};
 
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipUint, CipUsint};
@@ -16,7 +18,7 @@ pub const INPUT_ASSEMBLY_INSTANCE: u8 = 0x64;
 /// Motor Statusword: the real-time status bits of one motor
 /// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=49>)
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct MotorStatusword {
@@ -81,7 +83,7 @@ pub struct MotorStatusword {
 /// Motor Shutdown Register: which shutdowns (faults) are present
 /// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=45>)
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct MotorShutdownRegister {
@@ -109,7 +111,7 @@ pub struct MotorShutdownRegister {
 /// Motor Warning Register: non-critical warnings and why the last move was cancelled
 /// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=47>)
 #[bitsize(32)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct MotorWarningRegister {
@@ -177,7 +179,7 @@ pub enum AoiErrorCode {
 /// Per-motor input data, 44 bytes per motor
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct MotorInputData {
     pub statusword: MotorStatusword,
     pub shutdown_register: MotorShutdownRegister,
@@ -220,7 +222,7 @@ impl MotorInputData {
 /// (Param133-Param145)
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct AnalogInputs {
     // pub io0: CipInt,
     // pub io1: CipInt,
@@ -252,7 +254,7 @@ pub struct AnalogInputs {
 
 /// Digital inputs I/O-0 through I/O-12
 #[bitsize(16)]
-#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone)]
+#[derive(FromBits, PartialEq, DebugBits, BinRead, BinWrite, Copy, Clone, DefaultBits)]
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct DigitalInputs {
@@ -275,8 +277,9 @@ pub struct DigitalInputs {
 /// The electrical mode of one I/O point, a 4-bit nibble
 /// (<https://teknic.com/files/downloads/ClearPath-IP%20Software_Reference.pdf#page=68>)
 #[bitsize(4)]
-#[derive(TryFromBits, PartialEq, Copy, Clone, Debug)]
+#[derive(TryFromBits, PartialEq, Copy, Clone, Debug, Default)]
 pub enum IoConfigMode {
+    #[default]
     NpnDigitalInput = 0,
     PnpDigitalInput = 1,
     PushPull24VDigitalOutput = 2,
@@ -290,7 +293,7 @@ pub enum IoConfigMode {
 /// The 7-byte I/O configuration block: the mode of each I/O point as a nibble, io0 in the low
 /// nibble of the first byte, io12 in the low nibble of the last, whose high nibble is padding
 #[bitsize(56)]
-#[derive(TryFromBits, DebugBits, PartialEq, Copy, Clone, BinRead, BinWrite)]
+#[derive(TryFromBits, DebugBits, PartialEq, Copy, Clone, BinRead, BinWrite, DefaultBits)]
 #[br(little, try_map = |raw: [u8; 7]| {
     let packed = u64::from_le_bytes([raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6], 0]);
     IoPointConfiguration::try_from(u56::new(packed)).map_err(|_| {
@@ -324,7 +327,7 @@ pub struct IoPointConfiguration {
 /// I/O input data, 36 bytes
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct IoInputData {
     pub digital_inputs: DigitalInputs,
     pub io_configuration: IoPointConfiguration,
@@ -335,7 +338,7 @@ pub struct IoInputData {
 /// Encoder input data, 16 bytes
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct EncoderInputData {
     pub external_encoder_position: CipDint,
     pub external_encoder_velocity: CipDint,
@@ -348,7 +351,7 @@ pub struct EncoderInputData {
 /// The T->O input assembly of the IO-HUB-4-E (instance 100): I/O, four motors and the encoder
 #[binrw]
 #[brw(little)]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct InputAssemblyHub4E {
     pub io_input_data: IoInputData,
     motor0_input_data: MotorInputData,
@@ -368,6 +371,17 @@ impl InputAssemblyHub4E {
             1 => &self.motor1_input_data,
             2 => &self.motor2_input_data,
             3 => &self.motor3_input_data,
+            _ => panic!("motor index must be 0-3, got {index}"),
+        }
+    }
+
+    /// The inputs of motor port `index` (0 = M0 ... 3 = M3), to change
+    pub fn motor_input_mut(&mut self, index: u8) -> &mut MotorInputData {
+        match index {
+            0 => &mut self.motor0_input_data,
+            1 => &mut self.motor1_input_data,
+            2 => &mut self.motor2_input_data,
+            3 => &mut self.motor3_input_data,
             _ => panic!("motor index must be 0-3, got {index}"),
         }
     }

@@ -11,17 +11,19 @@ The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging ove
 
 [src/README.md](src/README.md) follows a packet through these modules.
 
-## Sample ClearLink
+## Sample IO-HUB
 
-`examples/sample-clearlink-adapter` serves a sample Teknic ClearLink on `127.0.0.1:44818`: an Identity object and the configuration, output and input assemblies. Its inputs report an output as driven while it is on or has a PWM duty cycle. Start it in one terminal and run the scanner's examples against it from another:
+`examples/sample-io-hub-adapter` serves a sample Teknic IO-HUB-4-E on `127.0.0.1:44818`: an Identity object and the hub's output (101) and input (100) assemblies, over explicit messaging, a class 3 connection or a class 1 connection with I/O on UDP 2223. Its motors enable when told, home about 2 s after a homing move, and turn in short spurts while a class 1 connection runs. Start it in one terminal and run the scanner's examples against it from another:
 
 ```text
-cargo run --example sample-clearlink-adapter
+cargo run --example sample-io-hub-adapter
 cargo run --example read-identity -- --host 127.0.0.1
-cargo run --example clearlink-explicit-outputs -- --host 127.0.0.1 --index 4 --on
+cargo run --example read-identity-connected -- --host 127.0.0.1
+cargo run --example io-hub-explicit-homing -- --host 127.0.0.1 --motor 0
+cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
 ```
 
-`read-identity` prints `Product Name: "Sample Clearlink"`; `clearlink-explicit-outputs` prints `IO-4: driven true (expected true), overloaded false`. `--host 0.0.0.0` serves other hosts too. The adapter serves unconnected messaging only, so `read-identity-connected` is refused.
+`read-identity` prints `Product Name: "Sample IO-HUB"`; `io-hub-explicit-homing` prints `HOMED`; `io-hub-eds-implicit` prints a burst of `position=` lines every 4 s. `--host 0.0.0.0` serves other hosts too.
 
 ## Sample implicit adapter
 

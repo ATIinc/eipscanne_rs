@@ -1,11 +1,16 @@
-//! Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging: register a
-//! session, clear a shutdown if one is present, enable the motor, send the homing command, read
-//! the inputs until the motor reports it has homed, then disable the motor again. The motor is
-//! disabled however the motion ends: homed, timed out, failed or stopped with Ctrl+C.
+//! Homes one ClearPath-IP motor on a Teknic IO-HUB-4-E over explicit messaging: clear a shutdown,
+//! enable the motor, send the homing move, poll until it has homed, then disable it. The motor is
+//! disabled however homing ends, Ctrl+C included.
 //!
-//! This moves a real motor. `--host` has no default on purpose.
-//!
+//! On a real hub this moves a motor, so `--host` has no default:
 //! `cargo run --example io-hub-explicit-homing -- --host 172.31.19.18 --motor 0`
+//!
+//! Without a hub, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-io-hub-adapter
+//! cargo run --example io-hub-explicit-homing -- --host 127.0.0.1 --motor 0
+//! ```
 
 use std::time::{Duration, Instant};
 
