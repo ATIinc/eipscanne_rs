@@ -48,18 +48,24 @@ pub(crate) async fn receive_outputs(
     // None until the first accepted packet
     let mut last_sequence_number: Option<CipUdint> = None;
     let mut last_cip_sequence_count: Option<CipUint> = None;
-    let mut bytes = vec![0u8; MAX_UDP_PAYLOAD];
+    let mut receive_buffer = vec![0u8; MAX_UDP_PAYLOAD];
 
     loop {
-        let Ok(received) = timeout_at(deadline, io_socket.recv_from(&mut bytes)).await else {
+        let Ok(received) = timeout_at(deadline, io_socket.recv_from(&mut receive_buffer)).await
+        else {
             tracing::warn!("the connection timed out: no output packet in time");
             return;
         };
         let checked = received.map_err(Error::from).and_then(|(len, from)| {
-            check_output_packet(connection, last_sequence_number, &bytes[..len], from)
+            check_output_packet(
+                connection,
+                last_sequence_number,
+                &receive_buffer[..len],
+                from,
+            )
         });
         let (sequenced_address, cip_io_data) = match checked {
-            Ok(checked) => checked,
+            Ok(accepted) => accepted,
             Err(error) => {
                 tracing::debug!(%error, "discarded an output packet");
                 continue;
@@ -76,30 +82,30 @@ pub(crate) async fn receive_outputs(
         let idle = cip_io_data
             .run_idle_header
             .is_some_and(|header| !header.run_idle());
-        let CipDataOpt::Raw(data) = &cip_io_data.data else {
+        let CipDataOpt::Raw(output_data) = &cip_io_data.data else {
             unreachable!("data read from the wire is always raw");
         };
-        if repeated || idle || data.is_empty() {
+        if repeated || idle || output_data.is_empty() {
             continue;
         }
-        match decode_data(data) {
+        match decode_data(output_data) {
             Ok(outputs) => device.consume_outputs(connection.output_instance, outputs),
             Err(status) => tracing::warn!(?status, "outputs not consumed"),
         }
     }
 }
 
-/// Checks the `bytes` of a packet of `connection` from `from`, given the last accepted
+/// Checks the `packet_bytes` of a packet of `connection` from `from`, given the last accepted
 /// encapsulation sequence number (`None` before the first). Returns its Sequenced Address and
 /// Connected Data Item, or `Error::UnexpectedPacket` saying why it was discarded.
 fn check_output_packet(
     connection: &ImplicitConnection,
     last_sequence_number: Option<CipUdint>,
-    bytes: &[u8],
+    packet_bytes: &[u8],
     from: SocketAddr,
 ) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is an I/O packet for this connection
-    let packet = EnIpIoPacket::read(&mut Cursor::new(bytes))?;
+    let packet = EnIpIoPacket::read(&mut Cursor::new(packet_bytes))?;
     let sequenced_address: SequencedAddress = packet.sequenced_address;
     if sequenced_address.connection_id != connection.response.o2t_network_connection_id {
         return Err(Error::UnexpectedPacket(format!(
@@ -140,25 +146,27 @@ fn check_output_packet(
 
     // 4. It carries the output assembly after the sequence count and real-time header
     let CipDataOpt::Raw(connected_data) = &packet.connected_data else {
-        return Err(Error::UnexpectedPacket(
-            "packet whose Connected Data Item is not raw".to_string(),
-        ));
+        unreachable!("data read from the wire is always raw");
     };
     let real_time_format = connection.o2t_real_time_format;
-    let carried = connection_size(
+    let o2t_connection_size = connection_size(
         connection.output_size,
         TransportClass::Class1,
         real_time_format,
     );
-    if connected_data.len() != usize::from(carried) {
+    if connected_data.len() != usize::from(o2t_connection_size) {
         return Err(Error::UnexpectedPacket(format!(
-            "{} connected data bytes, the connection carries {carried}",
+            "{} connected data bytes, the connection carries {o2t_connection_size}",
             connected_data.len()
         )));
     }
     let cip_io_data = CipIoData::read_le_args(
         &mut Cursor::new(connected_data),
-        (carried, TransportClass::Class1, real_time_format),
+        (
+            o2t_connection_size,
+            TransportClass::Class1,
+            real_time_format,
+        ),
     )?;
 
     Ok((sequenced_address, cip_io_data))

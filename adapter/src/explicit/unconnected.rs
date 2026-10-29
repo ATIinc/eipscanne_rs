@@ -7,9 +7,8 @@ use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode, RRPacketData};
 use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
-use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 
-use crate::explicit::connected::{ExplicitConnection, handle_connection_request};
+use crate::explicit::connected::ExplicitConnection;
 use crate::explicit::handle_request;
 use crate::message_router::MessageRouter;
 
@@ -30,19 +29,13 @@ pub(crate) fn handle_send_rr_data(
         return Err(EncapsStatusCode::InvalidFormatOrData);
     };
 
-    let (response, socket_addr_info_items) = if message_router.accepts_explicit_connections()
-        && let Some(response) = handle_connection_request(explicit_connection, request)
-    {
-        // A class 3 connection has no Socket Address Info
-        (response, SocketAddrInfoItems::empty())
-    } else {
-        handle_request(
-            message_router,
-            request,
-            originator_ip,
-            request_rr_data.socket_addr_info_items.t2o,
-        )
-    };
+    let (response, socket_addr_info_items) = handle_request(
+        message_router,
+        Some(explicit_connection),
+        request,
+        originator_ip,
+        request_rr_data.socket_addr_info_items.t2o,
+    );
 
     let mut reply_rr_data =
         RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);

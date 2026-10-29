@@ -1,11 +1,9 @@
 //! The Message Router of a device with implicit messaging: the device's Get and Set, and opening
 //! and closing the one connection whose task exchanges the I/O.
 
-use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
 
-use binrw::BinRead;
 use tokio::net::UdpSocket;
 use tokio::task::AbortHandle;
 
@@ -27,7 +25,7 @@ use crate::implicit::connection::connection_from_forward_open;
 use crate::implicit::o2t::receive_outputs;
 use crate::implicit::t2o::send_inputs;
 use crate::message_router::{
-    MessageRouter, connection_failure, decode_failure, message_router_response, rejection_response,
+    MessageRouter, connection_failure, message_router_response, rejection_response,
 };
 
 /// The Message Router of an [`ImplicitDevice`]: its Get and Set, plus Forward_Open and
@@ -39,7 +37,7 @@ pub(crate) struct ImplicitMessageRouter<D> {
     /// The O->T Socket Address Info of a granted Forward_Open: the I/O port, unless it is 2222
     o2t_socket_addr_info: Option<SocketAddrInfo>,
     /// The last connection opened; it has timed out once its I/O exchange task finishes
-    connection: Mutex<Option<OpenConnection>>,
+    open_connection: Mutex<Option<OpenConnection>>,
 }
 
 impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
@@ -54,7 +52,7 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
             o2t_socket_addr_info: (io_address.port() != ETHERNET_IP_IO_UDP_PORT).then(|| {
                 SocketAddrInfo::from(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, io_address.port()))
             }),
-            connection: Mutex::new(None),
+            open_connection: Mutex::new(None),
         })
     }
 }
@@ -103,28 +101,17 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         self.device.accepts_explicit_connections()
     }
 
-    /// Opens the one connection `forward_open_data` asks for
+    /// Opens the one connection `forward_open` asks for
     fn handle_forward_open(
         &self,
-        service: ServiceCode,
-        forward_open_data: &[u8],
+        forward_open: ForwardOpenRequest,
         originator_ip: IpAddr,
         t2o_socket_addr_info: Option<SocketAddrInfo>,
     ) -> (MessageRouterResponse, SocketAddrInfoItems) {
-        let large = service == ServiceCode::LargeForwardOpen;
-        let forward_open =
-            match ForwardOpenRequest::read_le_args(&mut Cursor::new(forward_open_data), (large,)) {
-                Ok(forward_open) => forward_open,
-                Err(error) => {
-                    return (
-                        decode_failure(service, &error),
-                        SocketAddrInfoItems::empty(),
-                    );
-                }
-            };
+        let service = forward_open.service_code();
         let triad = forward_open.connection_triad;
         let mut open_connection = self
-            .connection
+            .open_connection
             .lock()
             .expect("nothing panics while holding the connection lock");
         // While a connection runs, every Forward_Open is refused before it is checked
@@ -157,12 +144,12 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                 );
             }
         };
-        let response = connection.response.clone();
+        let forward_open_response = connection.response.clone();
         tracing::info!(
-            o2t_id = format_args!("{:#010x}", response.o2t_network_connection_id),
-            t2o_id = format_args!("{:#010x}", response.t2o_network_connection_id),
-            o2t_api_us = response.o2t_actual_packet_interval,
-            t2o_api_us = response.t2o_actual_packet_interval,
+            o2t_id = format_args!("{:#010x}", forward_open_response.o2t_network_connection_id),
+            t2o_id = format_args!("{:#010x}", forward_open_response.t2o_network_connection_id),
+            o2t_api_us = forward_open_response.o2t_actual_packet_interval,
+            t2o_api_us = forward_open_response.t2o_actual_packet_interval,
             output_instance = connection.output_instance,
             input_instance = connection.input_instance,
             t2o_endpoint = %connection.t2o_endpoint,
@@ -189,7 +176,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                 service,
                 ResponseStatusCode::Success,
                 vec![],
-                CipDataOpt::Typed(Box::new(response)),
+                CipDataOpt::Typed(Box::new(forward_open_response)),
             ),
             SocketAddrInfoItems {
                 o2t: self.o2t_socket_addr_info,
@@ -198,19 +185,16 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         )
     }
 
-    /// Closes the open connection `forward_close_data` names, when `originator_ip` opened it
+    /// Closes the open connection `forward_close` names, when `originator_ip` opened it
     fn handle_forward_close(
         &self,
-        forward_close_data: &[u8],
+        forward_close: ForwardCloseRequest,
         originator_ip: IpAddr,
     ) -> MessageRouterResponse {
         let service = ServiceCode::ForwardClose;
-        let triad = match ForwardCloseRequest::read_le(&mut Cursor::new(forward_close_data)) {
-            Ok(forward_close) => forward_close.connection_triad,
-            Err(error) => return decode_failure(service, &error),
-        };
+        let triad = forward_close.connection_triad;
         let mut open_connection = self
-            .connection
+            .open_connection
             .lock()
             .expect("nothing panics while holding the connection lock");
         if let Some(current) = open_connection.as_ref()
@@ -272,7 +256,6 @@ impl Drop for OpenConnection {
 #[cfg(test)]
 mod tests {
     use bilge::prelude::u4;
-    use binrw::BinWrite;
 
     use eipscanne_rs::cip::connection_manager::parameters::{PriorityTimeTick, RealTimeFormat};
     use eipscanne_rs::cip::path::CipPath;
@@ -301,9 +284,8 @@ mod tests {
         fn produce_inputs(&self, _instance: u16) {}
     }
 
-    /// The data of the Forward_Close of the connection `connection_triad` names
-    fn forward_close_data(connection_triad: ConnectionTriad) -> Vec<u8> {
-        let mut bytes = Cursor::new(Vec::new());
+    /// The Forward_Close of the connection `connection_triad` names
+    fn forward_close(connection_triad: ConnectionTriad) -> ForwardCloseRequest {
         ForwardCloseRequest {
             priority_time_tick: PriorityTimeTick::builder()
                 .tick_time(u4::new(10))
@@ -313,9 +295,6 @@ mod tests {
             connection_triad,
             connection_path: CipPath::new_assembly_connection(151, 150, 100),
         }
-        .write_le(&mut bytes)
-        .expect("writing to memory does not fail");
-        bytes.into_inner()
     }
 
     #[tokio::test]
@@ -327,7 +306,7 @@ mod tests {
         let triad = ConnectionTriad::default();
         let opened_from = IpAddr::from(Ipv4Addr::new(192, 168, 1, 10));
         *message_router
-            .connection
+            .open_connection
             .lock()
             .expect("nothing panics while holding the connection lock") = Some(OpenConnection {
             connection_triad: triad,
@@ -336,14 +315,14 @@ mod tests {
         });
 
         let response = message_router.handle_forward_close(
-            &forward_close_data(triad),
+            forward_close(triad),
             IpAddr::from(Ipv4Addr::new(192, 168, 1, 11)),
         );
         assert_eq!(
             response.response_data.status,
             ResponseStatusCode::PrivilegeViolation
         );
-        let response = message_router.handle_forward_close(&forward_close_data(triad), opened_from);
+        let response = message_router.handle_forward_close(forward_close(triad), opened_from);
         assert_eq!(response.response_data.status, ResponseStatusCode::Success);
     }
 }

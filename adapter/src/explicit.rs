@@ -6,8 +6,10 @@ use std::net::IpAddr;
 
 use binrw::BinRead;
 
+use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters, TransportClass,
 };
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
@@ -16,7 +18,11 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::message_router::{MessageRouter, message_router_response};
+use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::open_close::{
+    handle_connected_forward_close, handle_connected_forward_open,
+};
+use crate::message_router::{MessageRouter, decode_failure, message_router_response};
 
 pub(crate) mod connected;
 pub(crate) mod unconnected;
@@ -42,9 +48,11 @@ where
 }
 
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items;
-/// Single services need an attribute, All services none
+/// `explicit_connection` (`None` on a connected request) takes class 3 Forward_Open and
+/// Forward_Close. Single services need an attribute, All services none
 pub(crate) fn handle_request(
     message_router: &impl MessageRouter,
+    explicit_connection: Option<&mut Option<ExplicitConnection>>,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
@@ -57,16 +65,55 @@ pub(crate) fn handle_request(
 
     let data_or_status = match (service, path_ids) {
         (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, _) => {
+            let forward_open = match ForwardOpenRequest::read_le_args(
+                &mut Cursor::new(request_data),
+                (service == ServiceCode::LargeForwardOpen,),
+            ) {
+                Ok(forward_open) => forward_open,
+                Err(error) => {
+                    return (
+                        decode_failure(service, &error),
+                        SocketAddrInfoItems::empty(),
+                    );
+                }
+            };
+            // Class 3 opens the session's connection when the Message Router accepts it
+            if let Some(explicit_connection) = explicit_connection
+                && message_router.accepts_explicit_connections()
+                && forward_open.transport_type_trigger.transport_class() == TransportClass::Class3
+            {
+                // A class 3 connection has no Socket Address Info
+                return (
+                    handle_connected_forward_open(explicit_connection, forward_open),
+                    SocketAddrInfoItems::empty(),
+                );
+            }
+            // Any other Forward_Open is the Message Router's
             return message_router.handle_forward_open(
-                service,
-                request_data,
+                forward_open,
                 originator_ip,
                 t2o_socket_addr_info,
             );
         }
         (ServiceCode::ForwardClose, _) => {
+            let forward_close = match ForwardCloseRequest::read_le(&mut Cursor::new(request_data)) {
+                Ok(forward_close) => forward_close,
+                Err(error) => {
+                    return (
+                        decode_failure(service, &error),
+                        SocketAddrInfoItems::empty(),
+                    );
+                }
+            };
+            // The session's class 3 connection first; any other is the Message Router's
+            if let Some(explicit_connection) = explicit_connection
+                && let Some(response) =
+                    handle_connected_forward_close(explicit_connection, &forward_close)
+            {
+                return (response, SocketAddrInfoItems::empty());
+            }
             return (
-                message_router.handle_forward_close(request_data, originator_ip),
+                message_router.handle_forward_close(forward_close, originator_ip),
                 SocketAddrInfoItems::empty(),
             );
         }

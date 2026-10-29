@@ -46,15 +46,14 @@ pub(crate) async fn send_inputs(
 
     loop {
         t2o_interval.tick().await;
-        let mut inputs = Cursor::new(Vec::new());
-        if let Err(error) =
-            CipDataOpt::Typed(Box::new(device.produce_inputs(connection.input_instance)))
-                .write_le_args(&mut inputs, (0,))
+        let mut inputs = Vec::new();
+        if let Err(error) = device
+            .produce_inputs(connection.input_instance)
+            .write_le(&mut Cursor::new(&mut inputs))
         {
             tracing::warn!(%error, "inputs not sent");
             continue;
         }
-        let inputs = inputs.into_inner();
         // Only inputs of the input assembly's size are sent
         if inputs.len() != usize::from(connection.input_size) {
             tracing::warn!(
@@ -79,12 +78,12 @@ pub(crate) async fn send_inputs(
             })),
         );
         encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
-        let mut bytes = Cursor::new(Vec::new());
+        let mut packet_bytes = Vec::new();
         packet
-            .write(&mut bytes)
+            .write(&mut Cursor::new(&mut packet_bytes))
             .expect("an I/O packet of raw inputs writes to memory");
         if let Err(error) = io_socket
-            .send_to(bytes.get_ref(), connection.t2o_endpoint)
+            .send_to(&packet_bytes, connection.t2o_endpoint)
             .await
         {
             tracing::warn!(%error, "inputs not sent");

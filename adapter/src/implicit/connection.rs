@@ -127,7 +127,7 @@ pub(crate) fn connection_from_forward_open(
         }
     }
 
-    let response = ForwardOpenResponse {
+    let forward_open_response = ForwardOpenResponse {
         // Chosen by the target; the T->O id is the scanner's
         o2t_network_connection_id: rand::random(),
         t2o_network_connection_id: forward_open.t2o_network_connection_id,
@@ -140,7 +140,7 @@ pub(crate) fn connection_from_forward_open(
     };
     Ok(ImplicitConnection {
         request: forward_open,
-        response,
+        response: forward_open_response,
         o2t_real_time_format,
         t2o_real_time_format,
         originator_ip,

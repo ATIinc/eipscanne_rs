@@ -14,10 +14,9 @@
 //! A Forward_Open while a connection is open is refused; a connection whose outputs stop times
 //! out, and the next Forward_Open opens.
 
-use binrw::BinRead;
+use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
-use eipscanne_rs::cip::message::data::CipData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 
 use crate::message_router::MessageRouter;
@@ -32,7 +31,7 @@ pub trait ImplicitDevice: MessageRouter {
     /// The outputs an O->T packet carries
     type Outputs: for<'a> BinRead<Args<'a> = ()>;
     /// The inputs a T->O packet carries
-    type Inputs: CipData + 'static;
+    type Inputs: for<'a> BinWrite<Args<'a> = ()>;
 
     /// UDP port of the I/O
     fn io_port(&self) -> u16 {

@@ -16,7 +16,8 @@ use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
-use crate::explicit::connected::{ExplicitConnection, handle_send_unit_data};
+use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::ImplicitDevice;
 use crate::implicit::message_router::ImplicitMessageRouter;

@@ -5,6 +5,8 @@ use std::net::IpAddr;
 
 use binrw::BinWrite;
 
+use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
+use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -67,11 +69,11 @@ pub trait MessageRouter: Send + Sync + 'static {
     /// Info items
     fn handle_forward_open(
         &self,
-        service: ServiceCode,
-        _forward_open_data: &[u8],
+        forward_open: ForwardOpenRequest,
         _originator_ip: IpAddr,
         _t2o_socket_addr_info: Option<SocketAddrInfo>,
     ) -> (MessageRouterResponse, SocketAddrInfoItems) {
+        let service = forward_open.service_code();
         tracing::warn!(?service, "refused a service that is not supported");
         (
             message_router_response(
@@ -87,7 +89,7 @@ pub trait MessageRouter: Send + Sync + 'static {
     /// Implicit messaging only: Forward_Close
     fn handle_forward_close(
         &self,
-        _forward_close_data: &[u8],
+        _forward_close: ForwardCloseRequest,
         _originator_ip: IpAddr,
     ) -> MessageRouterResponse {
         let service = ServiceCode::ForwardClose;
