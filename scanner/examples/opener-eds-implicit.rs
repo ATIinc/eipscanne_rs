@@ -9,13 +9,14 @@
 //! ```
 //!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
-//! The outputs are zeros, sent idle (run flag cleared) unless `--run` is given.
+//! The outputs are zeros, sent in run mode unless `--idle` is given.
 
 use std::fs::read_to_string;
 use std::time::{Duration, Instant};
 
 use bilge::prelude::u4;
 use clap::Parser;
+use clap::builder::{BoolishValueParser, TypedValueParser};
 use tokio::signal::ctrl_c;
 use tokio::time::{interval, sleep_until};
 
@@ -27,6 +28,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 use scanner::error::Error;
@@ -73,9 +75,18 @@ struct Args {
     #[arg(long)]
     large: Option<bool>,
 
-    /// Send the outputs with the run flag set instead of idle
-    #[arg(long)]
-    run: bool,
+    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    ///
+    /// Without it, every O->T packet is in run mode and the adapter applies the outputs. With it,
+    /// the Run/Idle bit of the 32-bit header is cleared: the connection stays open, the adapter
+    /// holds its outputs in their idle state, and OpENer still echoes them.
+    #[arg(
+        long = "idle",
+        action = clap::ArgAction::SetTrue,
+        value_parser = BoolishValueParser::new()
+            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
+    )]
+    run_or_idle: RunOrIdle,
 }
 
 #[tokio::main]
@@ -126,9 +137,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{request:#?}");
 
     // Without a run/idle header there is no way to tell the adapter the outputs are not meant
-    if !args.run && o2t_real_time_format != RealTimeFormat::Header32Bit {
+    if args.run_or_idle == RunOrIdle::Idle && o2t_real_time_format != RealTimeFormat::Header32Bit {
         return Err(
-            "the O->T direction has no run/idle header, so idle cannot be signalled: pass --run to send the outputs as real"
+            "the O->T direction has no run/idle header, so idle cannot be signalled: drop --idle to send the outputs in run mode"
                 .into(),
         );
     }
@@ -197,11 +208,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    args.run,
+                    args.run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {} ({})", hex(&outputs), if args.run { "run" } else { "idle" });
+                println!("[{cycle:>3}] SENT     {} ({:?})", hex(&outputs), args.run_or_idle);
             }
 
             received = recv_io_packet(&socket) => {
@@ -214,7 +225,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok((address, inputs)) => {
                         last_sequence_number = Some(address.encapsulation_sequence_number);
                         deadline = Instant::now() + timeout;

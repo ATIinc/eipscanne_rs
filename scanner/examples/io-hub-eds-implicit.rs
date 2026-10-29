@@ -4,7 +4,7 @@
 //! motor's status is printed whenever it changes.
 //!
 //! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
-//! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
+//! sent in run mode unless `--idle` is given. `--host` has no default on purpose.
 //!
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
 
@@ -16,6 +16,7 @@ use std::time::{Duration, Instant};
 use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
+use clap::builder::{BoolishValueParser, TypedValueParser};
 use tokio::net::UdpSocket;
 use tokio::signal::ctrl_c;
 use tokio::time::{interval, sleep_until};
@@ -28,7 +29,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
-use eipscanne_rs::cip::io_data::CipIoData;
+use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
@@ -82,9 +83,18 @@ struct Args {
     #[arg(long, default_value_t = 1000)]
     cycles: u32,
 
-    /// Send the outputs with the run flag set instead of idle
-    #[arg(long)]
-    run: bool,
+    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    ///
+    /// Without it, every O->T packet is in run mode and the hub applies the outputs. With it, the
+    /// Run/Idle bit of the 32-bit header is cleared: the connection stays open and the hub holds
+    /// its outputs in their idle state.
+    #[arg(
+        long = "idle",
+        action = clap::ArgAction::SetTrue,
+        value_parser = BoolishValueParser::new()
+            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
+    )]
+    run_or_idle: RunOrIdle,
 }
 
 #[tokio::main]
@@ -192,7 +202,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default())),
-                    args.run,
+                    args.run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
@@ -208,7 +218,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok(accepted) => accepted,
                     Err(discarded) => {
                         eprintln!("[{cycle:>4}] DISCARDED {discarded}");

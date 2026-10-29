@@ -32,18 +32,18 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 
 ## OpENer
 
-OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100).
+OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100), idle ones too.
 
 ### opener-implicit
 
 Opens a class 1 connection, exchanges I/O for a number of cycles and closes it. `main` is the five
 stages in order: register the session, open the connection, exchange I/O, close the connection,
-unregister.
+unregister. `--toggle-every N` switches the outputs between run and idle every N cycles.
 
 ### opener-eds-implicit
 
 `opener-implicit` with the connection read from OpENer's EDS
-(`scanner/tests/fixtures/sample_adapter.eds`). The outputs are sent idle.
+(`scanner/tests/fixtures/sample_adapter.eds`). `--idle` sends the outputs idle.
 
 ## Teknic
 
@@ -61,7 +61,7 @@ included.
 ### io-hub-eds-implicit
 
 Opens the IO-HUB-4-E's connection from its EDS and prints one motor's status whenever it
-changes. Every output stays off, sent idle.
+changes. Every output stays off; `--idle` sends them idle.
 
 ## SICK
 

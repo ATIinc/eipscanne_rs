@@ -19,6 +19,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
@@ -295,8 +296,14 @@ async fn one_connection_against_a_fake_adapter() {
 
     // 3. One cycle each way
     let outputs = [0xde, 0xad, 0xbe, 0xef];
-    let packet = build_o2t_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true)
-        .expect("the four output bytes fit the O->T size");
+    let packet = build_o2t_packet(
+        &connection,
+        7,
+        1,
+        CipDataOpt::Raw(outputs.to_vec()),
+        RunOrIdle::Run,
+    )
+    .expect("the four output bytes fit the O->T size");
     send_io_packet(&scanner_io_socket, &packet, connection.o2t_endpoint)
         .await
         .expect("UDP sends to the fake adapter's bound loopback port");
@@ -304,11 +311,11 @@ async fn one_connection_against_a_fake_adapter() {
     let (packet, from) = recv_io_packet(&scanner_io_socket)
         .await
         .expect("the fake adapter echoes the outputs as one input packet");
-    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from)
+    let (address, inputs) = accept_t2o_packet(&connection, &packet, from, None)
         .expect("the fake adapter sends on the granted T->O connection ID");
     assert_eq!(address.encapsulation_sequence_number, 1);
     assert_eq!(inputs.cip_sequence_count, Some(1));
-    assert_eq!(inputs.run_idle_header, None);
+    assert_eq!(inputs.output_control_header, None);
     assert_eq!(inputs.data, CipDataOpt::Raw(outputs.to_vec()));
 
     // 4. Close, 5. End session
