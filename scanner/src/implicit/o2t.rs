@@ -11,7 +11,7 @@ use tokio::net::UdpSocket;
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, RealTimeFormat, TransportClass,
 };
-use eipscanne_rs::cip::io_data::{CipIoData, RunIdleHeader};
+use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
@@ -19,8 +19,9 @@ use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use crate::error::{Error, Result};
 use crate::implicit::connection::{ImplicitConnection, data_len_matches_connection, data_size};
 
-/// The O->T packet of `connection` carrying `assembly_data` (raw bytes or a `binrw` struct). `run`
-/// sets the run/idle flag when the O->T real-time format is `Header32Bit`; other formats ignore it.
+/// The O->T packet of `connection` carrying `assembly_data` (raw bytes or a `binrw` struct).
+/// `run_or_idle` fills the Run/Idle bit when the O->T real-time format is `Header32Bit`; other
+/// formats ignore it.
 ///
 /// `encapsulation_sequence_number` advances every packet (start it at random, so a restarted
 /// scanner does not repeat old numbers); `cip_sequence_count` only when the assembly data changes.
@@ -29,7 +30,7 @@ pub fn build_o2t_packet(
     encapsulation_sequence_number: CipUdint,
     cip_sequence_count: CipUint,
     assembly_data: CipDataOpt,
-    run: bool,
+    run_or_idle: RunOrIdle,
 ) -> Result<EnIpIoPacket> {
     let assembly_data_bytes: Vec<u8> = to_bytes(&assembly_data)?;
 
@@ -54,10 +55,10 @@ pub fn build_o2t_packet(
         }
         TransportClass::Class0 | TransportClass::Unknown(_) => None,
     };
-    let run_idle_header: Option<RunIdleHeader> = match connection.o2t_real_time_format {
+    let output_control_header: Option<OutputControlHeader> = match connection.o2t_real_time_format {
         RealTimeFormat::Header32Bit => Some(
-            RunIdleHeader::builder()
-                .run_idle(run)
+            OutputControlHeader::builder()
+                .run_or_idle(run_or_idle)
                 .claim_output_ownership(false)
                 .ready_for_ownership_of_outputs(u2::new(0))
                 .build(),
@@ -67,7 +68,7 @@ pub fn build_o2t_packet(
 
     let cip_io_data = CipIoData {
         cip_sequence_count,
-        run_idle_header,
+        output_control_header,
         data: CipDataOpt::Raw(assembly_data_bytes),
     };
     Ok(EnIpIoPacket::new(
@@ -111,8 +112,12 @@ mod tests {
     use super::*;
 
     /// The bytes of the packet `build_o2t_packet` builds as the first one of `connection`
-    fn build(connection: &ImplicitConnection, outputs: CipDataOpt, run: bool) -> Result<Vec<u8>> {
-        let packet = build_o2t_packet(connection, 1, 1, outputs, run)?;
+    fn build(
+        connection: &ImplicitConnection,
+        outputs: CipDataOpt,
+        run_or_idle: RunOrIdle,
+    ) -> Result<Vec<u8>> {
+        let packet = build_o2t_packet(connection, 1, 1, outputs, run_or_idle)?;
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes).unwrap();
         Ok(bytes.into_inner())
@@ -131,14 +136,29 @@ mod tests {
         let connection = sample_connection();
         let outputs: [u8; 32] = from_fn(|index| index as u8);
 
-        let raw = build(&connection, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
-        let typed = build(&connection, CipDataOpt::Typed(Box::new(outputs)), true).unwrap();
+        let raw = build(
+            &connection,
+            CipDataOpt::Raw(outputs.to_vec()),
+            RunOrIdle::Run,
+        )
+        .unwrap();
+        let typed = build(
+            &connection,
+            CipDataOpt::Typed(Box::new(outputs)),
+            RunOrIdle::Run,
+        )
+        .unwrap();
         assert_eq_hex!(expected_byte_array, raw);
         assert_eq!(typed, raw);
 
         // Idle clears bit 0 of the run/idle header
         expected_byte_array[20] = 0x00;
-        let idle = build(&connection, CipDataOpt::Raw(outputs.to_vec()), false).unwrap();
+        let idle = build(
+            &connection,
+            CipDataOpt::Raw(outputs.to_vec()),
+            RunOrIdle::Idle,
+        )
+        .unwrap();
         assert_eq!(idle, expected_byte_array);
     }
 
@@ -147,16 +167,20 @@ mod tests {
         // Fixed: exactly 32 bytes, raw or typed
         let fixed = sample_connection();
         assert!(matches!(
-            build(&fixed, CipDataOpt::Raw(vec![0; 31]), true),
+            build(&fixed, CipDataOpt::Raw(vec![0; 31]), RunOrIdle::Run),
             Err(Error::OutputSize {
                 connection_size_type: ConnectionSizeType::Fixed,
                 data_size: 32,
                 actual: 31
             })
         ));
-        assert!(build(&fixed, CipDataOpt::Raw(vec![0; 33]), true).is_err());
+        assert!(build(&fixed, CipDataOpt::Raw(vec![0; 33]), RunOrIdle::Run).is_err());
         assert!(matches!(
-            build(&fixed, CipDataOpt::Typed(Box::new([0u8; 31])), true),
+            build(
+                &fixed,
+                CipDataOpt::Typed(Box::new([0u8; 31])),
+                RunOrIdle::Run
+            ),
             Err(Error::OutputSize { actual: 31, .. })
         ));
 
@@ -164,7 +188,7 @@ mod tests {
         let mut variable = sample_connection();
         variable.request.o2t_network_connection_parameters =
             standard_parameters(38, ConnectionSizeType::Variable);
-        assert!(build(&variable, CipDataOpt::Raw(vec![]), true).is_ok());
-        assert!(build(&variable, CipDataOpt::Raw(vec![0; 33]), true).is_err());
+        assert!(build(&variable, CipDataOpt::Raw(vec![]), RunOrIdle::Run).is_ok());
+        assert!(build(&variable, CipDataOpt::Raw(vec![0; 33]), RunOrIdle::Run).is_err());
     }
 }

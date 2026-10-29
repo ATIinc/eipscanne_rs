@@ -58,9 +58,9 @@ const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 /// decode).
 pub fn accept_t2o_packet(
     connection: &ImplicitConnection,
-    last_sequence_number: Option<CipUdint>,
     packet: &EnIpIoPacket,
     from: SocketAddr,
+    last_sequence_number: Option<CipUdint>,
 ) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is for this connection
     let address: SequencedAddress = packet.sequenced_address;
@@ -153,7 +153,7 @@ mod tests {
     use eipscanne_rs::cip::connection_manager::parameters::{
         ConnectionSizeType, ConnectionTimeoutMultiplier, RealTimeFormat,
     };
-    use eipscanne_rs::cip::io_data::RunIdleHeader;
+    use eipscanne_rs::cip::io_data::{OutputControlHeader, RunOrIdle};
     use eipscanne_rs::cip::types::CipUint;
 
     use crate::implicit::connection::test_support::{
@@ -186,9 +186,9 @@ mod tests {
     ) -> Result<(SequencedAddress, CipIoData)> {
         accept_t2o_packet(
             connection,
-            Some(last),
             &input_packet(received, 1, &[0; 32]),
             from_adapter(),
+            Some(last),
         )
     }
 
@@ -210,9 +210,9 @@ mod tests {
         let any_port = SocketAddr::V4(SocketAddrV4::new(TARGET_IP, 49152));
         let (address, inputs) = accept_t2o_packet(
             &sample_connection(),
-            None,
             &input_packet(0xdead_beef, 7, &data),
             any_port,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -226,7 +226,7 @@ mod tests {
             inputs,
             CipIoData {
                 cip_sequence_count: Some(7),
-                run_idle_header: None,
+                output_control_header: None,
                 data: CipDataOpt::Raw(data),
             }
         );
@@ -237,32 +237,32 @@ mod tests {
             standard_parameters(34, ConnectionSizeType::Variable);
         let (_, inputs) = accept_t2o_packet(
             &variable,
-            None,
             &input_packet(1, 1, &[7; 3]),
             from_adapter(),
+            None,
         )
         .unwrap();
         assert_eq!(inputs.data, CipDataOpt::Raw(vec![7; 3]));
 
-        // A run/idle header: the same 32 bytes of data behind it
+        // A 32-bit header: the same 32 bytes of data behind it
         let mut header = sample_connection();
         header.t2o_real_time_format = RealTimeFormat::Header32Bit;
         header.request.t2o_network_connection_parameters =
             standard_parameters(38, ConnectionSizeType::Fixed);
-        let idle_header = RunIdleHeader::builder()
-            .run_idle(false)
+        let idle_header = OutputControlHeader::builder()
+            .run_or_idle(RunOrIdle::Idle)
             .claim_output_ownership(false)
             .ready_for_ownership_of_outputs(u2::new(0))
             .build();
         let mut bytes = u32::from(idle_header).to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 32]);
         let (_, inputs) =
-            accept_t2o_packet(&header, None, &input_packet(1, 1, &bytes), from_adapter()).unwrap();
+            accept_t2o_packet(&header, &input_packet(1, 1, &bytes), from_adapter(), None).unwrap();
         assert_eq!(
             inputs,
             CipIoData {
                 cip_sequence_count: Some(1),
-                run_idle_header: Some(idle_header),
+                output_control_header: Some(idle_header),
                 data: CipDataOpt::Raw(vec![0; 32]),
             }
         );
@@ -306,7 +306,7 @@ mod tests {
 
         for (packet, from, reason) in cases {
             assert_eq!(
-                accept_t2o_packet(&sample_connection(), None, &packet, from)
+                accept_t2o_packet(&sample_connection(), &packet, from, None)
                     .unwrap_err()
                     .to_string(),
                 format!("unexpected packet: {reason}")

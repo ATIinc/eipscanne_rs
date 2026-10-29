@@ -32,13 +32,13 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 
 ## OpENer
 
-OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100).
+OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100), idle ones too.
 
 ### opener-implicit
 
 Opens a class 1 connection, exchanges I/O for a number of cycles and closes it. `main` is the five
 stages in order: register the session, open the connection, exchange I/O, close the connection,
-unregister.
+unregister. `--toggle-every N` switches the outputs between run and idle every N cycles.
 
 ### opener-eds-implicit
 

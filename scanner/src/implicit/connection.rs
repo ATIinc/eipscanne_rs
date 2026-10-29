@@ -21,7 +21,7 @@ use crate::error::Result;
 use crate::explicit::decode_reply;
 use crate::session::Session;
 
-/// An open connection: the Forward_Open sent, the adapter's reply, and each direction's
+/// An open class 1 connection: the Forward_Open sent, the adapter's reply, and each direction's
 /// real-time format (agreed off the wire). Everything else is read from these, never copied.
 ///
 /// Connection IDs and packet intervals come from `response`; the request's are only proposals.
