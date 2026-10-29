@@ -33,7 +33,7 @@ cargo run --example sample-implicit-adapter
 cargo run --example read-identity -- --host 127.0.0.1
 cargo run --example read-identity-connected -- --host 127.0.0.1
 cargo run --example opener-implicit -- --host 127.0.0.1
-cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
+cargo run --example opener-eds-implicit -- --host 127.0.0.1
 ```
 
-Both OpENer examples print their outputs echoed back as `RECEIVED` lines. Without `--run`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them. `opener-implicit --toggle-every 3` switches between run and idle every three cycles: while idle the echo holds the last run outputs and the adapter logs `outputs idle`.
+Both OpENer examples print their outputs echoed back as `RECEIVED` lines. With `--idle`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them. `opener-implicit --toggle-every 3` switches between run and idle every three cycles: while idle the echo holds the last run outputs and the adapter logs `outputs idle`.
