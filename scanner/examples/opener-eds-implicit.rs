@@ -8,6 +8,13 @@
 //! cargo run --example opener-eds-implicit
 //! ```
 //!
+//! Without OpENer, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-implicit-adapter
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
+//! ```
+//!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
 //! The outputs are zeros, sent idle (run flag cleared) unless `--run` is given.
 

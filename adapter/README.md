@@ -34,4 +34,7 @@ cargo run --example sample-implicit-adapter
 cargo run --example read-identity -- --host 127.0.0.1
 cargo run --example read-identity-connected -- --host 127.0.0.1
 cargo run --example opener-implicit -- --host 127.0.0.1
+cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
 ```
+
+Both OpENer examples print their outputs echoed back as `RECEIVED` lines. Without `--run`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them.

@@ -10,6 +10,7 @@
 //! cargo run --example read-identity -- --host 127.0.0.1
 //! cargo run --example read-identity-connected -- --host 127.0.0.1
 //! cargo run --example opener-implicit -- --host 127.0.0.1
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
 //! ```
 
 use std::net::Ipv4Addr;
@@ -137,6 +138,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     tracing::info!(
         "try: cargo run --example opener-implicit -- --host {}",
+        args.host
+    );
+    tracing::info!(
+        "try: cargo run --example opener-eds-implicit -- --host {} --run",
         args.host
     );
     let adapter = SampleImplicitAdapter {

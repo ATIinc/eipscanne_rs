@@ -31,7 +31,8 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 
 ## OpENer
 
-OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100).
+OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100). The adapter
+crate's `sample-implicit-adapter` stands in for OpENer.
 
 ### opener-implicit
 

@@ -8,6 +8,13 @@
 //! tests/integration/start-opener.sh
 //! cargo run --example opener-implicit
 //! ```
+//!
+//! Without OpENer, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-implicit-adapter
+//! cargo run --example opener-implicit -- --host 127.0.0.1
+//! ```
 
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
