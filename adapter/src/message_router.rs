@@ -107,6 +107,8 @@ pub trait MessageRouter: Send + Sync + 'static {
 /// The device's explicit messaging, fixed for the server's life
 #[derive(Clone, Copy)]
 pub struct ExplicitOptions {
+    /// Whether a class 3 Forward_Open opens the session's connection
+    pub accepts_explicit_connections: bool,
     /// The TCP/IP Interface object's Encapsulation Inactivity Timeout: a session without
     /// encapsulation activity for this long closes, unless `None`. A Set of the attribute cannot
     /// change it
@@ -116,6 +118,7 @@ pub struct ExplicitOptions {
 impl Default for ExplicitOptions {
     fn default() -> Self {
         ExplicitOptions {
+            accepts_explicit_connections: false,
             // The attribute's default
             encapsulation_inactivity_timeout: Some(Duration::from_secs(120)),
         }

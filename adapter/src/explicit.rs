@@ -1,4 +1,5 @@
-//! Explicit messaging: each request, decoded for its handler and answered.
+//! Explicit messaging: each unconnected or connected request, decoded for its handler and
+//! answered.
 
 use std::io::Cursor;
 use std::net::IpAddr;
@@ -7,23 +8,34 @@ use binrw::BinRead;
 
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::parameters::TransportClass;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::message_router::{MessageRouter, class_instance_and_attribute, message_router_response};
+use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::open_close::{
+    handle_connected_forward_close, handle_connected_forward_open,
+};
+use crate::message_router::{
+    ExplicitOptions, MessageRouter, class_instance_and_attribute, message_router_response,
+};
 
+pub(crate) mod connected;
 pub(crate) mod unconnected;
 
-/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items.
-/// Single services need an attribute, All services none
+/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items; a
+/// class 3 Forward_Open and Forward_Close open and close `class_3_connection` when `options` accept
+/// explicit connections. Single services need an attribute, All services none
 pub(crate) fn handle_request(
     message_router: &impl MessageRouter,
+    options: ExplicitOptions,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
+    class_3_connection: &mut Option<ExplicitConnection>,
 ) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
     let path_ids = class_instance_and_attribute(&request.request_data.cip_path);
@@ -60,7 +72,7 @@ pub(crate) fn handle_request(
             | ServiceCode::SetAttributeSingle,
             None,
         ) => Err(ResponseStatusCode::PathSegmentError),
-        // Connection Manager: opens a class 1 connection for implicit I/O
+        // Connection Manager: opens a class 3 connection, or a class 1 one for implicit I/O
         (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, _) => {
             let is_large_forward_open = service == ServiceCode::LargeForwardOpen;
             let forward_open_request = match ForwardOpenRequest::read_le_args(
@@ -75,13 +87,28 @@ pub(crate) fn handle_request(
                     );
                 }
             };
+
+            // Class 3 opens the session's connection, when the options accept it
+            if options.accepts_explicit_connections
+                && forward_open_request
+                    .transport_type_trigger
+                    .transport_class()
+                    == TransportClass::Class3
+            {
+                return (
+                    handle_connected_forward_open(forward_open_request, class_3_connection),
+                    SocketAddrInfoItems::empty(),
+                );
+            }
+
+            // Every non-class-3 Forward_Open goes to the Message Router
             return message_router.handle_forward_open(
                 forward_open_request,
                 originator_ip,
                 t2o_socket_addr_info,
             );
         }
-        // Connection Manager: closes a class 1 connection and its implicit I/O
+        // Connection Manager: closes a class 3 connection, or a class 1 one and its implicit I/O
         (ServiceCode::ForwardClose, _) => {
             let forward_close_request =
                 match ForwardCloseRequest::read_le(&mut Cursor::new(request_data)) {
@@ -93,6 +120,14 @@ pub(crate) fn handle_request(
                         );
                     }
                 };
+            // The session's class 3 connection first
+            if let Some(response) =
+                handle_connected_forward_close(&forward_close_request, class_3_connection.as_ref())
+            {
+                *class_3_connection = None;
+                return (response, SocketAddrInfoItems::empty());
+            }
+            // Every non-class-3 Forward_Close goes to the Message Router
             return (
                 message_router.handle_forward_close(forward_close_request, originator_ip),
                 SocketAddrInfoItems::empty(),

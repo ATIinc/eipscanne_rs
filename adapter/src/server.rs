@@ -1,5 +1,5 @@
 //! The server: one task and one encapsulation session per TCP connection, handing Send RR Data to
-//! unconnected explicit messaging.
+//! unconnected and Send Unit Data to connected explicit messaging.
 
 use std::io::ErrorKind;
 use std::net::IpAddr;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
-use tokio::time::timeout;
+use tokio::time::{Instant, timeout_at};
 use tracing::Instrument;
 
 use eipscanne_rs::cip::types::CipUdint;
@@ -17,6 +17,8 @@ use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
+use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::message_router::ImplicitMessageRouter;
 use crate::implicit::{ImplicitDevice, ImplicitOptions};
@@ -66,7 +68,7 @@ pub async fn serve(
 
 /// Answers the packets of the scanner at `originator_ip` as session `session_handle` until it
 /// unregisters, closes the stream or has no encapsulation activity for the `options` inactivity
-/// timeout
+/// timeout; its class 3 connection ends with it
 #[tracing::instrument(skip(message_router, options, stream))]
 async fn serve_session(
     message_router: Arc<impl MessageRouter>,
@@ -76,9 +78,17 @@ async fn serve_session(
     originator_ip: IpAddr,
 ) -> Result<()> {
     let mut registered = false;
+    let mut class_3_connection: Option<ExplicitConnection> = None;
     loop {
         let packet = match options.encapsulation_inactivity_timeout {
-            Some(inactivity_timeout) => timeout(inactivity_timeout, read_packet(&mut stream)).await,
+            Some(timeout) => {
+                let inactivity_start = match &class_3_connection {
+                    // An open class 3 connection is encapsulation activity until it times out
+                    Some(connection) => connection.deadline().max(Instant::now()),
+                    None => Instant::now(),
+                };
+                timeout_at(inactivity_start + timeout, read_packet(&mut stream)).await
+            }
             None => Ok(read_packet(&mut stream).await),
         };
         let Ok(packet) = packet else {
@@ -123,16 +133,41 @@ async fn serve_session(
                 }
                 reply
             }
-            // Send RR Data needs the registered session
-            EnIpCommand::SendRrData if !registered || header.session_handle != session_handle => {
+            // Send RR Data and Send Unit Data need the registered session
+            EnIpCommand::SendRrData | EnIpCommand::SendUnitData
+                if !registered || header.session_handle != session_handle =>
+            {
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
-            EnIpCommand::SendRrData => handle_send_rr_data(
-                message_router.as_ref(),
-                &header,
-                originator_ip,
-                command_specific_data.as_ref(),
-            ),
+            EnIpCommand::SendRrData => {
+                // The session keeps its class 3 connection only until it times out
+                class_3_connection =
+                    class_3_connection.filter(|connection| connection.deadline() > Instant::now());
+                handle_send_rr_data(
+                    message_router.as_ref(),
+                    options,
+                    &header,
+                    originator_ip,
+                    command_specific_data.as_ref(),
+                    &mut class_3_connection,
+                )
+            }
+            EnIpCommand::SendUnitData => {
+                class_3_connection =
+                    class_3_connection.filter(|connection| connection.deadline() > Instant::now());
+                let Some(reply) = handle_send_unit_data(
+                    message_router.as_ref(),
+                    options,
+                    &header,
+                    originator_ip,
+                    command_specific_data.as_ref(),
+                    &mut class_3_connection,
+                ) else {
+                    // A discarded request has no reply
+                    continue;
+                };
+                reply
+            }
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
         reply.header.sender_context = header.sender_context;

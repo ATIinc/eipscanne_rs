@@ -1,6 +1,6 @@
 //! A sample adapter with an Identity object and the OpENer sample's assemblies: configuration 151,
-//! output 150 and input 100, 32 bytes each. Its inputs echo the last run outputs. Served on
-//! 127.0.0.1 until Ctrl-C.
+//! output 150 and input 100, 32 bytes each. Its inputs echo the last run outputs, and it accepts a
+//! class 3 connection. Served on 127.0.0.1 until Ctrl-C.
 //!
 //! The scanner binds UDP 2222, so on the same host the adapter takes its outputs on another port
 //! and names it in the Forward_Open reply:
@@ -8,6 +8,7 @@
 //! ```text
 //! cargo run --example sample-implicit-adapter
 //! cargo run --example read-identity -- --host 127.0.0.1
+//! cargo run --example read-identity-connected -- --host 127.0.0.1
 //! cargo run --example opener-implicit -- --host 127.0.0.1
 //! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --run
 //! ```
@@ -127,6 +128,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.host
     );
     tracing::info!(
+        "try: cargo run --example read-identity-connected -- --host {}",
+        args.host
+    );
+    tracing::info!(
         "try: cargo run --example opener-implicit -- --host {}",
         args.host
     );
@@ -142,7 +147,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         served = serve_implicit(
             Arc::new(adapter),
             listener,
-            ExplicitOptions::default(),
+            ExplicitOptions {
+                accepts_explicit_connections: true,
+                ..Default::default()
+            },
             ImplicitOptions {
                 io_port: args.io_port,
                 ..Default::default()
