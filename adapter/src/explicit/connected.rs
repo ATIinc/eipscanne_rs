@@ -48,18 +48,14 @@ impl ExplicitConnection {
     }
 }
 
-/// The connection while it is established; one that has timed out is deleted
-fn established(
-    explicit_connection: &mut Option<ExplicitConnection>,
-) -> Option<&mut ExplicitConnection> {
-    if let Some(connection) = explicit_connection.as_ref()
-        && connection.deadline <= Instant::now()
+/// Deletes the connection once no request has come within its timeout
+fn delete_timed_out_connection(explicit_connection: &mut Option<ExplicitConnection>) {
+    if let Some(connection) =
+        explicit_connection.take_if(|connection| connection.deadline <= Instant::now())
     {
         tracing::warn!(
             connection_serial_number = connection.request.connection_triad.connection_serial_number,
             "class 3 connection timed out: no request in time"
         );
-        *explicit_connection = None;
     }
-    explicit_connection.as_mut()
 }

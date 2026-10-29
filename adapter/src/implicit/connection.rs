@@ -17,9 +17,8 @@ use eipscanne_rs::cip::types::CipInt;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 
-use crate::explicit::{segment_id, size_and_types};
 use crate::implicit::ImplicitDevice;
-use crate::message_router::connection_failure;
+use crate::message_router::{connection_failure_rejection, segment_id, size_and_types};
 
 /// `sin_family` of an IPv4 Socket Address Info
 const AF_INET: CipInt = 2;
@@ -62,7 +61,7 @@ pub(crate) fn connection_from_forward_open(
     if trigger.transport_class() != TransportClass::Class1
         || trigger.production_trigger() != ProductionTrigger::Cyclic
     {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
         ));
@@ -73,7 +72,7 @@ pub(crate) fn connection_from_forward_open(
         let (_, size_type, connection_type) = size_and_types(parameters);
         size_type != ConnectionSizeType::Fixed || connection_type != ConnectionType::PointToPoint
     }) {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter,
         ));
@@ -81,13 +80,13 @@ pub(crate) fn connection_from_forward_open(
     if forward_open.o2t_requested_packet_interval == 0
         || forward_open.t2o_requested_packet_interval == 0
     {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::RequestedPacketIntervalNotSupported,
         ));
     }
     if t2o_socket_addr_info.is_some_and(|info| info.sin_family != AF_INET) {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::ParameterErrorInUnconnectedRequestService,
         ));
@@ -96,7 +95,7 @@ pub(crate) fn connection_from_forward_open(
     let Some((output_instance, input_instance)) =
         output_and_input_instances(&forward_open.connection_path)
     else {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::InvalidSegmentInConnectionPath,
         ));
@@ -105,7 +104,7 @@ pub(crate) fn connection_from_forward_open(
         device.assembly_layout(output_instance),
         device.assembly_layout(input_instance),
     ) else {
-        return Err(connection_failure(
+        return Err(connection_failure_rejection(
             service,
             ConnectionManagerExtendedStatus::InvalidProducedOrConsumedApplicationPath,
         ));
@@ -118,7 +117,7 @@ pub(crate) fn connection_from_forward_open(
         let supported_size =
             connection_size(assembly_size, TransportClass::Class1, real_time_format);
         if size_and_types(parameters).0 != supported_size {
-            let mut rejection = connection_failure(
+            let mut rejection = connection_failure_rejection(
                 service,
                 ConnectionManagerExtendedStatus::InvalidConnectionSize,
             );

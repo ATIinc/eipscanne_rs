@@ -16,9 +16,9 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
-use crate::explicit::decode_data;
 use crate::implicit::ImplicitDevice;
 use crate::implicit::connection::ImplicitConnection;
+use crate::packet::decode_data;
 
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;

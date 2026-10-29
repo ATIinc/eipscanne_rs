@@ -13,9 +13,9 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, UnitPacketData};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::connected::{ExplicitConnection, established};
-use crate::explicit::{handle_request, size_and_types};
-use crate::message_router::{MessageRouter, message_router_response};
+use crate::explicit::connected::{ExplicitConnection, delete_timed_out_connection};
+use crate::explicit::handle_request;
+use crate::message_router::{MessageRouter, message_router_response, size_and_types};
 
 /// Bytes of the CIP sequence count in front of each message
 const CIP_SEQUENCE_COUNT_LEN: usize = 2;
@@ -67,7 +67,8 @@ fn consume_request(
     connection_id: CipUdint,
     cip_sequence_count: CipUint,
 ) -> Option<&ExplicitConnection> {
-    let Some(connection) = established(explicit_connection) else {
+    delete_timed_out_connection(explicit_connection);
+    let Some(connection) = explicit_connection.as_mut() else {
         tracing::debug!("discarded a request: no class 3 connection");
         return None;
     };

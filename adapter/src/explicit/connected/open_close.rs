@@ -15,9 +15,11 @@ use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatus
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INSTANCE_ID};
 
-use crate::explicit::connected::{ExplicitConnection, established};
-use crate::explicit::{class_instance_and_attribute, size_and_types};
-use crate::message_router::{connection_failure, message_router_response, rejection_response};
+use crate::explicit::connected::{ExplicitConnection, delete_timed_out_connection};
+use crate::message_router::{
+    class_instance_and_attribute, connection_failure_rejection, message_router_response,
+    rejection_response, size_and_types,
+};
 
 /// Opens the connection `forward_open` asks for, unless the session has one
 pub(crate) fn handle_connected_forward_open(
@@ -26,18 +28,25 @@ pub(crate) fn handle_connected_forward_open(
 ) -> MessageRouterResponse {
     let service = forward_open.service_code();
     let triad = forward_open.connection_triad;
+    delete_timed_out_connection(explicit_connection);
     // While the session's connection is established, every Forward_Open is refused before it is
     // checked
-    if let Some(current) = established(explicit_connection) {
+    if let Some(current) = explicit_connection.as_ref() {
         let extended_status = if current.request.connection_triad == triad {
             ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen
         } else {
             ConnectionManagerExtendedStatus::OutOfConnections
         };
-        return rejection_response(connection_failure(service, extended_status), triad);
+        return rejection_response(
+            connection_failure_rejection(service, extended_status),
+            triad,
+        );
     }
-    if let Some(extended_status) = unsupported_parameter(&forward_open) {
-        return rejection_response(connection_failure(service, extended_status), triad);
+    if let Some(extended_status) = unsupported_parameter_status(&forward_open) {
+        return rejection_response(
+            connection_failure_rejection(service, extended_status),
+            triad,
+        );
     }
 
     let forward_open_response = ForwardOpenResponse {
@@ -76,7 +85,7 @@ pub(crate) fn handle_connected_forward_open(
 
 /// The extended status refusing what `forward_open` asks for beyond a point-to-point connection
 /// to the Message Router as server, with a packet interval; `None` when it asks for nothing more
-fn unsupported_parameter(
+fn unsupported_parameter_status(
     forward_open: &ForwardOpenRequest,
 ) -> Option<ConnectionManagerExtendedStatus> {
     // The production trigger is ignored
@@ -117,8 +126,9 @@ pub(crate) fn handle_connected_forward_close(
     forward_close: &ForwardCloseRequest,
 ) -> Option<MessageRouterResponse> {
     let triad = forward_close.connection_triad;
+    delete_timed_out_connection(explicit_connection);
     // Any other connection is the Message Router's
-    if established(explicit_connection)?.request.connection_triad != triad {
+    if explicit_connection.as_ref()?.request.connection_triad != triad {
         return None;
     }
     *explicit_connection = None;

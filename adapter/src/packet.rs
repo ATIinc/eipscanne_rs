@@ -1,10 +1,12 @@
-//! Encapsulation packets on a stream, read whole however the bytes arrive.
+//! Bytes on the wire: encapsulation packets on a stream, read whole however the bytes arrive, and
+//! the data a request or an I/O packet carries.
 
 use std::io::Cursor;
 
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
+use eipscanne_rs::cip::message::response::ResponseStatusCode;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
@@ -36,4 +38,49 @@ pub async fn write_packet(
     packet.write(&mut bytes)?;
     stream.write_all(bytes.get_ref()).await?;
     Ok(())
+}
+
+/// The data of a Set, or a connection's outputs, as `T`, or the General Status refusing it; mirrors
+/// the scanner's `decode_reply`
+pub fn decode_data<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
+where
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
+    let mut reader = Cursor::new(data);
+    let value = T::read_le(&mut reader).map_err(|error| {
+        if error.is_eof() {
+            ResponseStatusCode::NotEnoughData
+        } else {
+            ResponseStatusCode::InvalidAttributeValue
+        }
+    })?;
+    if reader.position() < data.len() as u64 {
+        return Err(ResponseStatusCode::TooMuchData);
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_data_reads_exactly_the_data() {
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde]),
+            Ok(0xdead_beef)
+        );
+    }
+
+    #[test]
+    fn decode_data_refuses_short_and_long_data() {
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe]),
+            Err(ResponseStatusCode::NotEnoughData)
+        );
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
+            Err(ResponseStatusCode::TooMuchData)
+        );
+    }
 }

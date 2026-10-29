@@ -1,4 +1,5 @@
-//! The Message Router a device implements: the services a scanner's requests reach.
+//! The Message Router a device implements: the services a scanner's requests reach, and the paths,
+//! connection parameters and responses of those services.
 
 use std::io::Cursor;
 use std::net::IpAddr;
@@ -7,6 +8,9 @@ use binrw::BinWrite;
 
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
+};
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -14,6 +18,7 @@ use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
 use eipscanne_rs::cip::types::CipUint;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -141,7 +146,7 @@ pub(crate) fn rejection_response(
 }
 
 /// A Connection Manager refusal: Connection Failure with `extended_status` as the Additional Status
-pub(crate) fn connection_failure(
+pub(crate) fn connection_failure_rejection(
     service: ServiceCode,
     extended_status: ConnectionManagerExtendedStatus,
 ) -> Rejection {
@@ -162,17 +167,52 @@ pub(crate) fn connection_failure(
     }
 }
 
-/// The refusal of a Connection Manager request that does not decode
-pub(crate) fn decode_failure(service: ServiceCode, error: &binrw::Error) -> MessageRouterResponse {
-    let general_status = if error.is_eof() {
-        ResponseStatusCode::NotEnoughData
-    } else {
-        ResponseStatusCode::InvalidParameterValue
-    };
-    tracing::warn!(
-        ?service,
-        ?general_status,
-        "refused a Connection Manager request"
-    );
-    message_router_response(service, general_status, vec![], CipDataOpt::Raw(vec![]))
+/// The class, instance and optional attribute of a logical path
+pub(crate) fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
+    match path.segments.as_slice() {
+        [class, instance] => Some((
+            segment_id(class, LogicalSegmentType::ClassId)?,
+            segment_id(instance, LogicalSegmentType::InstanceId)?,
+            None,
+        )),
+        [class, instance, attribute] => Some((
+            segment_id(class, LogicalSegmentType::ClassId)?,
+            segment_id(instance, LogicalSegmentType::InstanceId)?,
+            Some(segment_id(attribute, LogicalSegmentType::AttributeId)?),
+        )),
+        _ => None,
+    }
+}
+
+/// The value of a segment of `logical_segment_type`
+pub(crate) fn segment_id(
+    segment: &LogicalPathSegment,
+    logical_segment_type: LogicalSegmentType,
+) -> Option<u16> {
+    if segment.path_definition.logical_segment_type() != logical_segment_type {
+        return None;
+    }
+    match segment.data {
+        PathData::FormatAsU8(value) => Some(value.into()),
+        PathData::FormatAsU16(value) => Some(value),
+        PathData::ElectronicKey(_) => None,
+    }
+}
+
+/// The connection size, its type and the connection type of a direction
+pub(crate) fn size_and_types(
+    parameters: &NetworkConnectionParameters,
+) -> (u16, ConnectionSizeType, ConnectionType) {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => (
+            parameters.connection_size().value(),
+            parameters.connection_size_type(),
+            parameters.connection_type(),
+        ),
+        NetworkConnectionParameters::Large(parameters) => (
+            parameters.connection_size(),
+            parameters.connection_size_type(),
+            parameters.connection_type(),
+        ),
+    }
 }

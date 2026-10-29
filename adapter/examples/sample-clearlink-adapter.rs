@@ -30,8 +30,8 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
-use adapter::explicit::decode_data;
 use adapter::message_router::MessageRouter;
+use adapter::packet::decode_data;
 use adapter::server::serve;
 
 // The ClearLink assemblies the scanner's examples use, in scanner/assemblies/

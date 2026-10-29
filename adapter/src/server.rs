@@ -24,6 +24,12 @@ use crate::implicit::message_router::ImplicitMessageRouter;
 use crate::message_router::MessageRouter;
 use crate::packet::{read_packet, write_packet};
 
+/// [`serve`], plus one class 1 connection at a time on an I/O socket at the listener's address
+pub async fn serve_implicit(device: Arc<impl ImplicitDevice>, listener: TcpListener) -> Result<()> {
+    let message_router = ImplicitMessageRouter::bind(device, listener.local_addr()?.ip()).await?;
+    serve(Arc::new(message_router), listener).await
+}
+
 /// Serves every connecting scanner with `message_router` until accepting fails; dropping it closes
 /// every connection
 pub async fn serve(message_router: Arc<impl MessageRouter>, listener: TcpListener) -> Result<()> {
@@ -46,12 +52,6 @@ pub async fn serve(message_router: Arc<impl MessageRouter>, listener: TcpListene
         );
         while sessions.try_join_next().is_some() {}
     }
-}
-
-/// [`serve`], plus one class 1 connection at a time on an I/O socket at the listener's address
-pub async fn serve_implicit(device: Arc<impl ImplicitDevice>, listener: TcpListener) -> Result<()> {
-    let message_router = ImplicitMessageRouter::bind(device, listener.local_addr()?.ip()).await?;
-    serve(Arc::new(message_router), listener).await
 }
 
 /// Answers the packets of the scanner at `originator_ip` as session `session_handle` until it

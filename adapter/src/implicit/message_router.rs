@@ -25,7 +25,7 @@ use crate::implicit::connection::connection_from_forward_open;
 use crate::implicit::o2t::receive_outputs;
 use crate::implicit::t2o::send_inputs;
 use crate::message_router::{
-    MessageRouter, connection_failure, message_router_response, rejection_response,
+    MessageRouter, connection_failure_rejection, message_router_response, rejection_response,
 };
 
 /// The Message Router of an [`ImplicitDevice`]: its Get and Set, plus Forward_Open and
@@ -124,7 +124,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                 ConnectionManagerExtendedStatus::OutOfConnections
             };
             return (
-                rejection_response(connection_failure(service, extended_status), triad),
+                rejection_response(
+                    connection_failure_rejection(service, extended_status),
+                    triad,
+                ),
                 SocketAddrInfoItems::empty(),
             );
         }
@@ -230,7 +233,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         }
         // A timed-out connection is not found
         rejection_response(
-            connection_failure(
+            connection_failure_rejection(
                 service,
                 ConnectionManagerExtendedStatus::TargetConnectionNotFound,
             ),

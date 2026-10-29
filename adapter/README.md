@@ -3,11 +3,13 @@
 The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818, one class 3 connection per session, and one class 1 I/O connection at a time over UDP. A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request. A device whose `accepts_explicit_connections` is true also takes class 3 connections. A device that also implements `implicit::ImplicitDevice` is served by `server::serve_implicit`, which adds class 1 Forward_Open, Forward_Close and the I/O:
 
 * `server`: accepts connections, registers sessions and hands Send RR Data to `explicit::unconnected` and Send Unit Data to `explicit::connected`.
-* `message_router`: the `MessageRouter` trait, the services a scanner's requests reach.
-* `explicit`: `decode_data` for the data of a Set or a connection's outputs, and the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the session's class 3 connection.
+* `message_router`: the `MessageRouter` trait, the services a scanner's requests reach, and the paths, connection parameters and responses of those services.
+* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the session's class 3 connection.
 * `implicit`: the `ImplicitDevice` trait, and the opening, exchange and closing of the class 1 connection.
-* `packet`: reads and writes one encapsulation packet on a stream, and finds the request it carries.
+* `packet`: reads and writes one encapsulation packet on a stream; `decode_data` decodes the data of a Set or a connection's outputs.
 * `error`: the one error type of every fallible call.
+
+[src/README.md](src/README.md) follows a packet through these modules.
 
 ## Sample ClearLink
 
