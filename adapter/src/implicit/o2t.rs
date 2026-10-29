@@ -28,7 +28,8 @@ const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);
 /// The smallest allowed sequence number gap
 const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 
-/// Hands the device the new run mode outputs of `connection` until no packet comes in time
+/// Hands the device the new run mode outputs of `connection` until no packet comes in time, and
+/// tells it when they switch to idle or time out
 pub(crate) async fn receive_outputs(
     device: &impl ImplicitDevice,
     connection: &ImplicitConnection,
@@ -48,12 +49,15 @@ pub(crate) async fn receive_outputs(
     // None until the first accepted packet
     let mut last_sequence_number: Option<CipUdint> = None;
     let mut last_cip_sequence_count: Option<CipUint> = None;
+    // Until the first idle packet
+    let mut running = true;
     let mut receive_buffer = vec![0u8; MAX_UDP_PAYLOAD];
 
     loop {
         let Ok(received) = timeout_at(deadline, io_socket.recv_from(&mut receive_buffer)).await
         else {
             tracing::warn!("the connection timed out: no output packet in time");
+            device.idle_outputs(connection.output_instance);
             return;
         };
         let checked = received.map_err(Error::from).and_then(|(len, from)| {
@@ -75,17 +79,24 @@ pub(crate) async fn receive_outputs(
         // Each accepted packet restarts the timeout
         deadline = Instant::now() + timeout;
 
-        // The same CIP sequence count is old data
-        let repeated = cip_io_data.cip_sequence_count == last_cip_sequence_count;
-        last_cip_sequence_count = cip_io_data.cip_sequence_count;
-        // Idle outputs keep the connection open but are not applied
-        let idle = cip_io_data
+        let run = cip_io_data
             .run_idle_header
-            .is_some_and(|header| !header.run_idle());
+            .is_none_or(|header| header.run_idle());
+        // The same CIP sequence count in the same mode is old data
+        let repeated = cip_io_data.cip_sequence_count == last_cip_sequence_count && run == running;
+        last_cip_sequence_count = cip_io_data.cip_sequence_count;
+        if repeated {
+            continue;
+        }
+        // Idle outputs keep the connection open but are not applied; the device hears of the switch
+        if running && !run {
+            device.idle_outputs(connection.output_instance);
+        }
+        running = run;
         let CipDataOpt::Raw(output_data) = &cip_io_data.data else {
             unreachable!("data read from the wire is always raw");
         };
-        if repeated || idle || output_data.is_empty() {
+        if !run || output_data.is_empty() {
             continue;
         }
         match decode_data(output_data) {

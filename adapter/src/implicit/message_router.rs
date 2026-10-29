@@ -158,6 +158,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             t2o_endpoint = %connection.t2o_endpoint,
             "class 1 connection opened"
         );
+        let output_instance = connection.output_instance;
         let device = Arc::clone(&self.device);
         let io_socket = Arc::clone(&self.io_socket);
         // Exchanges the I/O until the outputs time out or the connection is closed
@@ -172,6 +173,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         *open_connection = Some(OpenConnection {
             connection_triad: triad,
             originator_ip,
+            output_instance,
             io_exchange_task,
         });
         (
@@ -188,7 +190,8 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         )
     }
 
-    /// Closes the open connection `forward_close` names, when `originator_ip` opened it
+    /// Closes the open connection `forward_close` names, when `originator_ip` opened it, and idles
+    /// its outputs
     fn handle_forward_close(
         &self,
         forward_close: ForwardCloseRequest,
@@ -214,8 +217,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                     triad,
                 );
             }
+            let output_instance = current.output_instance;
             // Dropping it stops the I/O exchange task
             *open_connection = None;
+            self.device.idle_outputs(output_instance);
             tracing::info!(
                 connection_serial_number = triad.connection_serial_number,
                 "connection closed"
@@ -247,6 +252,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
 struct OpenConnection {
     connection_triad: ConnectionTriad,
     originator_ip: IpAddr,
+    output_instance: u16,
     io_exchange_task: AbortHandle,
 }
 

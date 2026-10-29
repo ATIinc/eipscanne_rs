@@ -47,4 +47,7 @@ pub trait ImplicitDevice: MessageRouter {
 
     /// The inputs of the next T->O packet
     fn produce_inputs(&self, instance: u16) -> Self::Inputs;
+
+    /// The outputs of `instance` stopped: a switch to idle, a timeout or a Forward_Close
+    fn idle_outputs(&self, _instance: u16) {}
 }

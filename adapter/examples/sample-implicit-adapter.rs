@@ -1,5 +1,5 @@
 //! A sample adapter with an Identity object and the OpENer sample's assemblies: configuration 151,
-//! output 150 and input 100, 32 bytes each. Its inputs echo the last outputs, and it accepts a
+//! output 150 and input 100, 32 bytes each. Its inputs echo the last run outputs, and it accepts a
 //! class 3 connection. Served on 127.0.0.1 until Ctrl-C.
 //!
 //! The scanner binds UDP 2222, so on the same host the adapter takes its outputs on another port
@@ -115,6 +115,10 @@ impl ImplicitDevice for SampleImplicitAdapter {
             .outputs
             .lock()
             .expect("nothing panics while holding the outputs lock")
+    }
+
+    fn idle_outputs(&self, _instance: u16) {
+        tracing::info!("outputs idle");
     }
 }
 

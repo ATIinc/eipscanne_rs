@@ -2,6 +2,7 @@
 
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -49,9 +50,10 @@ const T2O_CONNECTION_SIZE: u16 = 6;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
-/// Implicit messaging only: echoes its outputs as its inputs
+/// Implicit messaging only: echoes its outputs as its inputs and counts how often they stop
 struct EchoDevice {
     outputs: Mutex<[u8; DATA_SIZE as usize]>,
+    idle_count: AtomicUsize,
 }
 
 impl MessageRouter for EchoDevice {}
@@ -86,10 +88,15 @@ impl ImplicitDevice for EchoDevice {
             .lock()
             .expect("nothing panics while holding the outputs lock")
     }
+
+    fn idle_outputs(&self, _instance: u16) {
+        self.idle_count.fetch_add(1, Ordering::SeqCst);
+    }
 }
 
 /// A registered session to an `EchoDevice`, and the scanner's I/O socket
 struct Scanner {
+    device: Arc<EchoDevice>,
     stream: TcpStream,
     io_socket: UdpSocket,
 }
@@ -103,10 +110,11 @@ impl Scanner {
         let address = listener
             .local_addr()
             .expect("a bound listener has a local address");
-        let device = EchoDevice {
+        let device = Arc::new(EchoDevice {
             outputs: Mutex::new([0; DATA_SIZE as usize]),
-        };
-        tokio::spawn(serve_implicit(Arc::new(device), listener));
+            idle_count: AtomicUsize::new(0),
+        });
+        tokio::spawn(serve_implicit(Arc::clone(&device), listener));
 
         let mut stream = TcpStream::connect(address)
             .await
@@ -121,7 +129,11 @@ impl Scanner {
         let io_socket = UdpSocket::bind((Ipv4Addr::LOCALHOST, 0))
             .await
             .expect("port 0 lets the OS pick a free loopback port");
-        Scanner { stream, io_socket }
+        Scanner {
+            device,
+            stream,
+            io_socket,
+        }
     }
 
     /// Sends `request` and reads the reply
@@ -176,13 +188,14 @@ impl Scanner {
         while self.next_inputs().await != inputs {}
     }
 
-    /// Sends a run O->T packet of connection `o2t_id` to `o2t_endpoint`
+    /// Sends an O->T packet of connection `o2t_id` to `o2t_endpoint`, in run mode when `run`
     async fn send_outputs(
         &self,
         o2t_endpoint: SocketAddrV4,
         o2t_id: CipUdint,
         sequence_number: CipUdint,
         cip_sequence_count: u16,
+        run: bool,
         outputs: &[u8],
     ) {
         let packet = EnIpIoPacket::new(
@@ -192,7 +205,7 @@ impl Scanner {
                 cip_sequence_count: Some(cip_sequence_count),
                 run_idle_header: Some(
                     RunIdleHeader::builder()
-                        .run_idle(true)
+                        .run_idle(run)
                         .claim_output_ownership(false)
                         .ready_for_ownership_of_outputs(u2::new(0))
                         .build(),
@@ -341,6 +354,7 @@ async fn open_echo_and_close() {
             response.o2t_network_connection_id,
             1,
             1,
+            true,
             &outputs,
         )
         .await;
@@ -355,6 +369,49 @@ async fn open_echo_and_close() {
     );
     // The Connection Manager takes another connection
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+}
+
+#[tokio::test]
+async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
+    let mut scanner = Scanner::connect().await;
+    let mut request = forward_open_request(1);
+    // 5.12 s without outputs before the connection times out
+    request.connection_timeout_multiplier = ConnectionTimeoutMultiplier::X512;
+    let reply = scanner.forward_open(request.clone()).await;
+    let o2t_id = forward_open_response(&reply).o2t_network_connection_id;
+    let o2t_endpoint = o2t_endpoint(&reply);
+
+    let running = [1, 1, 1, 1];
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 1, 1, true, &running)
+        .await;
+    scanner.recv_inputs(&running).await;
+    // Idle with the same CIP sequence count, then new idle data
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 2, 1, false, &running)
+        .await;
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 3, 2, false, &[2, 2, 2, 2])
+        .await;
+    for _ in 0..5 {
+        assert_eq!(scanner.next_inputs().await, running);
+    }
+    // Run with the same CIP sequence count
+    let resumed = [2, 2, 2, 2];
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 4, 2, true, &resumed)
+        .await;
+    scanner.recv_inputs(&resumed).await;
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);
+
+    let reply = scanner.request(&forward_close(&request)).await;
+    assert!(
+        reply
+            .response()
+            .expect("a Send RR Data reply carries a Message Router response")
+            .is_success()
+    );
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]
@@ -435,4 +492,5 @@ async fn a_connection_without_outputs_times_out_and_another_opens() {
     // Past the grace for the first output packet
     tokio::time::sleep(Duration::from_secs(11)).await;
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);
 }
