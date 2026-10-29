@@ -1,12 +1,20 @@
 //! Opens a class 1 connection to the OpENer sample, exchanges cyclic I/O for a number of cycles
 //! and closes it; `main` is the five stages in order. OpENer echoes the outputs of assembly 150 as
-//! the inputs of assembly 100, idle ones too.
+//! the inputs of assembly 100, idle ones too; the adapter crate's sample echoes run outputs only.
 //!
 //! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
 //!
 //! ```text
 //! tests/integration/start-opener.sh
 //! cargo run --example opener-implicit
+//! ```
+//!
+//! Without OpENer, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-implicit-adapter
+//! cargo run --example opener-implicit -- --host 127.0.0.1
+//! cargo run --example opener-implicit -- --host 127.0.0.1 --toggle-every 3
 //! ```
 
 use std::net::SocketAddr;

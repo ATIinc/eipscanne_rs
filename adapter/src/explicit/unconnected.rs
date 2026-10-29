@@ -1,5 +1,7 @@
 //! Unconnected explicit messaging: each Send RR Data request answered by the Message Router.
 
+use std::net::IpAddr;
+
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode, RRPacketData};
 use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
@@ -14,6 +16,7 @@ use crate::packet::error_reply;
 pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
     header: &EncapsulationHeader,
+    originator_ip: IpAddr,
     command_specific_data: Option<&CommandSpecificData>,
 ) -> EnIpPacket {
     let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
@@ -23,10 +26,16 @@ pub(crate) fn handle_send_rr_data(
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
 
-    let response = handle_request(message_router, request);
+    let (response, socket_addr_info_items) = handle_request(
+        message_router,
+        request,
+        originator_ip,
+        request_rr_data.socket_addr_info_items.t2o,
+    );
 
-    let reply_rr_data =
+    let mut reply_rr_data =
         RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
+    reply_rr_data.socket_addr_info_items = socket_addr_info_items;
     EnIpPacket {
         header: EncapsulationHeader {
             length: None,

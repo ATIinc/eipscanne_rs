@@ -1,12 +1,17 @@
-//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection, with the same assembly structs the
-//! explicit examples read and write. The connection comes from the hub's EDS file in
-//! `scanner/assemblies/io_hub`, and every input packet is decoded as an `InputAssemblyHub4E`. One
-//! motor's status is printed whenever it changes.
+//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection opened from the hub's EDS, decoding
+//! each input packet as the `InputAssemblyHub4E` that `io-hub-explicit-homing` reads, and prints
+//! one motor's status whenever it changes. The outputs are `OutputAssemblyHub4E::default()`,
+//! sent idle unless `--run` is given.
 //!
-//! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
-//! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
-//!
+//! `--host` has no default:
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
+//!
+//! Without a hub, run it against the adapter crate's sample, whose motors move in spurts:
+//!
+//! ```text
+//! cargo run --example sample-io-hub-adapter
+//! cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
+//! ```
 
 use std::fs::read_to_string;
 use std::io::Cursor;
