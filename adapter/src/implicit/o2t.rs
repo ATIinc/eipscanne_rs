@@ -12,7 +12,9 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc::Receiver;
 use tokio::time::{Instant, timeout_at};
 
-use eipscanne_rs::cip::connection_manager::parameters::{TransportClass, connection_size};
+use eipscanne_rs::cip::connection_manager::parameters::{
+    TransportClass, connected_data_header_len,
+};
 use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
@@ -193,11 +195,8 @@ fn check_output_packet(
         unreachable!("data read from the wire is always raw");
     };
     let real_time_format = connection.o2t.real_time_format;
-    let o2t_connection_size = connection_size(
-        connection.o2t.size,
-        TransportClass::Class1,
-        real_time_format,
-    );
+    let o2t_connection_size =
+        connection.o2t.size + connected_data_header_len(TransportClass::Class1, real_time_format);
     if connected_data.len() != usize::from(o2t_connection_size) {
         return Err(Error::UnexpectedPacket(format!(
             "{} connected data bytes, the connection carries {o2t_connection_size}",

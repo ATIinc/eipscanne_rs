@@ -12,7 +12,7 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, ConnectionType, ProductionTrigger, RealTimeFormat, TransportClass,
-    connection_size,
+    connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
@@ -154,11 +154,8 @@ pub(crate) fn connection_from_forward_open(
     };
     // Each size is its assembly's plus headers; a refusal names the size that fits
     for (parameters, connection_point) in [(o2t_parameters, o2t), (t2o_parameters, t2o)] {
-        let supported_size = connection_size(
-            connection_point.size,
-            TransportClass::Class1,
-            connection_point.real_time_format,
-        );
+        let supported_size = connection_point.size
+            + connected_data_header_len(TransportClass::Class1, connection_point.real_time_format);
         if network_connection_size(parameters) != supported_size {
             let mut rejection = connection_failure_rejection(
                 service,

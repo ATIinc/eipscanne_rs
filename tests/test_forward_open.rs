@@ -14,7 +14,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     LargeNetworkConnectionParameters, NetworkConnectionParameters, PriorityTimeTick,
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
-    TransportClass, TransportTypeTrigger, connection_size,
+    TransportClass, TransportTypeTrigger, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
@@ -100,7 +100,7 @@ fn sample_network_connection_parameters(
     large: bool,
     real_time_format: RealTimeFormat,
 ) -> NetworkConnectionParameters {
-    let size = connection_size(IO_DATA_SIZE, TransportClass::Class1, real_time_format);
+    let size = IO_DATA_SIZE + connected_data_header_len(TransportClass::Class1, real_time_format);
     if large {
         NetworkConnectionParameters::Large(sample_large_parameters(size))
     } else {

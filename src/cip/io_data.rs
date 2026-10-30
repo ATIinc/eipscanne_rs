@@ -3,7 +3,9 @@
 use bilge::prelude::{BuilderBits, DebugBits, FromBits, bitsize, u1, u2, u28};
 use binrw::{BinRead, BinWrite, binrw};
 
-use crate::cip::connection_manager::parameters::{RealTimeFormat, TransportClass, connection_size};
+use crate::cip::connection_manager::parameters::{
+    RealTimeFormat, TransportClass, connected_data_header_len,
+};
 use crate::cip::message::data::CipDataOpt;
 use crate::cip::types::CipUint;
 
@@ -59,7 +61,7 @@ pub struct CipIoData {
     pub output_control_header: Option<OutputControlHeader>,
 
     /// The application data (an assembly), declared by the caller: whatever is left of the item
-    /// after the fields above, whose size is the connection size of zero data bytes
-    #[br(args(byte_len - connection_size(0, transport_class, real_time_format)))]
+    /// after the fields above
+    #[br(args(byte_len - connected_data_header_len(transport_class, real_time_format)))]
     pub data: CipDataOpt,
 }
