@@ -12,10 +12,10 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, NetworkConnectionParameters, RealTimeFormat, TransportClass,
     connected_data_header_len,
 };
-use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
+use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::error::Result;
@@ -50,18 +50,16 @@ pub async fn forward_open_implicit(
     t2o_real_time_format: RealTimeFormat,
     t2o_port: u16,
 ) -> Result<ImplicitConnection> {
-    let mut forward_open: EnIpPacket =
-        RequestObjectAssembly::new_forward_open(session.session_handle(), request.clone());
-    // Point-to-point inputs come to this host, so the item names only the port
-    if t2o_port != ETHERNET_IP_IO_UDP_PORT
-        && let CommandSpecificData::SendRrData(rr_data) = &mut forward_open.command_specific_data
-    {
-        rr_data.socket_addr_info_items.t2o = Some(SocketAddrInfo::from(SocketAddrV4::new(
-            Ipv4Addr::UNSPECIFIED,
-            t2o_port,
-        )));
-    }
-    let reply: EnIpPacket = session.request(&forward_open).await?;
+    // The item names only the port; 2222 needs none
+    let t2o = (t2o_port != ETHERNET_IP_IO_UDP_PORT)
+        .then(|| SocketAddrInfo::from(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, t2o_port)));
+    let reply: EnIpPacket = session
+        .request(&RequestObjectAssembly::new_forward_open(
+            session.session_handle(),
+            request.clone(),
+            SocketAddrInfoItems { o2t: None, t2o },
+        ))
+        .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;
 
     let target_ip: Ipv4Addr = session.peer_ip();
