@@ -62,7 +62,6 @@ impl<M: MessageRouter> ConnectedMessageRouter<M> {
 }
 
 impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
-    // The server's Get and Set
     fn handle_get_attributes_all(
         &self,
         class: u16,
@@ -184,7 +183,6 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
         }
 
         let mut forward_open_response = successful_forward_open_response(&forward_open_request);
-        // Each established connection has its own O->T id
         while established_connections.contains_key(&forward_open_response.o2t_network_connection_id)
         {
             forward_open_response.o2t_network_connection_id = rand::random();
@@ -203,7 +201,6 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
                 response: forward_open_response.clone(),
                 originator_ip,
                 inactivity_timeout,
-                // Its inactivity timer starts now
                 deadline: Instant::now() + inactivity_timeout,
                 last_cip_sequence_count: None,
             },

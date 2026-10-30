@@ -188,7 +188,7 @@ impl Session {
         Ok(EnIpPacket::read(&mut Cursor::new(&bytes))?)
     }
 
-    /// Sends a Message Router request and returns the accepted reply to the same service
+    /// Sends a Message Router request and returns the accepted reply
     pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket> {
         self.send(packet).await?;
         let reply = self.read_reply().await?;

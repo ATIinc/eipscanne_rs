@@ -58,7 +58,7 @@ impl BinRead for CipDataOpt {
         _endian: Endian,
         args: Self::Args<'_>,
     ) -> BinResult<Self> {
-        // ALWAYS read a RequestDataOpt as a Raw Type
+        // Always read as Raw
         let (len,) = args;
         let mut buf = vec![0u8; len as usize];
         reader.read_exact(&mut buf)?;
