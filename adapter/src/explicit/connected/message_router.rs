@@ -25,8 +25,7 @@ use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
 use crate::connection_helpers::{
     class_instance_and_attribute, connection_failure_rejection, network_connection_size,
-    network_connection_type, o2t_timeout, successful_forward_close_response,
-    successful_forward_open_response,
+    network_connection_type, o2t_timeout, successful_forward_open_response,
 };
 use crate::error::{Error, Result};
 use crate::explicit::connected::ExplicitConnection;
@@ -241,7 +240,11 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             connection_serial_number = triad.connection_serial_number,
             "class 3 connection closed"
         );
-        Ok(successful_forward_close_response(triad))
+        Ok(ForwardCloseResponse {
+            connection_triad: triad,
+            application_reply_size: 0,
+            application_reply: vec![],
+        })
     }
 
     /// Consumes a request on the established connection `connection_id`, when `originator_ip`

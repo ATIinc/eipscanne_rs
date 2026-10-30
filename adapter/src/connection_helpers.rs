@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use binrw::BinWrite;
 
-use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
@@ -14,7 +13,6 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionType, NetworkConnectionParameters,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
-use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
@@ -32,15 +30,6 @@ pub(crate) fn successful_forward_open_response(
         // Granted as requested
         o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
         t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
-        application_reply_size: 0,
-        application_reply: vec![],
-    }
-}
-
-/// The response closing the connection of `triad`
-pub(crate) fn successful_forward_close_response(triad: ConnectionTriad) -> ForwardCloseResponse {
-    ForwardCloseResponse {
-        connection_triad: triad,
         application_reply_size: 0,
         application_reply: vec![],
     }

@@ -25,7 +25,7 @@ use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::connection_helpers::{connection_failure_rejection, successful_forward_close_response};
+use crate::connection_helpers::connection_failure_rejection;
 use crate::error::Result;
 use crate::implicit::connection::{OpenConnection, connection_from_forward_open};
 use crate::implicit::o2t::{receive_outputs, route_outputs};
@@ -252,6 +252,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             connection_serial_number = triad.connection_serial_number,
             "class 1 connection closed"
         );
-        Ok(successful_forward_close_response(triad))
+        Ok(ForwardCloseResponse {
+            connection_triad: triad,
+            application_reply_size: 0,
+            application_reply: vec![],
+        })
     }
 }
