@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Starts the OpENer adapter the integration tests and examples talk to, on the host (not in the
-# devcontainer): creates the `eip-network` Docker network when it is missing (a fixed --ip needs a
-# user-defined network), builds the `eip-adapter` image from OpENer/ and runs it in the foreground
-# at 172.28.0.10. Ctrl+C stops the adapter and removes its container.
+# Starts the OpENer adapter the examples talk to, on the host (not in the devcontainer): creates
+# the `eip-network` Docker network when it is missing (a fixed --ip needs a user-defined network),
+# builds the `eip-adapter` image from OpENer/ and runs it in the foreground at 172.28.0.10.
+# Ctrl+C stops the adapter and removes its container.
 #
 #   tests/integration/start-opener.sh
 #

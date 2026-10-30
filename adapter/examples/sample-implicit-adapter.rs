@@ -1,7 +1,7 @@
-//! A sample adapter with an Identity object and the OpENer sample's assemblies: configuration 151,
-//! output 150 and input 100, 32 bytes each, and the heartbeat point 254 of an Input Only
-//! connection. Its inputs echo the last run outputs, and it accepts a class 3 connection. Two
-//! class 1 connections can be open at once: one owns the outputs. Served on 127.0.0.1 until Ctrl-C.
+//! A sample adapter with an Identity object and the OpENer sample's assemblies: output 150 and
+//! input 100, 32 bytes each, and the heartbeat point 254 of an Input Only connection. Its inputs
+//! echo the last run outputs, and it accepts a class 3 connection. Two class 1 connections can be
+//! open at once: one owns the outputs. Served on 127.0.0.1 until Ctrl-C.
 //!
 //! The scanner binds UDP 2222, so on the same host the adapter takes its outputs on another port
 //! and names it in the Forward_Open reply:

@@ -6,8 +6,8 @@
 server::serve
 └─ server::serve_session                     one task and one session per TCP connection
    ├─ packet::read_packet                    none within the inactivity timeout: the session ends
-   ├─ NOP, a request with a Status           no reply
    ├─ Unregister Session                     the session ends
+   ├─ NOP, a request with a Status           no reply
    ├─ Register Session
    │  └─ server::handle_register_session
    ├─ Send RR Data

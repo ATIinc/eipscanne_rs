@@ -90,7 +90,6 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
 }
 
 impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
-    // The device's Get and Set
     fn handle_get_attributes_all(
         &self,
         class: u16,

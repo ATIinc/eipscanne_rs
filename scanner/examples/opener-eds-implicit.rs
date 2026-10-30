@@ -1,5 +1,5 @@
 //! The stages of `opener-implicit`, with the connection read from this crate's
-//! `sample_adapter.eds` fixture, the EDS of the OpENer sample.
+//! `sample_adapter.eds` fixture.
 //!
 //! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
 //!
@@ -67,7 +67,7 @@ const SAMPLE_ADAPTER_EDS: &str = concat!(
     "/tests/fixtures/sample_adapter.eds"
 );
 
-/// Exchanges cyclic I/O with the OpENer sample over a connection its EDS file describes
+/// Exchanges cyclic I/O with the OpENer sample over a connection from a sample EDS
 #[derive(Parser)]
 #[command(version)]
 struct Args {

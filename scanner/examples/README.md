@@ -9,7 +9,7 @@ repository root: `cargo run --example <name>`; `-- --help` lists its flags.
 | `read-identity` | any adapter | explicit | no |
 | `read-identity-connected` | any class 3 adapter | explicit (connected) | no |
 | `opener-implicit` | OpENer | implicit | no |
-| `opener-eds-implicit` | OpENer, from its EDS | implicit | no |
+| `opener-eds-implicit` | OpENer, from a sample EDS | implicit | no |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E | explicit | a motor |
 | `io-hub-eds-implicit` | Teknic IO-HUB-4-E, from its EDS | implicit | no |
 | `flexi-net-implicit` | SICK flexi-net | implicit | safety logic inputs |
@@ -42,7 +42,7 @@ unregister. `--toggle-every N` switches the outputs between run and idle every N
 
 ### opener-eds-implicit
 
-`opener-implicit` with the connection read from OpENer's EDS
+`opener-implicit` with the connection read from a sample EDS
 (`scanner/tests/fixtures/sample_adapter.eds`). `--idle` sends the outputs idle. `--connection 2`
 opens the Input Only connection, and `--io-port N` takes the inputs on port N, so a second run
 can open a connection beside the first.
@@ -72,4 +72,4 @@ to 0 before the connection closes.
 Write plain `binrw` structs in `scanner/assemblies/<device>/`. The same struct decodes an explicit
 reply and implicit inputs, and is sent as implicit outputs. An EDS's `AssemN` members are
 `ParamN`s, each with a type, name and units: write the structs from them (or hand the EDS to
-Claude), name reserved bytes `_reserved`, and test against the real device's packet bytes.
+Claude), skip reserved bytes with `pad_before`/`pad_after`, and test against the real device's packet bytes.
