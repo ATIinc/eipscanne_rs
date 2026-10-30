@@ -253,7 +253,7 @@ async fn open_request_and_close() {
 }
 
 #[tokio::test]
-async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
+async fn a_router_without_class_3_refuses_class_3() {
     let mut scanner = Scanner::connect(Arc::new(SampleDevice)).await;
 
     let reply = scanner
