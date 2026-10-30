@@ -5,6 +5,14 @@
 //!
 //! `--host` has no default:
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
+//!
+//! Without a hub, run it against the adapter crate's sample, whose motors move in spurts:
+//!
+//! ```text
+//! cargo run --example sample-io-hub-adapter
+//! cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
+//! cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0 --toggle-every 400
+//! ```
 
 use std::fs::read_to_string;
 use std::io::Cursor;

@@ -8,6 +8,20 @@
 //! cargo run --example opener-eds-implicit
 //! ```
 //!
+//! Without OpENer, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-implicit-adapter
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1
+//! ```
+//!
+//! The sample takes an Input Only connection beside it, its inputs on another port:
+//!
+//! ```text
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --cycles 100
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --connection 2 --io-port 2224
+//! ```
+//!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
 //! The outputs are zeros, sent in run mode unless `--idle` is given.
 

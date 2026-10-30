@@ -5,10 +5,10 @@ use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use bilge::prelude::{u4, u9};
-use binrw::{BinRead, BinResult, BinWrite};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream, UdpSocket};
+use binrw::BinRead;
+use tokio::net::{TcpListener, UdpSocket};
 
+use adapter::packet::{read_packet, write_packet};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -32,7 +32,7 @@ use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
-use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
+use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
@@ -87,24 +87,6 @@ fn request() -> ForwardOpenRequest {
 }
 
 // ======= The fake adapter ========
-
-/// Reads one encapsulation packet the way an adapter does: the header, then its Length
-async fn read_packet(stream: &mut TcpStream) -> BinResult<EnIpPacket> {
-    let mut bytes = vec![0u8; 24];
-    stream.read_exact(&mut bytes).await?;
-    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes))?;
-    bytes.resize(24 + usize::from(header.length.unwrap_or(0)), 0);
-    stream.read_exact(&mut bytes[24..]).await?;
-    EnIpPacket::read(&mut Cursor::new(&bytes))
-}
-
-/// Writes one encapsulation packet
-async fn write_packet(stream: &mut TcpStream, packet: &EnIpPacket) -> BinResult<()> {
-    let mut bytes = Cursor::new(Vec::new());
-    packet.write(&mut bytes)?;
-    stream.write_all(bytes.get_ref()).await?;
-    Ok(())
-}
 
 /// The Message Router request a Send RR Data packet carries
 fn extract_message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
