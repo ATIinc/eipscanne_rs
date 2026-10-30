@@ -12,7 +12,6 @@ use eipscanne_rs::eip::command::EncapsStatusCode;
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// What can go wrong while talking to an adapter
-#[derive(Debug)]
 pub enum Error {
     Io(std::io::Error),
     /// The adapter did not connect or answer in time
@@ -56,6 +55,13 @@ const _: () = {
 };
 
 // ======= Start of Error impl ========
+
+// The Display text, so an error returned from main or unwrapped reads as the reason
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
