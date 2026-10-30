@@ -29,6 +29,7 @@ use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::packet::EnIpPacket;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use adapter::message_router::{ExplicitOptions, MessageRouter};
@@ -109,6 +110,7 @@ impl Scanner {
             .request(&RequestObjectAssembly::new_forward_open(
                 SESSION_HANDLE,
                 request,
+                SocketAddrInfoItems::empty(),
             ))
             .await;
         let response = response(&reply);
@@ -259,6 +261,7 @@ async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
         .request(&RequestObjectAssembly::new_forward_open(
             SESSION_HANDLE,
             forward_open_request(1),
+            SocketAddrInfoItems::empty(),
         ))
         .await;
     assert_eq!(

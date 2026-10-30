@@ -16,6 +16,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 use scanner::error::Error;
 use scanner::implicit::eds::forward_open_request;
@@ -56,7 +57,8 @@ fn the_exclusive_owner_connection_builds_the_known_forward_open() {
         0x45, 0x23, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x42, 0x0f, 0x00, 0x26, 0x48, 0x40,
         0x42, 0x0f, 0x00, 0x22, 0x48, 0x01, 0x04, 0x20, 0x04, 0x24, 0x97, 0x2c, 0x96, 0x2c, 0x64,
     ];
-    let packet = RequestObjectAssembly::new_forward_open(0x03, request(&eds));
+    let packet =
+        RequestObjectAssembly::new_forward_open(0x03, request(&eds), SocketAddrInfoItems::empty());
     let mut bytes = Cursor::new(Vec::new());
     packet.write(&mut bytes).unwrap();
     let bytes = bytes.into_inner();

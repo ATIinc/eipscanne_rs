@@ -36,6 +36,7 @@ use eipscanne_rs::eip::constants::{
     NO_ENCAPSULATION_TIMEOUT,
 };
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::{
@@ -316,8 +317,11 @@ fn test_serialize_forward_open_request() {
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // The constructor builds the same packet, computing the lengths while writing
-    let request_object =
-        RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
+    let request_object = RequestObjectAssembly::new_forward_open(
+        CLEARLINK_IO_SESSION_HANDLE,
+        request.clone(),
+        SocketAddrInfoItems::empty(),
+    );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = Cursor::new(&mut byte_array_buffer);
@@ -487,8 +491,11 @@ fn test_serialize_large_forward_open_request() {
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // The constructor picks the Large_Forward_Open service from the parameter width
-    let request_object =
-        RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
+    let request_object = RequestObjectAssembly::new_forward_open(
+        CLEARLINK_IO_SESSION_HANDLE,
+        request.clone(),
+        SocketAddrInfoItems::empty(),
+    );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = Cursor::new(&mut byte_array_buffer);

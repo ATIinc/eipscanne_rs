@@ -9,8 +9,10 @@ use crate::cip::object_ids::{
 };
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
-use crate::eip::constants::NO_ENCAPSULATION_TIMEOUT;
+use crate::eip::command::{CommandSpecificData, EnIpCommand, RRPacketData};
+use crate::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
 use crate::eip::packet::EnIpPacket;
+use crate::eip::socket_addr::SocketAddrInfoItems;
 
 /// An encapsulated packet sent by the scanner. The same type as [`ResponseObjectAssembly`]; the
 /// name only documents the direction.
@@ -46,14 +48,28 @@ impl RequestObjectAssembly {
     }
 
     /// Forward_Open or Large_Forward_Open, decided by the width of the request's connection
-    /// parameters
-    pub fn new_forward_open(session_handle: CipUdint, request: ForwardOpenRequest) -> Self {
-        let service_code = request.service_code();
-        Self::new_service_request(
-            session_handle,
+    /// parameters, followed by `socket_addr_info_items`
+    pub fn new_forward_open(
+        session_handle: CipUdint,
+        request: ForwardOpenRequest,
+        socket_addr_info_items: SocketAddrInfoItems,
+    ) -> Self {
+        let message = MessageRouterRequest::new_data(
+            request.service_code(),
             CipPath::new_u8(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
-            service_code,
             Some(Box::new(request)),
+        );
+        Self::new(
+            EnIpCommand::SendRrData,
+            session_handle,
+            CommandSpecificData::SendRrData(RRPacketData {
+                socket_addr_info_items,
+                ..RRPacketData::new_unconnected(
+                    CIP_INTERFACE_HANDLE,
+                    NO_ENCAPSULATION_TIMEOUT,
+                    message,
+                )
+            }),
         )
     }
 

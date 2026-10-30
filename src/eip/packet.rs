@@ -113,7 +113,7 @@ pub struct EnIpPacket {
 // ======= Start of EnIpPacket impl ========
 
 impl EnIpPacket {
-    fn new(
+    pub(crate) fn new(
         command: EnIpCommand,
         session_handle: CipUdint,
         command_specific_data: CommandSpecificData,
