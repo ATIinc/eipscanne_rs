@@ -161,6 +161,18 @@ impl Args {
             )
         })
     }
+
+    /// Run, then idle and run in turn every `toggle_every` cycles
+    fn run_or_idle(&self, cycle: u32) -> RunOrIdle {
+        if self
+            .toggle_every
+            .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
+        {
+            RunOrIdle::Run
+        } else {
+            RunOrIdle::Idle
+        }
+    }
 }
 
 #[tokio::main]
@@ -234,14 +246,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
-                let run_or_idle = if args
-                    .toggle_every
-                    .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
-                {
-                    RunOrIdle::Run
-                } else {
-                    RunOrIdle::Idle
-                };
+                let run_or_idle = args.run_or_idle(cycle);
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
