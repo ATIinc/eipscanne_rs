@@ -26,7 +26,7 @@ use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 use crate::implicit::ImplicitDevice;
 use crate::message_router::{
     connection_failure_rejection, network_connection_size, network_connection_size_type,
-    network_connection_type, segment_id,
+    network_connection_type, segment_id, successful_forward_open_response,
 };
 
 /// What the I/O exchange task runs on: the Forward_Open request and response, then per direction
@@ -159,17 +159,7 @@ pub(crate) fn connection_from_forward_open(
         }
     }
 
-    let forward_open_response = ForwardOpenResponse {
-        // Chosen by the target; the T->O id is the scanner's
-        o2t_network_connection_id: rand::random(),
-        t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
-        connection_triad: forward_open_request.connection_triad,
-        // Granted as requested
-        o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
-        t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
-        application_reply_size: 0,
-        application_reply: vec![],
-    };
+    let forward_open_response = successful_forward_open_response(&forward_open_request);
     Ok(ImplicitConnection {
         request: forward_open_request,
         response: forward_open_response,

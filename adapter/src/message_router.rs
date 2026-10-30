@@ -151,6 +151,32 @@ pub(crate) fn message_router_response(
     }
 }
 
+/// The response accepting `forward_open_request` as it asks
+pub(crate) fn successful_forward_open_response(
+    forward_open_request: &ForwardOpenRequest,
+) -> ForwardOpenResponse {
+    ForwardOpenResponse {
+        // Chosen by the target; the T->O id is the scanner's
+        o2t_network_connection_id: rand::random(),
+        t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
+        connection_triad: forward_open_request.connection_triad,
+        // Granted as requested
+        o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
+        t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
+        application_reply_size: 0,
+        application_reply: vec![],
+    }
+}
+
+/// The response closing the connection of `triad`
+pub(crate) fn successful_forward_close_response(triad: ConnectionTriad) -> ForwardCloseResponse {
+    ForwardCloseResponse {
+        connection_triad: triad,
+        application_reply_size: 0,
+        application_reply: vec![],
+    }
+}
+
 /// The response carrying `rejection` and the triad of the request it refuses
 pub(crate) fn rejection_response(
     rejection: Rejection,
@@ -244,4 +270,19 @@ pub(crate) fn network_connection_type(parameters: &NetworkConnectionParameters) 
         NetworkConnectionParameters::Standard(parameters) => parameters.connection_type(),
         NetworkConnectionParameters::Large(parameters) => parameters.connection_type(),
     }
+}
+
+/// The timeout multiplier times the O->T actual packet interval
+pub(crate) fn o2t_timeout(
+    forward_open_request: &ForwardOpenRequest,
+    forward_open_response: &ForwardOpenResponse,
+) -> Duration {
+    // x512 on a 10 s interval overflows 32-bit microseconds
+    Duration::from_micros(
+        u64::from(
+            forward_open_request
+                .connection_timeout_multiplier
+                .multiplier(),
+        ) * u64::from(forward_open_response.o2t_actual_packet_interval),
+    )
 }

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::net::{IpAddr, Ipv4Addr, SocketAddrV4};
 use std::ops::RangeInclusive;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
@@ -30,7 +30,9 @@ use crate::implicit::connection::{OpenConnection, connection_from_forward_open};
 use crate::implicit::o2t::{receive_outputs, route_outputs};
 use crate::implicit::t2o::send_inputs;
 use crate::implicit::{ImplicitDevice, ImplicitOptions};
-use crate::message_router::{MessageRouter, connection_failure_rejection};
+use crate::message_router::{
+    MessageRouter, connection_failure_rejection, successful_forward_close_response,
+};
 
 /// O->T packets waiting for their connection; more are lost, like on the network
 const OUTPUT_PACKET_QUEUE: usize = 8;
@@ -74,6 +76,17 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
             packet_interval: options.packet_interval,
             _output_routing_task,
         })
+    }
+
+    /// The open connections, once timed-out ones are dropped
+    fn open_connections(&self) -> MutexGuard<'_, HashMap<CipUdint, OpenConnection>> {
+        let mut open_connections = self
+            .open_connections
+            .lock()
+            .expect("nothing panics while holding the connections lock");
+        open_connections
+            .retain(|_, open_connection| !open_connection.output_packet_sender.is_closed());
+        open_connections
     }
 }
 
@@ -127,13 +140,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
     ) -> Result<(ForwardOpenResponse, SocketAddrInfoItems), Rejection> {
         let service = forward_open_request.service_code();
         let triad = forward_open_request.connection_triad;
-        let mut open_connections = self
-            .open_connections
-            .lock()
-            .expect("nothing panics while holding the connections lock");
-        // Timed-out connections free their place
-        open_connections
-            .retain(|_, open_connection| !open_connection.output_packet_sender.is_closed());
+        let mut open_connections = self.open_connections();
         // A duplicate, or one too many, is refused before it is checked
         if open_connections
             .values()
@@ -223,16 +230,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
     ) -> Result<ForwardCloseResponse, Rejection> {
         let service = ServiceCode::ForwardClose;
         let triad = forward_close_request.connection_triad;
-        let mut open_connections = self
-            .open_connections
-            .lock()
-            .expect("nothing panics while holding the connections lock");
-        // A timed-out connection is not found
-        let Some((&o2t_network_connection_id, current)) =
-            open_connections.iter().find(|(_, open_connection)| {
-                open_connection.connection_triad == triad
-                    && !open_connection.output_packet_sender.is_closed()
-            })
+        let mut open_connections = self.open_connections();
+        let Some((&o2t_network_connection_id, current)) = open_connections
+            .iter()
+            .find(|(_, open_connection)| open_connection.connection_triad == triad)
         else {
             return Err(connection_failure_rejection(
                 service,
@@ -252,10 +253,6 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             connection_serial_number = triad.connection_serial_number,
             "class 1 connection closed"
         );
-        Ok(ForwardCloseResponse {
-            connection_triad: triad,
-            application_reply_size: 0,
-            application_reply: vec![],
-        })
+        Ok(successful_forward_close_response(triad))
     }
 }

@@ -23,6 +23,7 @@ use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use crate::error::{Error, Result};
 use crate::implicit::ImplicitDevice;
 use crate::implicit::connection::{ImplicitConnection, OpenConnection};
+use crate::message_router::o2t_timeout;
 use crate::packet::decode_data;
 
 /// UDP's 16-bit length limit, so no packet is cut short
@@ -82,16 +83,7 @@ pub(crate) async fn receive_outputs(
     connection: &ImplicitConnection,
     output_packet_receiver: &mut Receiver<(EnIpIoPacket, SocketAddr)>,
 ) {
-    // The timeout multiplier times the O->T actual packet interval; x512 on a 10 s interval
-    // overflows 32-bit microseconds
-    let timeout = Duration::from_micros(
-        u64::from(
-            connection
-                .request
-                .connection_timeout_multiplier
-                .multiplier(),
-        ) * u64::from(connection.response.o2t_actual_packet_interval),
-    );
+    let timeout = o2t_timeout(&connection.request, &connection.response);
     let mut deadline = Instant::now() + MIN_FIRST_PACKET_TIMEOUT.max(timeout);
     // None until the first accepted packet
     let mut last_sequence_number: Option<CipUdint> = None;

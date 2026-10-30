@@ -3,7 +3,6 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
 
 use tokio::time::Instant;
 
@@ -28,7 +27,8 @@ use crate::error::{Error, Result};
 use crate::explicit::connected::ExplicitConnection;
 use crate::message_router::{
     MessageRouter, class_instance_and_attribute, connection_failure_rejection,
-    network_connection_size, network_connection_type,
+    network_connection_size, network_connection_type, o2t_timeout,
+    successful_forward_close_response, successful_forward_open_response,
 };
 
 /// `message_router`, plus the class 3 Forward_Open, Forward_Close and requests of up to
@@ -183,17 +183,7 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             ));
         }
 
-        let mut forward_open_response = ForwardOpenResponse {
-            // Chosen by the target; the T->O id is the scanner's
-            o2t_network_connection_id: rand::random(),
-            t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
-            connection_triad: triad,
-            // Granted as requested
-            o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
-            t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
-            application_reply_size: 0,
-            application_reply: vec![],
-        };
+        let mut forward_open_response = successful_forward_open_response(&forward_open_request);
         // Each established connection has its own O->T id
         while established_connections.contains_key(&forward_open_response.o2t_network_connection_id)
         {
@@ -205,13 +195,7 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             o2t_api_us = forward_open_response.o2t_actual_packet_interval,
             "class 3 connection opened"
         );
-        let inactivity_timeout = Duration::from_micros(
-            u64::from(
-                forward_open_request
-                    .connection_timeout_multiplier
-                    .multiplier(),
-            ) * u64::from(forward_open_response.o2t_actual_packet_interval),
-        );
+        let inactivity_timeout = o2t_timeout(&forward_open_request, &forward_open_response);
         established_connections.insert(
             forward_open_response.o2t_network_connection_id,
             ExplicitConnection {
@@ -256,11 +240,7 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             connection_serial_number = triad.connection_serial_number,
             "class 3 connection closed"
         );
-        Ok(ForwardCloseResponse {
-            connection_triad: triad,
-            application_reply_size: 0,
-            application_reply: vec![],
-        })
+        Ok(successful_forward_close_response(triad))
     }
 
     /// Consumes a request on the established connection `connection_id`, when `originator_ip`
