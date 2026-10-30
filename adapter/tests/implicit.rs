@@ -372,6 +372,13 @@ async fn open_echo_and_close() {
             .expect("a Send RR Data reply carries a Message Router response")
             .is_success()
     );
+    timeout(PACKET_WAIT, async {
+        while scanner.device.idle_count.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("closing a connection idles its outputs");
     // The Connection Manager takes another connection
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
 }
@@ -382,7 +389,7 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
     let mut request = forward_open_request(1);
     // 5.12 s without outputs before the connection times out
     request.connection_timeout_multiplier = ConnectionTimeoutMultiplier::X512;
-    let reply = scanner.forward_open(request.clone()).await;
+    let reply = scanner.forward_open(request).await;
     let o2t_id = forward_open_response(&reply).o2t_network_connection_id;
     let o2t_endpoint = o2t_endpoint(&reply);
 
@@ -408,15 +415,6 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
         .await;
     scanner.recv_inputs(&resumed).await;
     assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);
-
-    let reply = scanner.request(&forward_close(&request)).await;
-    assert!(
-        reply
-            .response()
-            .expect("a Send RR Data reply carries a Message Router response")
-            .is_success()
-    );
-    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]

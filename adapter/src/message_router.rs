@@ -167,20 +167,15 @@ pub(crate) fn connection_failure_rejection(
     service: ServiceCode,
     extended_status: ConnectionManagerExtendedStatus,
 ) -> Rejection {
-    let mut bytes = Cursor::new(Vec::new());
+    // The status codes exist only as binrw magics, so the word is written, not cast
+    let mut word = Cursor::new([0u8; 2]);
     extended_status
-        .write_le(&mut bytes)
-        .expect("writing to memory does not fail");
-    let word = CipUint::from_le_bytes(
-        bytes
-            .into_inner()
-            .try_into()
-            .expect("an extended status is one word"),
-    );
+        .write_le(&mut word)
+        .expect("an extended status is one word");
     Rejection {
         service,
         general_status: ResponseStatusCode::ConnectionFailure,
-        additional_status: vec![word],
+        additional_status: vec![CipUint::from_le_bytes(word.into_inner())],
     }
 }
 
