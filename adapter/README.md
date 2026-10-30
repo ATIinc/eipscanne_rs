@@ -1,10 +1,10 @@
 # adapter
 
-The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818 and class 1 I/O connections over UDP (one at a time unless the device allows more). A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request. A device that also implements `implicit::ImplicitDevice` is served by `server::serve_implicit`, which adds class 1 Forward_Open, Forward_Close and the I/O:
+The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818, class 3 connections, and class 1 I/O connections over UDP (one at a time unless the device allows more). A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request. A Message Router wrapped in `explicit::connected::message_router::ConnectedMessageRouter` also takes class 3 connections. A device that also implements `implicit::ImplicitDevice` is wrapped in `implicit::message_router::ImplicitMessageRouter`, which adds class 1 Forward_Open, Forward_Close and the I/O:
 
-* `server`: accepts connections, registers sessions, hands Send RR Data to `explicit::unconnected`, and closes a session without encapsulation activity for its inactivity timeout.
-* `message_router`: the `MessageRouter` trait, the services a scanner's requests reach, and the paths, connection parameters and responses of those services.
-* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data.
+* `server`: accepts connections, registers sessions, hands Send RR Data to `explicit::unconnected` and Send Unit Data to `explicit::connected`, and closes a session without encapsulation activity for its inactivity timeout.
+* `message_router`: the `MessageRouter` trait, the services a scanner's requests reach.
+* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the class 3 connections.
 * `implicit`: the `ImplicitDevice` trait, and the opening, exchange and closing of the class 1 connections.
 * `packet`: reads and writes one encapsulation packet on a stream; `error_reply` refuses one; `decode_data` decodes the data of a Set or a connection's outputs.
 * `error`: the one error type of every fallible call.
@@ -26,18 +26,25 @@ cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
 
 ## Sample implicit adapter
 
-`examples/sample-implicit-adapter` serves an Identity object and the OpENer sample's assemblies on `127.0.0.1:44818`: configuration 151, output 150 and input 100, 32 bytes each, and the heartbeat point 254 of the EDS's Input Only connection. Its inputs echo the last run outputs. Two connections can be open at once; one owns the outputs. The scanner binds UDP 2222, so the adapter takes its outputs on 2223 and names that port in the Forward_Open reply:
+`examples/sample-implicit-adapter` serves an Identity object and the OpENer sample's assemblies on `127.0.0.1:44818`: configuration 151, output 150 and input 100, 32 bytes each, and the heartbeat point 254 of the EDS's Input Only connection. Its inputs echo the last run outputs, and it accepts a class 3 connection. Two class 1 connections can be open at once; one owns the outputs. The scanner binds UDP 2222, so the adapter takes its outputs on 2223 and names that port in the Forward_Open reply:
 
 ```text
 cargo run --example sample-implicit-adapter
 cargo run --example read-identity -- --host 127.0.0.1
+cargo run --example read-identity-connected -- --host 127.0.0.1
 cargo run --example opener-implicit -- --host 127.0.0.1
 cargo run --example opener-eds-implicit -- --host 127.0.0.1
 ```
 
 Both OpENer examples print their outputs echoed back as `RECEIVED` lines. With `--idle`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them. `opener-implicit --toggle-every 3` switches between run and idle every three cycles: while idle the echo holds the last run outputs and the adapter logs `outputs idle`.
 
-An Input Only connection takes its inputs on another port while an Exclusive Owner runs:
+A scanner can open the Input Only connection alone: its `SENT` lines are empty heartbeats, its `RECEIVED` lines the inputs:
+
+```text
+cargo run --example opener-eds-implicit -- --host 127.0.0.1 --connection 2
+```
+
+Beside an Exclusive Owner, the Input Only connection takes its inputs on another port:
 
 ```text
 cargo run --example opener-eds-implicit -- --host 127.0.0.1 --cycles 100

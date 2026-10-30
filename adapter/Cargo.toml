@@ -1,10 +1,10 @@
 [package]
 name = "adapter"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 publish = false
 license = "MIT OR Apache-2.0"
-description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device, and class 1 connections exchanging its assemblies"
+description = "The adapter side built on eipscanne_rs: an explicit messaging server that hands Get and Set requests to a device, unconnected or over a class 3 connection, and class 1 connections exchanging its assemblies"
 
 [dependencies]
 eipscanne_rs = { path = ".." }

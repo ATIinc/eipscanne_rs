@@ -1,7 +1,7 @@
 //! A sample adapter with an Identity object and the OpENer sample's assemblies: configuration 151,
 //! output 150 and input 100, 32 bytes each, and the heartbeat point 254 of an Input Only
-//! connection. Its inputs echo the last run outputs. Two connections can be open at once: one
-//! owns the outputs. Served on 127.0.0.1 until Ctrl-C.
+//! connection. Its inputs echo the last run outputs, and it accepts a class 3 connection. Two
+//! class 1 connections can be open at once: one owns the outputs. Served on 127.0.0.1 until Ctrl-C.
 //!
 //! The scanner binds UDP 2222, so on the same host the adapter takes its outputs on another port
 //! and names it in the Forward_Open reply:
@@ -9,6 +9,7 @@
 //! ```text
 //! cargo run --example sample-implicit-adapter
 //! cargo run --example read-identity -- --host 127.0.0.1
+//! cargo run --example read-identity-connected -- --host 127.0.0.1
 //! cargo run --example opener-implicit -- --host 127.0.0.1
 //! cargo run --example opener-eds-implicit -- --host 127.0.0.1
 //! ```
@@ -30,9 +31,11 @@ use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
+use adapter::explicit::connected::message_router::ConnectedMessageRouter;
+use adapter::implicit::message_router::ImplicitMessageRouter;
 use adapter::implicit::{ImplicitDevice, ImplicitOptions};
 use adapter::message_router::{ExplicitOptions, MessageRouter};
-use adapter::server::serve_implicit;
+use adapter::server::serve;
 
 const OUTPUT_INSTANCE: u16 = 150;
 const INPUT_INSTANCE: u16 = 100;
@@ -131,6 +134,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         args.host
     );
     tracing::info!(
+        "try: cargo run --example read-identity-connected -- --host {}",
+        args.host
+    );
+    tracing::info!(
         "try: cargo run --example opener-implicit -- --host {}",
         args.host
     );
@@ -142,18 +149,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         outputs: Mutex::new([0; DATA_SIZE]),
     };
 
+    let implicit_message_router = ImplicitMessageRouter::bind(
+        Arc::new(adapter),
+        listener.local_addr()?.ip(),
+        ImplicitOptions {
+            io_port: args.io_port,
+            // An Exclusive Owner and an Input Only connection
+            max_io_connections: 2,
+            ..Default::default()
+        },
+    )
+    .await?;
+    let message_router = ConnectedMessageRouter::new(Arc::new(implicit_message_router), 1);
+
     tokio::select! {
-        served = serve_implicit(
-            Arc::new(adapter),
-            listener,
-            ExplicitOptions::default(),
-            ImplicitOptions {
-                io_port: args.io_port,
-                // An Exclusive Owner and an Input Only connection
-                max_io_connections: 2,
-                ..Default::default()
-            },
-        ) => served?,
+        served = serve(Arc::new(message_router), listener, ExplicitOptions::default()) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");

@@ -1,4 +1,5 @@
-//! Explicit messaging: each request, decoded for its handler and answered.
+//! Explicit messaging: each unconnected or connected request, decoded for its handler and
+//! answered.
 
 use std::io::Cursor;
 use std::net::IpAddr;
@@ -7,16 +8,20 @@ use binrw::BinRead;
 
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
-use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
+};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::types::CipUint;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::message_router::{
-    MessageRouter, class_instance_and_attribute, message_router_response, rejection_response,
-};
+use crate::connection_helpers::class_instance_and_attribute;
+use crate::message_router::MessageRouter;
 
+pub mod connected;
 pub(crate) mod unconnected;
 
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items.
@@ -62,7 +67,7 @@ pub(crate) fn handle_message_router_request(
             | ServiceCode::SetAttributeSingle,
             None,
         ) => Err(ResponseStatusCode::PathSegmentError),
-        // Connection Manager: opens a class 1 connection for implicit I/O
+        // Connection Manager: opens a class 3 connection, or a class 1 one for implicit I/O
         (ServiceCode::ForwardOpen | ServiceCode::LargeForwardOpen, _) => {
             let is_large_forward_open = service == ServiceCode::LargeForwardOpen;
             let forward_open_request = match ForwardOpenRequest::read_le_args(
@@ -98,7 +103,7 @@ pub(crate) fn handle_message_router_request(
                 ),
             };
         }
-        // Connection Manager: closes a class 1 connection and its implicit I/O
+        // Connection Manager: closes a class 3 connection, or a class 1 one and its implicit I/O
         (ServiceCode::ForwardClose, _) => {
             let forward_close_request =
                 match ForwardCloseRequest::read_le(&mut Cursor::new(request_data)) {
@@ -152,4 +157,39 @@ fn decode_failure_response(service: ServiceCode, error: &binrw::Error) -> Messag
         "refused a Connection Manager request"
     );
     message_router_response(service, general_status, vec![], CipDataOpt::Raw(vec![]))
+}
+
+/// The response carrying `rejection` and the triad of the request it refuses
+fn rejection_response(rejection: Rejection, triad: ConnectionTriad) -> MessageRouterResponse {
+    tracing::warn!(
+        service = ?rejection.service,
+        general_status = ?rejection.general_status,
+        extended_status = ?rejection.extended_status(),
+        "refused a Connection Manager request"
+    );
+    message_router_response(
+        rejection.service,
+        rejection.general_status,
+        rejection.additional_status,
+        // Incomplete: Forward_Close refusals lack the trailing Remaining Path Size and reserved byte
+        CipDataOpt::Typed(Box::new(triad)),
+    )
+}
+
+/// The response to a `service` request
+pub(crate) fn message_router_response(
+    service: ServiceCode,
+    status: ResponseStatusCode,
+    additional_status: Vec<CipUint>,
+    data: CipDataOpt,
+) -> MessageRouterResponse {
+    MessageRouterResponse {
+        service_container: ServiceContainer::new_response(service),
+        response_data: ResponseData {
+            status,
+            additional_status_size: additional_status.len() as u8,
+            additional_status,
+            data,
+        },
+    }
 }

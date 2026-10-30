@@ -17,20 +17,29 @@ server::serve
    │        │  └─ MessageRouter::handle_get_* / handle_set_*
    │        └─ Forward_Open, Forward_Close
    │           └─ MessageRouter::handle_forward_open / _close
+   ├─ Send Unit Data
+   │  └─ explicit::connected::send_unit_data::handle_send_unit_data
+   │     ├─ MessageRouter::extract_t2o_info_from_connected_request  a discarded request has no reply
+   │     ├─ explicit::handle_message_router_request                 as above
+   │     └─ refuse_if_too_large
    ├─ any other command
    │  └─ packet::error_reply
    └─ packet::write_packet
+
+explicit::connected::message_router::ConnectedMessageRouter    a MessageRouter plus class 3 connections
+├─ Get, Set                                  the wrapped one's
+├─ handle_forward_open                       class 3, otherwise the wrapped one's
+├─ handle_forward_close                      its connections, otherwise the wrapped one's
+└─ extract_t2o_info_from_connected_request   its connections, otherwise the wrapped one's
 ```
 
 ## UDP: implicit messaging
 
 ```text
-server::serve_implicit
-├─ implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
-│  └─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
-└─ server::serve                                            the path above
+implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
+└─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
 
-ImplicitMessageRouter                        the MessageRouter behind serve_implicit
+ImplicitMessageRouter                        an ImplicitDevice plus class 1 connections
 ├─ Get, Set                                  the device's
 ├─ handle_forward_open
 │  ├─ implicit::connection::connection_from_forward_open

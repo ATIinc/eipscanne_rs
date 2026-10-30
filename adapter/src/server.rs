@@ -1,5 +1,5 @@
 //! The server: one task and one encapsulation session per TCP connection, handing Send RR Data to
-//! unconnected explicit messaging.
+//! unconnected and Send Unit Data to connected explicit messaging.
 
 use std::io::ErrorKind;
 use std::net::IpAddr;
@@ -18,24 +18,10 @@ use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
+use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
-use crate::implicit::message_router::ImplicitMessageRouter;
-use crate::implicit::{ImplicitDevice, ImplicitOptions};
 use crate::message_router::{ExplicitOptions, MessageRouter};
 use crate::packet::{error_reply, read_packet, write_packet};
-
-/// [`serve`], plus the class 1 connections `implicit_options` allows on an I/O socket at the
-/// listener's address
-pub async fn serve_implicit(
-    device: Arc<impl ImplicitDevice>,
-    listener: TcpListener,
-    explicit_options: ExplicitOptions,
-    implicit_options: ImplicitOptions,
-) -> Result<()> {
-    let message_router =
-        ImplicitMessageRouter::bind(device, listener.local_addr()?.ip(), implicit_options).await?;
-    serve(Arc::new(message_router), listener, explicit_options).await
-}
 
 /// Serves every connecting scanner with `message_router` until accepting fails; dropping it closes
 /// every connection
@@ -121,8 +107,10 @@ async fn serve_session(
                 }
                 reply
             }
-            // Send RR Data needs the registered session
-            EnIpCommand::SendRrData if !registered || header.session_handle != session_handle => {
+            // Send RR Data and Send Unit Data need the registered session
+            EnIpCommand::SendRrData | EnIpCommand::SendUnitData
+                if !registered || header.session_handle != session_handle =>
+            {
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
             EnIpCommand::SendRrData => handle_send_rr_data(
@@ -131,6 +119,18 @@ async fn serve_session(
                 &command_specific_data,
                 originator_ip,
             ),
+            EnIpCommand::SendUnitData => {
+                let Some(reply) = handle_send_unit_data(
+                    message_router.as_ref(),
+                    &header,
+                    &command_specific_data,
+                    originator_ip,
+                ) else {
+                    // A discarded request has no reply
+                    continue;
+                };
+                reply
+            }
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
         reply.header.sender_context = header.sender_context;
