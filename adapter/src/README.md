@@ -45,7 +45,7 @@ ImplicitMessageRouter                        the MessageRouter behind serve_impl
 │  ├─ implicit::connection::connection_from_forward_open
 │  └─ the I/O exchange task, one per connection
 │     ├─ O->T: implicit::o2t::receive_outputs
-│     │  ├─ check_output_packet, packet::decode_data, ImplicitDevice::consume_outputs
+│     │  ├─ extract_cip_io_data, packet::decode_data, ImplicitDevice::consume_outputs
 │     │  └─ ImplicitDevice::enter_idle       on a switch to idle and on the timeout
 │     └─ T->O: implicit::t2o::send_inputs
 │        └─ ImplicitDevice::produce_inputs, one packet every T->O interval
