@@ -135,8 +135,10 @@ impl SampleIoHubAdapter {
                 );
                 motor.move_number_ack = output.move_number;
                 motor.move_type_ack = output.move_type;
+                // A new homing move wipes the last one, finished or not
                 if output.move_type == MoveType::HomingMove as CipUsint {
                     motor.homing_since = Some(Instant::now());
+                    motor.has_homed = false;
                 }
             }
         }
