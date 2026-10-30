@@ -2,6 +2,7 @@
 //! unconnected explicit messaging.
 
 use std::io::ErrorKind;
+use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,8 +19,23 @@ use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
 use crate::explicit::unconnected::handle_send_rr_data;
+use crate::implicit::message_router::ImplicitMessageRouter;
+use crate::implicit::{ImplicitDevice, ImplicitOptions};
 use crate::message_router::{ExplicitOptions, MessageRouter};
 use crate::packet::{error_reply, read_packet, write_packet};
+
+/// [`serve`], plus the class 1 connections `implicit_options` allows on an I/O socket at the
+/// listener's address
+pub async fn serve_implicit(
+    device: Arc<impl ImplicitDevice>,
+    listener: TcpListener,
+    explicit_options: ExplicitOptions,
+    implicit_options: ImplicitOptions,
+) -> Result<()> {
+    let message_router =
+        ImplicitMessageRouter::bind(device, listener.local_addr()?.ip(), implicit_options).await?;
+    serve(Arc::new(message_router), listener, explicit_options).await
+}
 
 /// Serves every connecting scanner with `message_router` until accepting fails; dropping it closes
 /// every connection
@@ -38,7 +54,7 @@ pub async fn serve(
         sessions.spawn(
             async move {
                 if let Err(error) =
-                    serve_session(message_router, options, stream, session_handle).await
+                    serve_session(message_router, options, stream, session_handle, peer.ip()).await
                 {
                     tracing::warn!(%error, "connection ended");
                 }
@@ -49,14 +65,16 @@ pub async fn serve(
     }
 }
 
-/// Answers the packets of a scanner as session `session_handle` until it unregisters, closes the
-/// stream or has no encapsulation activity for the `options` inactivity timeout
+/// Answers the packets of the scanner at `originator_ip` as session `session_handle` until it
+/// unregisters, closes the stream or has no encapsulation activity for the `options` inactivity
+/// timeout
 #[tracing::instrument(skip(message_router, options, stream))]
 async fn serve_session(
     message_router: Arc<impl MessageRouter>,
     options: ExplicitOptions,
     mut stream: impl AsyncRead + AsyncWrite + Unpin,
     session_handle: CipUdint,
+    originator_ip: IpAddr,
 ) -> Result<()> {
     let inactivity_timeout = options
         .encapsulation_inactivity_timeout
@@ -107,9 +125,12 @@ async fn serve_session(
             EnIpCommand::SendRrData if !registered || header.session_handle != session_handle => {
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
-            EnIpCommand::SendRrData => {
-                handle_send_rr_data(message_router.as_ref(), &header, &command_specific_data)
-            }
+            EnIpCommand::SendRrData => handle_send_rr_data(
+                message_router.as_ref(),
+                &header,
+                &command_specific_data,
+                originator_ip,
+            ),
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
         reply.header.sender_context = header.sender_context;

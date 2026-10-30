@@ -1,15 +1,31 @@
 //! The Message Router a device implements and its explicit messaging options: the services a
-//! scanner's requests reach, and the paths and responses of those services.
+//! scanner's requests reach, and the paths, connection parameters and responses of those services.
 
+use std::io::Cursor;
+use std::net::IpAddr;
 use std::time::Duration;
 
+use binrw::BinWrite;
+
+use eipscanne_rs::cip::connection_manager::forward_close::{
+    ForwardCloseRequest, ForwardCloseResponse,
+};
+use eipscanne_rs::cip::connection_manager::forward_open::{
+    ForwardOpenRequest, ForwardOpenResponse,
+};
+use eipscanne_rs::cip::connection_manager::parameters::{
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
+};
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{
-    MessageRouterResponse, ResponseData, ResponseStatusCode,
+    MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
 use eipscanne_rs::cip::types::CipUint;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
@@ -53,6 +69,34 @@ pub trait MessageRouter: Send + Sync + 'static {
     ) -> Result<(), ResponseStatusCode> {
         Err(ResponseStatusCode::ServiceNotSupported)
     }
+
+    /// Implicit messaging only: Forward_Open and Large_Forward_Open, and the reply's Socket Address
+    /// Info items
+    fn handle_forward_open(
+        &self,
+        forward_open: ForwardOpenRequest,
+        _originator_ip: IpAddr,
+        _t2o_socket_addr_info: Option<SocketAddrInfo>,
+    ) -> Result<(ForwardOpenResponse, SocketAddrInfoItems), Rejection> {
+        Err(Rejection {
+            service: forward_open.service_code(),
+            general_status: ResponseStatusCode::ServiceNotSupported,
+            additional_status: vec![],
+        })
+    }
+
+    /// Implicit messaging only: Forward_Close
+    fn handle_forward_close(
+        &self,
+        _forward_close: ForwardCloseRequest,
+        _originator_ip: IpAddr,
+    ) -> Result<ForwardCloseResponse, Rejection> {
+        Err(Rejection {
+            service: ServiceCode::ForwardClose,
+            general_status: ResponseStatusCode::ServiceNotSupported,
+            additional_status: vec![],
+        })
+    }
 }
 
 /// The device's explicit messaging, fixed for the server's life
@@ -91,6 +135,43 @@ pub(crate) fn message_router_response(
     }
 }
 
+/// The response carrying `rejection` and the triad of the request it refuses
+pub(crate) fn rejection_response(
+    rejection: Rejection,
+    triad: ConnectionTriad,
+) -> MessageRouterResponse {
+    tracing::warn!(
+        service = ?rejection.service,
+        general_status = ?rejection.general_status,
+        extended_status = ?rejection.extended_status(),
+        "refused a Connection Manager request"
+    );
+    message_router_response(
+        rejection.service,
+        rejection.general_status,
+        rejection.additional_status,
+        // Incomplete: Forward_Close refusals lack the trailing Remaining Path Size and reserved byte
+        CipDataOpt::Typed(Box::new(triad)),
+    )
+}
+
+/// A Connection Manager refusal: Connection Failure with `extended_status` as the Additional Status
+pub(crate) fn connection_failure_rejection(
+    service: ServiceCode,
+    extended_status: ConnectionManagerExtendedStatus,
+) -> Rejection {
+    // The status codes exist only as binrw magics, so the word is written, not cast
+    let mut word = Cursor::new([0u8; 2]);
+    extended_status
+        .write_le(&mut word)
+        .expect("an extended status is one word");
+    Rejection {
+        service,
+        general_status: ResponseStatusCode::ConnectionFailure,
+        additional_status: vec![CipUint::from_le_bytes(word.into_inner())],
+    }
+}
+
 /// The class, instance and optional attribute of a logical path
 pub(crate) fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
     match path.segments.as_slice() {
@@ -120,5 +201,31 @@ pub(crate) fn segment_id(
         PathData::FormatAsU8(value) => Some(value.into()),
         PathData::FormatAsU16(value) => Some(value),
         PathData::ElectronicKey(_) => None,
+    }
+}
+
+/// The connection size of a direction
+pub(crate) fn network_connection_size(parameters: &NetworkConnectionParameters) -> u16 {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size().value(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size(),
+    }
+}
+
+/// Whether the connection size of a direction is fixed or variable
+pub(crate) fn network_connection_size_type(
+    parameters: &NetworkConnectionParameters,
+) -> ConnectionSizeType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size_type(),
+    }
+}
+
+/// The connection type of a direction
+pub(crate) fn network_connection_type(parameters: &NetworkConnectionParameters) -> ConnectionType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_type(),
     }
 }

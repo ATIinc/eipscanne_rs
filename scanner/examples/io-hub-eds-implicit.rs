@@ -1,12 +1,18 @@
-//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection, with the same assembly structs the
-//! explicit examples read and write. The connection comes from the hub's EDS file in
-//! `scanner/assemblies/io_hub`, and every input packet is decoded as an `InputAssemblyHub4E`. One
-//! motor's status is printed whenever it changes.
+//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection opened from the hub's EDS, decoding
+//! each input packet as the `InputAssemblyHub4E` that `io-hub-explicit-homing` reads, and prints
+//! one motor's status whenever it changes. The outputs are `OutputAssemblyHub4E::default()`,
+//! sent in run mode; `--toggle-every N` switches them between run and idle every N cycles.
 //!
-//! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
-//! sent in run mode unless `--idle` is given. `--host` has no default on purpose.
-//!
+//! `--host` has no default:
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
+//!
+//! Without a hub, run it against the adapter crate's sample, whose motors move in spurts:
+//!
+//! ```text
+//! cargo run --example sample-io-hub-adapter
+//! cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
+//! cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0 --toggle-every 400
+//! ```
 
 use std::fs::read_to_string;
 use std::io::Cursor;
@@ -16,7 +22,6 @@ use std::time::{Duration, Instant};
 use bilge::prelude::u4;
 use binrw::BinRead;
 use clap::Parser;
-use clap::builder::{BoolishValueParser, TypedValueParser};
 use tokio::net::UdpSocket;
 use tokio::signal::ctrl_c;
 use tokio::time::{interval, sleep_until};
@@ -83,18 +88,26 @@ struct Args {
     #[arg(long, default_value_t = 1000)]
     cycles: u32,
 
-    /// Send the outputs idle instead of in run mode, so the adapter does not apply them
+    /// Switch the outputs between run and idle every this many cycles, starting in run
     ///
-    /// Without it, every O->T packet is in run mode and the hub applies the outputs. With it, the
-    /// Run/Idle bit of the 32-bit header is cleared: the connection stays open and the hub holds
-    /// its outputs in their idle state.
-    #[arg(
-        long = "idle",
-        action = clap::ArgAction::SetTrue,
-        value_parser = BoolishValueParser::new()
-            .map(|idle| if idle { RunOrIdle::Idle } else { RunOrIdle::Run }),
-    )]
-    run_or_idle: RunOrIdle,
+    /// While idle, the Run/Idle bit of the 32-bit header is cleared: the connection stays open
+    /// and the hub holds its outputs in their idle state.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    toggle_every: Option<u32>,
+}
+
+impl Args {
+    /// Run, then idle and run in turn every `toggle_every` cycles
+    fn run_or_idle(&self, cycle: u32) -> RunOrIdle {
+        if self
+            .toggle_every
+            .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
+        {
+            RunOrIdle::Run
+        } else {
+            RunOrIdle::Idle
+        }
+    }
 }
 
 #[tokio::main]
@@ -171,14 +184,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ========= 3. Exchange I/O ============
-    // The outputs never change, so the CIP sequence count stays put after the first packet;
-    // every packet gets the next encapsulation sequence number, starting at a random one so a
-    // restarted scanner does not repeat what the adapter last saw
+    // The outputs never change, so the CIP sequence count advances only when the run/idle mode
+    // does; every packet gets the next encapsulation sequence number, starting at a random one so
+    // a restarted scanner does not repeat what the adapter last saw
     let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
-    let cip_sequence_count: u16 = 1;
+    let mut cip_sequence_count: u16 = 0;
+    let mut last_run_or_idle: Option<RunOrIdle> = None;
 
     let timeout: Duration = input_timeout(&connection);
     let mut last_sequence_number: Option<u32> = None;
@@ -197,12 +211,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     break;
                 }
                 cycle += 1;
+                let run_or_idle = args.run_or_idle(cycle);
+                if last_run_or_idle != Some(run_or_idle) {
+                    cip_sequence_count = cip_sequence_count.wrapping_add(1);
+                    println!("[{cycle:>4}] SENDING the outputs {run_or_idle:?}");
+                    last_run_or_idle = Some(run_or_idle);
+                }
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default())),
-                    args.run_or_idle,
+                    run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;

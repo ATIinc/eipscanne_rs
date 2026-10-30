@@ -10,7 +10,6 @@ repository root: `cargo run --example <name>`; `-- --help` lists its flags.
 | `read-identity-connected` | any class 3 adapter | explicit (connected) | no |
 | `opener-implicit` | OpENer | implicit | no |
 | `opener-eds-implicit` | OpENer, from its EDS | implicit | no |
-| `clearlink-explicit-outputs` | Teknic ClearLink | explicit | digital outputs |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E | explicit | a motor |
 | `io-hub-eds-implicit` | Teknic IO-HUB-4-E, from its EDS | implicit | no |
 | `flexi-net-implicit` | SICK flexi-net | implicit | safety logic inputs |
@@ -33,6 +32,7 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 ## OpENer
 
 OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100), idle ones too.
+The adapter crate's `sample-implicit-adapter` stands in for OpENer and echoes run outputs only.
 
 ### opener-implicit
 
@@ -47,21 +47,16 @@ unregister. `--toggle-every N` switches the outputs between run and idle every N
 
 ## Teknic
 
-### clearlink-explicit-outputs
-
-Sets one digital output of a ClearLink and checks it in the input assembly, using the assemblies
-of Teknic's
-[object reference](https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=18).
-
 ### io-hub-explicit-homing
 
 Homes one ClearPath-IP motor on an IO-HUB-4-E, then disables it however it ended, Ctrl+C
-included.
+included. The adapter crate's `sample-io-hub-adapter` stands in for the hub.
 
 ### io-hub-eds-implicit
 
 Opens the IO-HUB-4-E's connection from its EDS and prints one motor's status whenever it
-changes. Every output stays off; `--idle` sends them idle.
+changes. Every output stays off; `--toggle-every N` switches them between run and idle every N
+cycles. Against `sample-io-hub-adapter` the position moves in spurts while run and holds while idle.
 
 ## SICK
 
