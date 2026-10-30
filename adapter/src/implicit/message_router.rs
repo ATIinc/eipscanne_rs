@@ -214,15 +214,15 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         ))
     }
 
-    /// Closes the open connection `forward_close` names, when `originator_ip` opened it, and idles
-    /// its outputs
+    /// Closes the open connection `forward_close_request` names, when `originator_ip` opened it,
+    /// and idles its outputs
     fn handle_forward_close(
         &self,
-        forward_close: ForwardCloseRequest,
+        forward_close_request: ForwardCloseRequest,
         originator_ip: IpAddr,
     ) -> Result<ForwardCloseResponse, Rejection> {
         let service = ServiceCode::ForwardClose;
-        let triad = forward_close.connection_triad;
+        let triad = forward_close_request.connection_triad;
         let mut open_connections = self
             .open_connections
             .lock()
@@ -250,7 +250,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         open_connections.remove(&o2t_network_connection_id);
         tracing::info!(
             connection_serial_number = triad.connection_serial_number,
-            "connection closed"
+            "class 1 connection closed"
         );
         Ok(ForwardCloseResponse {
             connection_triad: triad,
