@@ -107,7 +107,7 @@ pub(crate) fn handle_message_router_request(
             message_router_response(service, ResponseStatusCode::Success, vec![], response_data)
         }
         Err(status) => {
-            tracing::warn!(?service, ?path_ids, ?status, "refused a request");
+            tracing::warn!(?service, ?path_ids, cip_path = ?request.request_data.cip_path, ?status, "refused a request");
             message_router_response(service, status, vec![], CipDataOpt::Raw(vec![]))
         }
     };
