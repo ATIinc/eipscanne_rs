@@ -10,7 +10,7 @@ use tokio::net::UdpSocket;
 use tokio::time::interval;
 
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
-use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
+use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
@@ -29,20 +29,10 @@ pub(crate) async fn send_inputs(
     )));
     // Starts at random and advances every packet
     let mut encapsulation_sequence_number: CipUdint = rand::random();
-    // Advances when the inputs change
+    // Advances when the inputs or their mode change
     let mut cip_sequence_count: CipUint = 0;
     let mut last_inputs: Option<Vec<u8>> = None;
-    // Always run mode
-    let output_control_header = match connection.t2o.real_time_format {
-        RealTimeFormat::Header32Bit => Some(
-            OutputControlHeader::builder()
-                .run_or_idle(RunOrIdle::Run)
-                .claim_output_ownership(false)
-                .ready_for_ownership_of_outputs(u2::new(0))
-                .build(),
-        ),
-        RealTimeFormat::Modeless | RealTimeFormat::ZeroLength | RealTimeFormat::Heartbeat => None,
-    };
+    let mut last_output_control_header: Option<OutputControlHeader> = None;
 
     loop {
         t2o_interval.tick().await;
@@ -63,9 +53,24 @@ pub(crate) async fn send_inputs(
             );
             continue;
         }
-        if last_inputs.as_ref() != Some(&inputs) {
+        let output_control_header = match connection.t2o.real_time_format {
+            RealTimeFormat::Header32Bit => Some(
+                OutputControlHeader::builder()
+                    .run_or_idle(device.read_run_or_idle(connection.t2o.instance))
+                    .claim_output_ownership(false)
+                    .ready_for_ownership_of_outputs(u2::new(0))
+                    .build(),
+            ),
+            RealTimeFormat::Modeless | RealTimeFormat::ZeroLength | RealTimeFormat::Heartbeat => {
+                None
+            }
+        };
+        if last_inputs.as_ref() != Some(&inputs)
+            || output_control_header != last_output_control_header
+        {
             cip_sequence_count = cip_sequence_count.wrapping_add(1);
             last_inputs = Some(inputs.clone());
+            last_output_control_header = output_control_header;
         }
 
         let packet = EnIpIoPacket::new(

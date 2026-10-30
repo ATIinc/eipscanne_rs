@@ -20,6 +20,7 @@ use std::ops::RangeInclusive;
 use binrw::{BinRead, BinWrite};
 
 use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 
 use crate::message_router::MessageRouter;
@@ -49,6 +50,11 @@ pub trait ImplicitDevice: MessageRouter {
     /// Idles the outputs of `instance` until the next `consume_outputs`: a switch to idle, a
     /// timeout or a Forward_Close
     fn enter_idle(&self, _instance: u16) {}
+
+    /// The device's run or idle mode, sent in the T->O 32-bit header of `instance`
+    fn read_run_or_idle(&self, _instance: u16) -> RunOrIdle {
+        RunOrIdle::Run
+    }
 }
 
 /// The device's class 1 connections, as its EDS declares them, and the UDP port of their I/O
