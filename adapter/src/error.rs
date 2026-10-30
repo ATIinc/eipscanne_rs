@@ -18,7 +18,7 @@ pub enum Error {
         header: EncapsulationHeader,
         error: binrw::Error,
     },
-    /// A packet that is not the next of its connection; it is discarded
+    /// A packet its connection discards, and why
     UnexpectedPacket(String),
 }
 

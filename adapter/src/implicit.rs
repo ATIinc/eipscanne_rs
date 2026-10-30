@@ -30,7 +30,7 @@ pub(crate) mod message_router;
 mod o2t;
 mod t2o;
 
-/// A [`MessageRouter`] that also exchanges assemblies over a class 1 connection; calls can overlap
+/// A [`MessageRouter`] that also exchanges assemblies over class 1 connections; calls can overlap
 pub trait ImplicitDevice: MessageRouter {
     /// The outputs an O->T packet carries
     type Outputs: for<'a> BinRead<Args<'a> = ()>;

@@ -48,7 +48,7 @@ pub(crate) struct ImplicitMessageRouter<D> {
     open_connections: Arc<Mutex<HashMap<CipUdint, OpenConnection>>>,
     max_io_connections: usize,
     packet_interval: RangeInclusive<u32>,
-    /// Dropping it stops the routing task, which closes every connection
+    /// Aborts the routing task when the Message Router drops; every connection then closes
     _output_routing_task: AbortOnDropHandle<()>,
 }
 
@@ -151,7 +151,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             ));
         }
 
-        // Checks the Forward_Open against the device's assemblies
+        // Checks its parameters, path and sizes against the device
         let mut connection = connection_from_forward_open(
             self.device.as_ref(),
             forward_open_request,

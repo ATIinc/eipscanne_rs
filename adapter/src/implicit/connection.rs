@@ -29,8 +29,8 @@ use crate::message_router::{
     network_connection_type, segment_id,
 };
 
-/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, then per
-/// direction where the I/O comes from or goes and its assembly (from the device)
+/// What the I/O exchange task runs on: the Forward_Open request and response, then per direction
+/// where the I/O comes from or goes and its assembly (from the device)
 #[derive(Debug)]
 pub(crate) struct ImplicitConnection {
     pub request: ForwardOpenRequest,
@@ -54,7 +54,7 @@ pub(crate) struct ConnectionPoint {
 }
 
 /// What the Message Router keeps of a connection: the triad a Forward_Close names, the IP address
-/// that opened it, and the sender its I/O exchange task receives from, which dropping it closes
+/// that opened it, the outputs it owns, and the sender whose drop closes it
 pub(crate) struct OpenConnection {
     pub connection_triad: ConnectionTriad,
     pub originator_ip: IpAddr,

@@ -50,7 +50,7 @@ const T2O_CONNECTION_SIZE: u16 = 6;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
-/// Implicit messaging only: echoes its outputs as its inputs and counts how often they stop
+/// Implicit messaging only: echoes its outputs as its inputs and counts its `enter_idle` calls
 struct EchoDevice {
     outputs: Mutex<[u8; DATA_SIZE as usize]>,
     idle_count: AtomicUsize,
@@ -193,7 +193,7 @@ impl Scanner {
         while self.next_inputs().await != inputs {}
     }
 
-    /// Sends an O->T packet of connection `o2t_id` to `o2t_endpoint`, in run mode when `run`
+    /// Sends an O->T packet of connection `o2t_id` to `o2t_endpoint`, in `run_or_idle` mode
     async fn send_outputs(
         &self,
         o2t_endpoint: SocketAddrV4,
