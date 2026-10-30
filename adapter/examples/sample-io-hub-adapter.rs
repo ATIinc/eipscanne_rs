@@ -95,11 +95,12 @@ struct Motor {
     position: CipDint,
 }
 
-/// The last outputs, the four motors and the last spurt step
+/// The last outputs, the four motors, whether a class 1 connection runs and the last spurt step
 #[derive(Default)]
 struct Hub {
     outputs: OutputAssemblyHub4E,
     motors: [Motor; 4],
+    running: bool,
     spurt_step: u128,
 }
 
@@ -258,6 +259,10 @@ impl ImplicitDevice for SampleIoHubAdapter {
 
     fn consume_outputs(&self, _instance: u16, outputs: OutputAssemblyHub4E) {
         self.apply_outputs(outputs);
+        self.hub
+            .lock()
+            .expect("nothing panics while holding the hub lock")
+            .running = true;
     }
 
     fn produce_inputs(&self, _instance: u16) -> InputAssemblyHub4E {
@@ -266,7 +271,7 @@ impl ImplicitDevice for SampleIoHubAdapter {
             .lock()
             .expect("nothing panics while holding the hub lock");
         let elapsed = self.started.elapsed().as_millis();
-        let moving = elapsed % SPURT_PERIOD.as_millis() < SPURT_TIME.as_millis();
+        let moving = hub.running && elapsed % SPURT_PERIOD.as_millis() < SPURT_TIME.as_millis();
         let step = elapsed / SPURT_STEP_TIME.as_millis();
         if moving && step != hub.spurt_step {
             hub.spurt_step = step;
@@ -275,6 +280,13 @@ impl ImplicitDevice for SampleIoHubAdapter {
             }
         }
         Self::inputs(&mut hub, moving)
+    }
+
+    fn enter_idle(&self, _instance: u16) {
+        self.hub
+            .lock()
+            .expect("nothing panics while holding the hub lock")
+            .running = false;
     }
 }
 

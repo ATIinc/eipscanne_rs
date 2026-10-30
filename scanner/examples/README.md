@@ -56,7 +56,7 @@ included. The adapter crate's `sample-io-hub-adapter` stands in for the hub.
 
 Opens the IO-HUB-4-E's connection from its EDS and prints one motor's status whenever it
 changes. Every output stays off; `--idle` sends them idle. Against `sample-io-hub-adapter` the
-position moves in spurts.
+position moves in spurts; with `--idle` it holds.
 
 ## SICK
 
