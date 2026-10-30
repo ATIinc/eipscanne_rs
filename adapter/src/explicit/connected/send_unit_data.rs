@@ -28,8 +28,8 @@ pub(crate) fn handle_send_unit_data(
     message_router: &impl MessageRouter,
     options: ExplicitOptions,
     header: &EncapsulationHeader,
-    originator_ip: IpAddr,
     command_specific_data: &CommandSpecificData,
+    originator_ip: IpAddr,
     class_3_connection: &mut Option<ExplicitConnection>,
 ) -> Option<EnIpPacket> {
     let CommandSpecificData::SendUnitData(request_unit_data) = command_specific_data else {
