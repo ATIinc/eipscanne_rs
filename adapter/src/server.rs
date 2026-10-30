@@ -128,8 +128,8 @@ async fn serve_session(
             EnIpCommand::SendRrData => handle_send_rr_data(
                 message_router.as_ref(),
                 &header,
-                originator_ip,
                 &command_specific_data,
+                originator_ip,
             ),
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
