@@ -43,10 +43,14 @@ const SESSION_HANDLE: CipUdint = 1;
 const T2O_NETWORK_CONNECTION_ID: CipUdint = 0x1234_5678;
 const OUTPUT_INSTANCE: u8 = 150;
 const INPUT_INSTANCE: u8 = 100;
+/// The O->T point of a heartbeat connection: no outputs
+const HEARTBEAT_INSTANCE: u8 = 254;
 /// Data bytes of each assembly; 10 and 6 bytes with the overhead of each direction
 const DATA_SIZE: u16 = 4;
 const O2T_CONNECTION_SIZE: u16 = 10;
 const T2O_CONNECTION_SIZE: u16 = 6;
+/// A heartbeat carries the sequence count only
+const HEARTBEAT_CONNECTION_SIZE: u16 = 2;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
@@ -66,6 +70,7 @@ impl ImplicitDevice for EchoDevice {
         match u8::try_from(instance) {
             Ok(OUTPUT_INSTANCE) => Some((DATA_SIZE, RealTimeFormat::Header32Bit)),
             Ok(INPUT_INSTANCE) => Some((DATA_SIZE, RealTimeFormat::Modeless)),
+            Ok(HEARTBEAT_INSTANCE) => Some((0, RealTimeFormat::Heartbeat)),
             _ => None,
         }
     }
@@ -542,4 +547,20 @@ async fn a_connection_without_outputs_times_out_and_another_opens() {
     tokio::time::sleep(Duration::from_secs(11)).await;
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
     assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_heartbeat_connection_has_no_outputs_to_idle() {
+    let mut scanner = Scanner::connect().await;
+    let heartbeat_request = ForwardOpenRequest {
+        o2t_network_connection_parameters: parameters(HEARTBEAT_CONNECTION_SIZE),
+        connection_path: CipPath::new_assembly_connection(151, HEARTBEAT_INSTANCE, INPUT_INSTANCE),
+        ..forward_open_request(1)
+    };
+    forward_open_response(&scanner.forward_open(heartbeat_request).await);
+
+    // Past the first heartbeat timeout
+    tokio::time::sleep(Duration::from_secs(11)).await;
+    forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 0);
 }

@@ -1,6 +1,6 @@
 //! A `ConnectionN` of a device's EDS file (read by `eds_parser`) as the Forward_Open that opens
-//! it, or why this scanner cannot open it: it opens class 1, cyclic, exclusive-owner connections,
-//! point-to-point both ways. The caller sets what an EDS does not describe:
+//! it, or why this scanner cannot open it: it opens class 1, cyclic, exclusive-owner or input-only
+//! connections, point-to-point both ways. The caller sets what an EDS does not describe:
 //!
 //! ```text
 //! let connection: &ConnectionEntry = &eds.connections[&first_openable_connection(&eds, None)?];
@@ -14,7 +14,7 @@
 //!     ..forward_open_request(&eds, connection, None)?
 //! };
 //! let (o2t, t2o) = (o2t_real_time_format(connection)?, t2o_real_time_format(connection)?);
-//! forward_open_implicit(&mut session, request, o2t, t2o)
+//! forward_open_implicit(&mut session, request, o2t, t2o, ETHERNET_IP_IO_UDP_PORT)
 //! ```
 
 use std::io::Cursor;
@@ -97,13 +97,15 @@ pub fn forward_open_request(
     let trigger_and_transport = connection.trigger_and_transport;
     let connection_parameters = connection.connection_parameters;
 
-    // 0x04010002: class 1 (bit 1), cyclic (bit 16), exclusive owner (bit 26)
+    // 0x04010002: class 1 (bit 1), cyclic (bit 16), exclusive owner (bit 26) or input only
+    // (bit 25)
+    let application_types = trigger_and_transport.application_types();
     if !(trigger_and_transport.transport_classes().class_1()
         && trigger_and_transport.triggers().cyclic()
-        && trigger_and_transport.application_types().exclusive_owner())
+        && (application_types.exclusive_owner() || application_types.input_only()))
     {
         return Err(Error::UnsupportedConnection(format!(
-            "this scanner opens class 1, cyclic, exclusive-owner connections; this one offers {trigger_and_transport:?}"
+            "this scanner opens class 1, cyclic, exclusive-owner or input-only connections; this one offers {trigger_and_transport:?}"
         )));
     }
     // 0x44440405: point-to-point O->T (bit 18) and T->O (bit 22), scheduled priority O->T
@@ -126,6 +128,11 @@ pub fn forward_open_request(
     })?;
     let o2t_real_time_format: RealTimeFormat = o2t_real_time_format(connection)?;
     let t2o_real_time_format: RealTimeFormat = t2o_real_time_format(connection)?;
+    if application_types.input_only() && o2t_real_time_format != RealTimeFormat::Heartbeat {
+        return Err(Error::UnsupportedConnection(format!(
+            "an input-only connection sends heartbeats O->T; this one offers {o2t_real_time_format:?}"
+        )));
+    }
 
     // Param1,32,Assem150, (fields 3-5): O->T every Param1's default microseconds, 32 bytes
     let o2t_requested_packet_interval: CipUdint = eds

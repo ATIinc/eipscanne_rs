@@ -1,6 +1,7 @@
 //! A sample adapter with an Identity object and the OpENer sample's assemblies: configuration 151,
-//! output 150 and input 100, 32 bytes each. Its inputs echo the last run outputs, and it accepts a
-//! class 3 connection. Served on 127.0.0.1 until Ctrl-C.
+//! output 150 and input 100, 32 bytes each, and the heartbeat point 254 of an Input Only
+//! connection. Its inputs echo the last run outputs, and it accepts a class 3 connection. Two
+//! class 1 connections can be open at once: one owns the outputs. Served on 127.0.0.1 until Ctrl-C.
 //!
 //! The scanner binds UDP 2222, so on the same host the adapter takes its outputs on another port
 //! and names it in the Forward_Open reply:
@@ -36,6 +37,8 @@ use adapter::server::serve_implicit;
 
 const OUTPUT_INSTANCE: u16 = 150;
 const INPUT_INSTANCE: u16 = 100;
+/// The O->T point of an Input Only connection: heartbeats, no data
+const INPUT_ONLY_HEARTBEAT_INSTANCE: u16 = 254;
 /// Data bytes of each assembly
 const DATA_SIZE: usize = 32;
 
@@ -89,6 +92,7 @@ impl ImplicitDevice for SampleImplicitAdapter {
             // A run/idle header on the outputs only, like OpENer
             OUTPUT_INSTANCE => Some((DATA_SIZE as u16, RealTimeFormat::Header32Bit)),
             INPUT_INSTANCE => Some((DATA_SIZE as u16, RealTimeFormat::Modeless)),
+            INPUT_ONLY_HEARTBEAT_INSTANCE => Some((0, RealTimeFormat::Heartbeat)),
             _ => None,
         }
     }
@@ -153,6 +157,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             ImplicitOptions {
                 io_port: args.io_port,
+                // An Exclusive Owner and an Input Only connection
+                max_io_connections: 2,
                 ..Default::default()
             },
         ) => served?,
