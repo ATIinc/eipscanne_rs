@@ -72,8 +72,8 @@ pub trait MessageRouter: Send + Sync + 'static {
         Err(ResponseStatusCode::ServiceNotSupported)
     }
 
-    /// Implicit messaging only: Forward_Open and Large_Forward_Open, and the reply's Socket Address
-    /// Info items
+    /// Connections only: Forward_Open and Large_Forward_Open, and the reply's Socket Address Info
+    /// items
     fn handle_forward_open(
         &self,
         forward_open_request: ForwardOpenRequest,
@@ -87,7 +87,7 @@ pub trait MessageRouter: Send + Sync + 'static {
         })
     }
 
-    /// Implicit messaging only: Forward_Close
+    /// Connections only: Forward_Close
     fn handle_forward_close(
         &self,
         _forward_close_request: ForwardCloseRequest,
