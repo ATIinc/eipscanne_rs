@@ -38,7 +38,13 @@ cargo run --example opener-eds-implicit -- --host 127.0.0.1
 
 Both OpENer examples print their outputs echoed back as `RECEIVED` lines. With `--idle`, `opener-eds-implicit` sends its outputs idle and the adapter does not apply them. `opener-implicit --toggle-every 3` switches between run and idle every three cycles: while idle the echo holds the last run outputs and the adapter logs `outputs idle`.
 
-An Input Only connection takes its inputs on another port while an Exclusive Owner runs:
+A scanner can open the Input Only connection alone: its `SENT` lines are empty heartbeats, its `RECEIVED` lines the inputs:
+
+```text
+cargo run --example opener-eds-implicit -- --host 127.0.0.1 --connection 2
+```
+
+Beside an Exclusive Owner, the Input Only connection takes its inputs on another port:
 
 ```text
 cargo run --example opener-eds-implicit -- --host 127.0.0.1 --cycles 100
