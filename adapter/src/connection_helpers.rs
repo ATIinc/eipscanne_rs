@@ -10,13 +10,15 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionType, NetworkConnectionParameters,
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
 use eipscanne_rs::cip::types::CipUint;
+
+// ======= Responses ========
 
 /// The response accepting `forward_open_request` as it asks
 pub(crate) fn successful_forward_open_response(
@@ -52,11 +54,23 @@ pub(crate) fn connection_failure_rejection(
     }
 }
 
+// ======= Connection parameters ========
+
 /// The connection size of a direction
 pub(crate) fn network_connection_size(parameters: &NetworkConnectionParameters) -> u16 {
     match parameters {
         NetworkConnectionParameters::Standard(parameters) => parameters.connection_size().value(),
         NetworkConnectionParameters::Large(parameters) => parameters.connection_size(),
+    }
+}
+
+/// Whether the connection size of a direction is fixed or variable
+pub(crate) fn network_connection_size_type(
+    parameters: &NetworkConnectionParameters,
+) -> ConnectionSizeType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size_type(),
     }
 }
 
@@ -67,6 +81,8 @@ pub(crate) fn network_connection_type(parameters: &NetworkConnectionParameters) 
         NetworkConnectionParameters::Large(parameters) => parameters.connection_type(),
     }
 }
+
+// ======= O->T timeout ========
 
 /// The timeout multiplier times the O->T actual packet interval
 pub(crate) fn o2t_timeout(
@@ -82,6 +98,8 @@ pub(crate) fn o2t_timeout(
         ) * u64::from(forward_open_response.o2t_actual_packet_interval),
     )
 }
+
+// ======= Ids in paths ========
 
 /// The class, instance and optional attribute of a logical path
 pub(crate) fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
