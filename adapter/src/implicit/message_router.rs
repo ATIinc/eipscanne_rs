@@ -275,7 +275,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             let output_instance = current.output_instance;
             // Dropping it stops the I/O exchange task
             open_connections.remove(&o2t_network_connection_id);
-            self.device.idle_outputs(output_instance);
+            self.device.enter_idle(output_instance);
             tracing::info!(
                 connection_serial_number = triad.connection_serial_number,
                 "connection closed"

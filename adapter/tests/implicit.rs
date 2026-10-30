@@ -84,7 +84,7 @@ impl ImplicitDevice for EchoDevice {
             .expect("nothing panics while holding the outputs lock")
     }
 
-    fn idle_outputs(&self, _instance: u16) {
+    fn enter_idle(&self, _instance: u16) {
         self.idle_count.fetch_add(1, Ordering::SeqCst);
     }
 }
@@ -417,6 +417,31 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
             .is_success()
     );
     assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn a_connection_is_idle_until_the_scanner_sends_run() {
+    let mut scanner = Scanner::connect().await;
+    let mut request = forward_open_request(1);
+    // 5.12 s without outputs before the connection times out
+    request.connection_timeout_multiplier = ConnectionTimeoutMultiplier::X512;
+    let reply = scanner.forward_open(request).await;
+    let o2t_id = forward_open_response(&reply).o2t_network_connection_id;
+    let o2t_endpoint = o2t_endpoint(&reply);
+
+    let running = [1, 1, 1, 1];
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 1, 1, RunOrIdle::Idle, &running)
+        .await;
+    for _ in 0..5 {
+        assert_eq!(scanner.next_inputs().await, [0; 4]);
+    }
+    // Run with the same CIP sequence count
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 2, 1, RunOrIdle::Run, &running)
+        .await;
+    scanner.recv_inputs(&running).await;
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 0);
 }
 
 #[tokio::test]
