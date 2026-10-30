@@ -9,7 +9,7 @@ use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOU
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::explicit::connected::ExplicitConnection;
-use crate::explicit::handle_request;
+use crate::explicit::handle_message_router_request;
 use crate::message_router::{ExplicitOptions, MessageRouter};
 use crate::packet::error_reply;
 
@@ -21,17 +21,17 @@ pub(crate) fn handle_send_rr_data(
     options: ExplicitOptions,
     header: &EncapsulationHeader,
     originator_ip: IpAddr,
-    command_specific_data: Option<&CommandSpecificData>,
+    command_specific_data: &CommandSpecificData,
     class_3_connection: &mut Option<ExplicitConnection>,
 ) -> EnIpPacket {
-    let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
+    let CommandSpecificData::SendRrData(request_rr_data) = command_specific_data else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
     let CipMessage::Request(request) = &request_rr_data.cip_message else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
 
-    let (response, socket_addr_info_items) = handle_request(
+    let (response, socket_addr_info_items) = handle_message_router_request(
         message_router,
         options,
         request,

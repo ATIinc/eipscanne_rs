@@ -29,7 +29,7 @@ pub(crate) mod unconnected;
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items; a
 /// class 3 Forward_Open and Forward_Close open and close `class_3_connection` when `options` accept
 /// explicit connections. Single services need an attribute, All services none
-pub(crate) fn handle_request(
+pub(crate) fn handle_message_router_request(
     message_router: &impl MessageRouter,
     options: ExplicitOptions,
     request: &MessageRouterRequest,

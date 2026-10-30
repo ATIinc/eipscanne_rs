@@ -14,7 +14,7 @@ use eipscanne_rs::eip::command::{CommandSpecificData, UnitPacketData};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::explicit::connected::ExplicitConnection;
-use crate::explicit::handle_request;
+use crate::explicit::handle_message_router_request;
 use crate::message_router::{
     ExplicitOptions, MessageRouter, message_router_response, network_connection_size,
 };
@@ -29,10 +29,10 @@ pub(crate) fn handle_send_unit_data(
     options: ExplicitOptions,
     header: &EncapsulationHeader,
     originator_ip: IpAddr,
-    command_specific_data: Option<&CommandSpecificData>,
+    command_specific_data: &CommandSpecificData,
     class_3_connection: &mut Option<ExplicitConnection>,
 ) -> Option<EnIpPacket> {
-    let Some(CommandSpecificData::SendUnitData(request_unit_data)) = command_specific_data else {
+    let CommandSpecificData::SendUnitData(request_unit_data) = command_specific_data else {
         tracing::warn!("discarded a Send Unit Data packet that did not decode");
         return None;
     };
@@ -57,7 +57,7 @@ pub(crate) fn handle_send_unit_data(
         network_connection_size(&connection.request.t2o_network_connection_parameters);
 
     // Over a connection: no Socket Address Info
-    let (response, _) = handle_request(
+    let (response, _) = handle_message_router_request(
         message_router,
         options,
         request,

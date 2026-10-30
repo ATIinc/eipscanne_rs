@@ -4,11 +4,12 @@
 use std::io::ErrorKind;
 use std::net::IpAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
-use tokio::time::{Instant, timeout_at};
+use tokio::time::{Instant, timeout};
 use tracing::Instrument;
 
 use eipscanne_rs::cip::types::CipUdint;
@@ -77,29 +78,34 @@ async fn serve_session(
     session_handle: CipUdint,
     originator_ip: IpAddr,
 ) -> Result<()> {
+    let inactivity_timeout = options
+        .encapsulation_inactivity_timeout
+        .unwrap_or(Duration::MAX);
     let mut registered = false;
     let mut class_3_connection: Option<ExplicitConnection> = None;
     loop {
-        let packet = match options.encapsulation_inactivity_timeout {
-            Some(timeout) => {
-                let inactivity_start = match &class_3_connection {
-                    // An open class 3 connection is encapsulation activity until it times out
-                    Some(connection) => connection.deadline().max(Instant::now()),
-                    None => Instant::now(),
-                };
-                timeout_at(inactivity_start + timeout, read_packet(&mut stream)).await
-            }
-            None => Ok(read_packet(&mut stream).await),
+        // An open class 3 connection is encapsulation activity until it times out
+        let class_3_time_left = match &class_3_connection {
+            Some(connection) => connection
+                .deadline()
+                .saturating_duration_since(Instant::now()),
+            None => Duration::ZERO,
         };
-        let Ok(packet) = packet else {
+        let Ok(packet) = timeout(
+            class_3_time_left.saturating_add(inactivity_timeout),
+            read_packet(&mut stream),
+        )
+        .await
+        else {
             tracing::warn!("the session timed out: no encapsulation activity in time");
             return Ok(());
         };
         let (header, command_specific_data) = match packet {
-            Ok(packet) => (packet.header, Some(packet.command_specific_data)),
+            Ok(packet) => (packet.header, packet.command_specific_data),
+            // Answered as a packet without data
             Err(Error::Undecodable { header, error }) => {
                 tracing::warn!(%error, "packet did not decode");
-                (header, None)
+                (header, CommandSpecificData::NoData)
             }
             Err(Error::Io(error)) if error.kind() == ErrorKind::UnexpectedEof => {
                 tracing::info!("scanner closed the stream");
@@ -122,11 +128,8 @@ async fn serve_session(
                 continue;
             }
             EnIpCommand::RegisterSession => {
-                let reply = handle_register_session(
-                    &header,
-                    session_handle,
-                    command_specific_data.as_ref(),
-                );
+                let reply =
+                    handle_register_session(session_handle, &header, &command_specific_data);
                 if reply.header.status_code == EncapsStatusCode::Success {
                     tracing::info!("session registered");
                     registered = true;
@@ -148,7 +151,7 @@ async fn serve_session(
                     options,
                     &header,
                     originator_ip,
-                    command_specific_data.as_ref(),
+                    &command_specific_data,
                     &mut class_3_connection,
                 )
             }
@@ -160,7 +163,7 @@ async fn serve_session(
                     options,
                     &header,
                     originator_ip,
-                    command_specific_data.as_ref(),
+                    &command_specific_data,
                     &mut class_3_connection,
                 ) else {
                     // A discarded request has no reply
@@ -177,11 +180,11 @@ async fn serve_session(
 
 /// The Register Session reply granting `session_handle`, or refusing another protocol version with ours
 fn handle_register_session(
-    header: &EncapsulationHeader,
     session_handle: CipUdint,
-    command_specific_data: Option<&CommandSpecificData>,
+    header: &EncapsulationHeader,
+    command_specific_data: &CommandSpecificData,
 ) -> EnIpPacket {
-    let Some(CommandSpecificData::RegisterSession(register_data)) = command_specific_data else {
+    let CommandSpecificData::RegisterSession(register_data) = command_specific_data else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
     let mut reply = EnIpPacket::new_registration();

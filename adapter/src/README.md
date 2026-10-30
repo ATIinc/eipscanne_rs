@@ -12,7 +12,7 @@ server::serve
    │  └─ server::handle_register_session
    ├─ Send RR Data
    │  └─ explicit::unconnected::handle_send_rr_data
-   │     └─ explicit::handle_request
+   │     └─ explicit::handle_message_router_request
    │        ├─ Get, Set
    │        │  └─ MessageRouter::handle_get_* / handle_set_*
    │        ├─ class 3 Forward_Open
@@ -24,7 +24,7 @@ server::serve
    ├─ Send Unit Data
    │  └─ explicit::connected::send_unit_data::handle_send_unit_data
    │     ├─ consume_request                  a discarded request has no reply
-   │     ├─ explicit::handle_request         as above
+   │     ├─ explicit::handle_message_router_request  as above
    │     └─ reply_unit_data
    ├─ any other command
    │  └─ packet::error_reply
