@@ -17,6 +17,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RedundantOwner,
     StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
+use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
@@ -32,6 +33,7 @@ use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
+use adapter::explicit::connected::message_router::ConnectedMessageRouter;
 use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::{read_packet, write_packet};
 use adapter::server::serve;
@@ -55,28 +57,21 @@ impl MessageRouter for SampleDevice {
     }
 }
 
-/// A registered session to a `SampleDevice`
+/// A registered session to a server
 struct Scanner {
     stream: TcpStream,
 }
 
 impl Scanner {
-    /// Serves a `SampleDevice` on the loopback interface and registers a session with it
-    async fn connect(accepts_explicit_connections: bool) -> Self {
+    /// Serves `message_router` on the loopback interface and registers a session with it
+    async fn connect(message_router: Arc<impl MessageRouter>) -> Self {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
             .await
             .expect("port 0 lets the OS pick a free loopback port");
         let address = listener
             .local_addr()
             .expect("a bound listener has a local address");
-        tokio::spawn(serve(
-            Arc::new(SampleDevice),
-            listener,
-            ExplicitOptions {
-                accepts_explicit_connections,
-                ..Default::default()
-            },
-        ));
+        tokio::spawn(serve(message_router, listener, ExplicitOptions::default()));
 
         let mut scanner = Scanner {
             stream: TcpStream::connect(address)
@@ -234,7 +229,11 @@ fn connected_reply_data(reply: &EnIpPacket, cip_sequence_count: CipUint) -> Vec<
 
 #[tokio::test]
 async fn open_request_and_close() {
-    let mut scanner = Scanner::connect(true).await;
+    let mut scanner = Scanner::connect(Arc::new(ConnectedMessageRouter::new(
+        Arc::new(SampleDevice),
+        1,
+    )))
+    .await;
     let request = forward_open_request(1);
 
     let o2t_id = scanner.forward_open(request.clone()).await;
@@ -255,7 +254,7 @@ async fn open_request_and_close() {
 
 #[tokio::test]
 async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
-    let mut scanner = Scanner::connect(false).await;
+    let mut scanner = Scanner::connect(Arc::new(SampleDevice)).await;
 
     let reply = scanner
         .request(&RequestObjectAssembly::new_forward_open(
@@ -267,5 +266,28 @@ async fn a_device_that_does_not_accept_explicit_connections_refuses_class_3() {
     assert_eq!(
         response(&reply).response_data.status,
         ResponseStatusCode::ServiceNotSupported
+    );
+}
+
+#[tokio::test]
+async fn a_second_forward_open_is_refused() {
+    let mut scanner = Scanner::connect(Arc::new(ConnectedMessageRouter::new(
+        Arc::new(SampleDevice),
+        1,
+    )))
+    .await;
+    scanner.forward_open(forward_open_request(1)).await;
+
+    let reply = scanner
+        .request(&RequestObjectAssembly::new_forward_open(
+            SESSION_HANDLE,
+            forward_open_request(2),
+            SocketAddrInfoItems::empty(),
+        ))
+        .await;
+    assert_eq!(
+        Rejection::from_response(response(&reply))
+            .and_then(|rejection| rejection.extended_status()),
+        Some(ConnectionManagerExtendedStatus::OutOfConnections)
     );
 }

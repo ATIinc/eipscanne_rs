@@ -5,7 +5,6 @@
 ```text
 server::serve
 └─ server::serve_session                     one task and one session per TCP connection
-   ├─ ConnectedMessageRouter::new            the session's Message Router, below
    ├─ packet::read_packet                    none within the inactivity timeout: the session ends
    ├─ NOP, a request with a Status           no reply
    ├─ Unregister Session                     the session ends
@@ -20,17 +19,18 @@ server::serve
    │           └─ MessageRouter::handle_forward_open / _close
    ├─ Send Unit Data
    │  └─ explicit::connected::send_unit_data::handle_send_unit_data
-   │     ├─ ConnectedMessageRouter::consume_request  a discarded request has no reply
+   │     ├─ MessageRouter::accept_connected_request  a discarded request has no reply
    │     ├─ explicit::handle_message_router_request  as above
    │     └─ reply_unit_data
    ├─ any other command
    │  └─ packet::error_reply
    └─ packet::write_packet
 
-explicit::connected::message_router::ConnectedMessageRouter    the MessageRouter of each session
-├─ Get, Set                                  the server's
-├─ handle_forward_open                       class 3 when the server accepts it, otherwise the server's
-└─ handle_forward_close                      the session's connection, otherwise the server's
+explicit::connected::message_router::ConnectedMessageRouter    a MessageRouter plus class 3 connections
+├─ Get, Set                                  the wrapped one's
+├─ handle_forward_open                       class 3, otherwise the wrapped one's
+├─ handle_forward_close                      its connections, otherwise the wrapped one's
+└─ accept_connected_request                  its connections, otherwise the wrapped one's
 ```
 
 ## UDP: implicit messaging

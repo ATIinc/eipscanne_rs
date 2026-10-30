@@ -37,7 +37,7 @@ const OUTPUT_PACKET_QUEUE: usize = 8;
 
 /// The Message Router of an [`ImplicitDevice`]: its Get and Set, plus Forward_Open and
 /// Forward_Close
-pub(crate) struct ImplicitMessageRouter<D> {
+pub struct ImplicitMessageRouter<D> {
     device: Arc<D>,
     /// The UDP socket of every connection's I/O
     io_socket: Arc<UdpSocket>,
@@ -54,7 +54,7 @@ pub(crate) struct ImplicitMessageRouter<D> {
 
 impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
     /// The Message Router of `device`, its I/O socket bound on `ip`
-    pub(crate) async fn bind(device: Arc<D>, ip: IpAddr, options: ImplicitOptions) -> Result<Self> {
+    pub async fn bind(device: Arc<D>, ip: IpAddr, options: ImplicitOptions) -> Result<Self> {
         let io_socket = Arc::new(UdpSocket::bind((ip, options.io_port)).await?);
         let io_address = io_socket.local_addr()?;
         tracing::info!(io = %io_address, "implicit messaging");

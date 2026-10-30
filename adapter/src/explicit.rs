@@ -18,7 +18,7 @@ use crate::message_router::{
     MessageRouter, class_instance_and_attribute, message_router_response, rejection_response,
 };
 
-pub(crate) mod connected;
+pub mod connected;
 pub(crate) mod unconnected;
 
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items.

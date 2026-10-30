@@ -1,4 +1,4 @@
-//! Connected explicit messaging: one class 3 connection per session, to the Message Router.
+//! Connected explicit messaging: class 3 connections to the Message Router.
 //!
 //! ```text
 //! Stage    What happens on the wire                                         Module
@@ -8,12 +8,13 @@
 //! Close    SendRRData(Forward_Close) -> the reply                           message_router
 //! ```
 //!
-//! Only a server whose [`ExplicitOptions`] accept explicit connections opens one. A request whose
-//! CIP sequence count repeats the last one is discarded; the connection is deleted when no request
-//! comes within its timeout, and when its session ends.
+//! Only a server whose Message Router is a [`ConnectedMessageRouter`] opens them. A request whose
+//! CIP sequence count repeats the last one is discarded; a connection is deleted when no request
+//! comes within its timeout.
 //!
-//! [`ExplicitOptions`]: crate::message_router::ExplicitOptions
+//! [`ConnectedMessageRouter`]: message_router::ConnectedMessageRouter
 
+use std::net::IpAddr;
 use std::time::Duration;
 
 use tokio::time::Instant;
@@ -23,7 +24,7 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
 };
 use eipscanne_rs::cip::types::CipUint;
 
-pub(crate) mod message_router;
+pub mod message_router;
 pub(crate) mod send_unit_data;
 
 /// An established class 3 connection: the Forward_Open received and the reply sent
@@ -31,6 +32,7 @@ pub(crate) mod send_unit_data;
 pub(crate) struct ExplicitConnection {
     request: ForwardOpenRequest,
     response: ForwardOpenResponse,
+    originator_ip: IpAddr,
     /// The timeout multiplier times the O->T actual packet interval
     inactivity_timeout: Duration,
     /// When it times out unless a request comes first
@@ -41,7 +43,11 @@ pub(crate) struct ExplicitConnection {
 
 impl ExplicitConnection {
     /// An established connection; its inactivity timer starts now
-    fn new(request: ForwardOpenRequest, response: ForwardOpenResponse) -> Self {
+    fn new(
+        request: ForwardOpenRequest,
+        response: ForwardOpenResponse,
+        originator_ip: IpAddr,
+    ) -> Self {
         let inactivity_timeout = Duration::from_micros(
             u64::from(request.connection_timeout_multiplier.multiplier())
                 * u64::from(response.o2t_actual_packet_interval),
@@ -49,6 +55,7 @@ impl ExplicitConnection {
         ExplicitConnection {
             request,
             response,
+            originator_ip,
             inactivity_timeout,
             deadline: Instant::now() + inactivity_timeout,
             last_cip_sequence_count: None,

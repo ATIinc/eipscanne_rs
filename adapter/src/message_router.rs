@@ -24,8 +24,10 @@ use eipscanne_rs::cip::message::response::{
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
-use eipscanne_rs::cip::types::CipUint;
+use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
+
+use crate::error::{Error, Result};
 
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
@@ -97,13 +99,25 @@ pub trait MessageRouter: Send + Sync + 'static {
             additional_status: vec![],
         })
     }
+
+    /// Connection Manager: accepts a request on the class 3 connection `connection_id` from
+    /// `originator_ip`; the T->O connection ID and size of its reply, or
+    /// `Error::UnexpectedPacket` when the request is discarded
+    fn accept_connected_request(
+        &self,
+        connection_id: CipUdint,
+        _cip_sequence_count: CipUint,
+        _originator_ip: IpAddr,
+    ) -> Result<(CipUdint, u16)> {
+        Err(Error::UnexpectedPacket(format!(
+            "request for no class 3 connection ({connection_id:#010x})"
+        )))
+    }
 }
 
 /// The device's explicit messaging, fixed for the server's life
 #[derive(Clone, Copy)]
 pub struct ExplicitOptions {
-    /// Whether a class 3 Forward_Open opens the session's connection
-    pub accepts_explicit_connections: bool,
     /// The TCP/IP Interface object's Encapsulation Inactivity Timeout: a session without
     /// encapsulation activity for this long closes, unless `None`. A Set of the attribute cannot
     /// change it
@@ -113,7 +127,6 @@ pub struct ExplicitOptions {
 impl Default for ExplicitOptions {
     fn default() -> Self {
         ExplicitOptions {
-            accepts_explicit_connections: false,
             // The attribute's default
             encapsulation_inactivity_timeout: Some(Duration::from_secs(120)),
         }

@@ -26,7 +26,7 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use crate::message_router::MessageRouter;
 
 mod connection;
-pub(crate) mod message_router;
+pub mod message_router;
 mod o2t;
 mod t2o;
 

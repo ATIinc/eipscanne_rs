@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
-use tokio::time::{Instant, timeout};
+use tokio::time::timeout;
 use tracing::Instrument;
 
 use eipscanne_rs::cip::types::CipUdint;
@@ -18,7 +18,6 @@ use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
-use crate::explicit::connected::message_router::ConnectedMessageRouter;
 use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::message_router::ImplicitMessageRouter;
@@ -69,7 +68,7 @@ pub async fn serve(
 
 /// Answers the packets of the scanner at `originator_ip` as session `session_handle` until it
 /// unregisters, closes the stream or has no encapsulation activity for the `options` inactivity
-/// timeout; its class 3 connection ends with it
+/// timeout
 #[tracing::instrument(skip(message_router, options, stream))]
 async fn serve_session(
     message_router: Arc<impl MessageRouter>,
@@ -78,16 +77,12 @@ async fn serve_session(
     session_handle: CipUdint,
     originator_ip: IpAddr,
 ) -> Result<()> {
-    let message_router =
-        ConnectedMessageRouter::new(message_router, options.accepts_explicit_connections);
+    let inactivity_timeout = options
+        .encapsulation_inactivity_timeout
+        .unwrap_or(Duration::MAX);
     let mut registered = false;
     loop {
-        let Ok(packet) = timeout(
-            session_inactivity_timeout(options, &message_router),
-            read_packet(&mut stream),
-        )
-        .await
-        else {
+        let Ok(packet) = timeout(inactivity_timeout, read_packet(&mut stream)).await else {
             tracing::warn!("the session timed out: no encapsulation activity in time");
             return Ok(());
         };
@@ -134,14 +129,14 @@ async fn serve_session(
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
             EnIpCommand::SendRrData => handle_send_rr_data(
-                &message_router,
+                message_router.as_ref(),
                 &header,
                 &command_specific_data,
                 originator_ip,
             ),
             EnIpCommand::SendUnitData => {
                 let Some(reply) = handle_send_unit_data(
-                    &message_router,
+                    message_router.as_ref(),
                     &header,
                     &command_specific_data,
                     originator_ip,
@@ -155,24 +150,6 @@ async fn serve_session(
         };
         reply.header.sender_context = header.sender_context;
         write_packet(&mut stream, &reply).await?;
-    }
-}
-
-/// How long the session waits for a packet: the `options` inactivity timeout, after the time its
-/// class 3 connection has left
-fn session_inactivity_timeout(
-    options: ExplicitOptions,
-    message_router: &ConnectedMessageRouter<impl MessageRouter>,
-) -> Duration {
-    let inactivity_timeout = options
-        .encapsulation_inactivity_timeout
-        .unwrap_or(Duration::MAX);
-    // An open class 3 connection is encapsulation activity until it times out
-    match message_router.connection_deadline() {
-        Some(deadline) => deadline
-            .saturating_duration_since(Instant::now())
-            .saturating_add(inactivity_timeout),
-        None => inactivity_timeout,
     }
 }
 

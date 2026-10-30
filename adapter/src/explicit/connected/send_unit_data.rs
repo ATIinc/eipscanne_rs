@@ -1,5 +1,5 @@
-//! Request: each Send Unit Data request on the session's class 3 connection, answered like an
-//! unconnected one.
+//! Request: each Send Unit Data request on a class 3 connection, answered like an unconnected
+//! one.
 
 use std::io::Cursor;
 use std::net::IpAddr;
@@ -16,14 +16,13 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, UnitPacketData};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::connected::message_router::ConnectedMessageRouter;
 use crate::explicit::handle_message_router_request;
 use crate::message_router::{MessageRouter, message_router_response};
 
 /// The Send Unit Data reply carrying the response to the connected request inside; `None` when the
 /// request is discarded
 pub(crate) fn handle_send_unit_data(
-    message_router: &ConnectedMessageRouter<impl MessageRouter>,
+    message_router: &impl MessageRouter,
     header: &EncapsulationHeader,
     command_specific_data: &CommandSpecificData,
     originator_ip: IpAddr,
@@ -38,14 +37,18 @@ pub(crate) fn handle_send_unit_data(
     };
     let cip_sequence_count = request_unit_data.cip_sequence_count;
     // The reply goes out on this connection, even when the request closes it
-    let (t2o_network_connection_id, t2o_connection_size) =
-        match message_router.consume_request(request_unit_data.connection_id, cip_sequence_count) {
-            Ok(reply_connection) => reply_connection,
-            Err(error) => {
-                tracing::debug!(%error, "discarded a request");
-                return None;
-            }
-        };
+    let (t2o_network_connection_id, t2o_connection_size) = match message_router
+        .accept_connected_request(
+            request_unit_data.connection_id,
+            cip_sequence_count,
+            originator_ip,
+        ) {
+        Ok(reply_connection) => reply_connection,
+        Err(error) => {
+            tracing::debug!(%error, "discarded a request");
+            return None;
+        }
+    };
 
     // Over a connection: no Socket Address Info
     let (response, _) = handle_message_router_request(message_router, request, originator_ip, None);

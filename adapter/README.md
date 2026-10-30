@@ -1,10 +1,10 @@
 # adapter
 
-The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818, one class 3 connection per session, and class 1 I/O connections over UDP (one at a time unless the device allows more). A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request. With `message_router::ExplicitOptions::accepts_explicit_connections` set, `serve` also takes class 3 connections. A device that also implements `implicit::ImplicitDevice` is served by `server::serve_implicit`, which adds class 1 Forward_Open, Forward_Close and the I/O:
+The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818, class 3 connections, and class 1 I/O connections over UDP (one at a time unless the device allows more). A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request. A Message Router wrapped in `explicit::connected::message_router::ConnectedMessageRouter` also takes class 3 connections. A device that also implements `implicit::ImplicitDevice` is served by `server::serve_implicit`, which adds class 1 Forward_Open, Forward_Close and the I/O:
 
 * `server`: accepts connections, registers sessions, hands Send RR Data to `explicit::unconnected` and Send Unit Data to `explicit::connected`, and closes a session without encapsulation activity for its inactivity timeout.
 * `message_router`: the `MessageRouter` trait, the services a scanner's requests reach, and the paths, connection parameters and responses of those services.
-* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the session's class 3 connection.
+* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data, `connected` the class 3 connections.
 * `implicit`: the `ImplicitDevice` trait, and the opening, exchange and closing of the class 1 connections.
 * `packet`: reads and writes one encapsulation packet on a stream; `error_reply` refuses one; `decode_data` decodes the data of a Set or a connection's outputs.
 * `error`: the one error type of every fallible call.
