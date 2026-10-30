@@ -75,8 +75,8 @@ pub(crate) async fn route_outputs(
     }
 }
 
-/// Hands the device the new run mode outputs of `connection` until no packet comes in time, and
-/// tells it when they switch to idle or time out
+/// Hands the device the new run mode outputs of `connection` until no packet comes in time or the
+/// connection is closed, and tells it when they switch to idle, time out or close
 pub(crate) async fn receive_outputs(
     device: &impl ImplicitDevice,
     connection: &ImplicitConnection,
@@ -102,8 +102,11 @@ pub(crate) async fn receive_outputs(
     loop {
         let (packet, from) = match timeout_at(deadline, output_packet_receiver.recv()).await {
             Ok(Some(received)) => received,
-            // The connection was closed
-            Ok(None) => return,
+            // The connection was closed; queued outputs come first
+            Ok(None) => {
+                device.enter_idle(connection.o2t.instance);
+                return;
+            }
             Err(_) => {
                 tracing::warn!("the connection timed out: no output packet in time");
                 device.enter_idle(connection.o2t.instance);

@@ -5,7 +5,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::ops::RangeInclusive;
 
 use tokio::sync::mpsc::Sender;
-use tokio::task::AbortHandle;
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -55,20 +54,14 @@ pub(crate) struct ConnectionPoint {
 }
 
 /// What the Message Router keeps of a connection: the triad a Forward_Close names, the IP address
-/// that opened it, and its I/O exchange task, which dropping it stops
+/// that opened it, and the sender its I/O exchange task receives from, which dropping it closes
 pub(crate) struct OpenConnection {
     pub connection_triad: ConnectionTriad,
     pub originator_ip: IpAddr,
     pub output_instance: u16,
-    /// Where [`route_outputs`](crate::implicit::o2t::route_outputs) hands its O->T packets
+    /// Where [`route_outputs`](crate::implicit::o2t::route_outputs) hands its O->T packets;
+    /// closed once the I/O exchange task ends
     pub output_packet_sender: Sender<(EnIpIoPacket, SocketAddr)>,
-    pub io_exchange_task: AbortHandle,
-}
-
-impl Drop for OpenConnection {
-    fn drop(&mut self) {
-        self.io_exchange_task.abort();
-    }
 }
 
 /// `sin_family` of an IPv4 Socket Address Info
