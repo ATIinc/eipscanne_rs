@@ -75,7 +75,7 @@ impl ServiceContainer {
             .build()
     }
 
-    /// The service byte of a response (request bit set)
+    /// The service byte of a response (response bit set)
     pub fn new_response(service: ServiceCode) -> Self {
         ServiceContainer::builder()
             .service(service)

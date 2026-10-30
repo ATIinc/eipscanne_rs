@@ -54,7 +54,7 @@
 //! Common Industrial Protocol                     .cip_message: CipMessage::Request / ::Response
 //! ```
 //! Register Session and Unregister Session packets have no items; their command specific data is
-//! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or nothing.
+//! `CommandSpecificData::RegisterSession` (Protocol Version, Option Flags) or `::NoData`.
 
 use std::io::{Cursor, Seek, Write};
 
@@ -67,6 +67,7 @@ use crate::cip::types::{CipByte, CipUdint, CipUint};
 
 use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, UnitPacketData};
 use super::constants as eip_constants;
+use super::socket_addr::SocketAddrInfoItems;
 
 #[binwrite]
 #[binread]
@@ -144,20 +145,27 @@ impl EnIpPacket {
         EnIpPacket::new(
             EnIpCommand::UnRegisterSession,
             session_handle,
-            CommandSpecificData::UnregisterSession,
+            CommandSpecificData::NoData,
         )
     }
 
-    /// A SendRRData packet carrying `message` as an unconnected message
+    /// A SendRRData packet carrying `message` as an unconnected message, followed by
+    /// `socket_addr_info_items`
     pub fn new_send_rr_data(
         session_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
+        socket_addr_info_items: SocketAddrInfoItems,
     ) -> Self {
         EnIpPacket::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::new_request(eip_constants::CIP_INTERFACE_HANDLE, timeout, message),
+            CommandSpecificData::new_request(
+                eip_constants::CIP_INTERFACE_HANDLE,
+                timeout,
+                message,
+                socket_addr_info_items,
+            ),
         )
     }
 

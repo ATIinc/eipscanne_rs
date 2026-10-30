@@ -1,11 +1,9 @@
-//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection, with the same assembly structs the
-//! explicit examples read and write. The connection comes from the hub's EDS file in
-//! `scanner/assemblies/io_hub`, and every input packet is decoded as an `InputAssemblyHub4E`. One
-//! motor's status is printed whenever it changes.
+//! Watches a Teknic IO-HUB-4-E over a class 1 I/O connection opened from the hub's EDS, decoding
+//! each input packet as the `InputAssemblyHub4E` that `io-hub-explicit-homing` reads, and prints
+//! one motor's status whenever it changes. The outputs are `OutputAssemblyHub4E::default()`,
+//! sent in run mode; `--toggle-every N` switches them between run and idle every N cycles.
 //!
-//! The outputs sent are `OutputAssemblyHub4E::default()`: no motor enabled, every output off,
-//! sent idle (run flag cleared) unless `--run` is given. `--host` has no default on purpose.
-//!
+//! `--host` has no default:
 //! `cargo run --example io-hub-eds-implicit -- --host 172.31.19.18 --motor 0`
 
 use std::fs::read_to_string;
@@ -28,10 +26,10 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick, RealTimeFormat,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
-use eipscanne_rs::cip::io_data::CipIoData;
+use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, ETHERNET_IP_TCP_PORT};
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 use scanner::error::Error;
 use scanner::implicit::connection::{ImplicitConnection, forward_close, forward_open_implicit};
@@ -42,7 +40,7 @@ use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 // The IO-HUB assemblies live outside the library, in scanner/assemblies/
 #[allow(dead_code)]
@@ -82,13 +80,31 @@ struct Args {
     #[arg(long, default_value_t = 1000)]
     cycles: u32,
 
-    /// Send the outputs with the run flag set instead of idle
-    #[arg(long)]
-    run: bool,
+    /// Switch the outputs between run and idle every this many cycles, starting in run
+    ///
+    /// While idle, the Run/Idle bit of the 32-bit header is cleared: the connection stays open
+    /// and the hub holds its outputs in their idle state.
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    toggle_every: Option<u32>,
+}
+
+impl Args {
+    /// Run, then idle and run in turn every `toggle_every` cycles
+    fn run_or_idle(&self, cycle: u32) -> RunOrIdle {
+        if self
+            .toggle_every
+            .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
+        {
+            RunOrIdle::Run
+        } else {
+            RunOrIdle::Idle
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= Read the EDS and derive the connection ============
@@ -135,17 +151,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket: UdpSocket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket(ETHERNET_IP_IO_UDP_PORT).await?;
     println!("OPENING the connection");
     let connection: ImplicitConnection = forward_open_implicit(
         &mut session,
         request,
         o2t_real_time_format,
         t2o_real_time_format,
+        ETHERNET_IP_IO_UDP_PORT,
     )
     .await?;
     let established_at = Instant::now();
@@ -156,14 +177,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // ========= 3. Exchange I/O ============
-    // The outputs never change, so the CIP sequence count stays put after the first packet;
-    // every packet gets the next encapsulation sequence number, starting at a random one so a
-    // restarted scanner does not repeat what the adapter last saw
+    // The outputs never change, so the CIP sequence count advances only when the run/idle mode
+    // does; every packet gets the next encapsulation sequence number, starting at a random one so
+    // a restarted scanner does not repeat what the adapter last saw
     let mut send_timer = interval(Duration::from_micros(u64::from(
         connection.response.o2t_actual_packet_interval,
     )));
     let mut encapsulation_sequence_number: u32 = rand::random();
-    let cip_sequence_count: u16 = 1;
+    let mut cip_sequence_count: u16 = 0;
+    let mut last_run_or_idle: Option<RunOrIdle> = None;
 
     let timeout: Duration = input_timeout(&connection);
     let mut last_sequence_number: Option<u32> = None;
@@ -182,12 +204,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     break;
                 }
                 cycle += 1;
+                let run_or_idle = args.run_or_idle(cycle);
+                if last_run_or_idle != Some(run_or_idle) {
+                    cip_sequence_count = cip_sequence_count.wrapping_add(1);
+                    println!("[{cycle:>4}] SENDING the outputs {run_or_idle:?}");
+                    last_run_or_idle = Some(run_or_idle);
+                }
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Typed(Box::new(OutputAssemblyHub4E::default())),
-                    args.run,
+                    run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
@@ -203,7 +231,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                let (address, inputs): (SequencedAddress, CipIoData) = match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok(accepted) => accepted,
                     Err(discarded) => {
                         eprintln!("[{cycle:>4}] DISCARDED {discarded}");

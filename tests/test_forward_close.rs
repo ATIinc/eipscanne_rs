@@ -30,6 +30,7 @@ use eipscanne_rs::eip::constants::{
     NO_ENCAPSULATION_TIMEOUT,
 };
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::{
@@ -199,6 +200,7 @@ fn test_serialize_forward_close_request() {
                     additional_data: CipDataOpt::Typed(Box::new(request.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -316,6 +318,7 @@ fn test_deserialize_forward_close_success_response() {
                     data: CipDataOpt::Typed(Box::new(expected_response.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 

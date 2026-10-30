@@ -13,9 +13,8 @@ use eipscanne_rs::cip::message::response::{
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::CipByte;
-use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, NO_ENCAPSULATION_TIMEOUT};
-use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 fn sample_address() -> SocketAddrV4 {
@@ -159,11 +158,15 @@ fn test_write_then_read_response() {
         },
     };
 
-    let mut response =
-        ResponseObjectAssembly::new_send_rr_data(0x3, NO_ENCAPSULATION_TIMEOUT, forward_open_reply);
-    if let CommandSpecificData::SendRrData(rr_data) = &mut response.command_specific_data {
-        rr_data.socket_addr_info_items.o2t = Some(sample_address().into());
-    }
+    let response = ResponseObjectAssembly::new_send_rr_data(
+        0x3,
+        NO_ENCAPSULATION_TIMEOUT,
+        forward_open_reply,
+        SocketAddrInfoItems {
+            o2t: Some(sample_address().into()),
+            t2o: None,
+        },
+    );
 
     let mut written_bytes: Vec<u8> = Vec::new();
     response

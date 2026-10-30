@@ -4,12 +4,13 @@
 use std::env::var_os;
 use std::io::Cursor;
 use std::net::{IpAddr, Ipv4Addr};
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, ToSocketAddrs};
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::response::Rejection;
@@ -27,19 +28,35 @@ const DUMP_VARIABLE: &str = "EIP_DUMP";
 /// Size of the encapsulation header on the wire
 const ENCAPSULATION_HEADER_LEN: usize = 24;
 
-/// How long connecting to the adapter may take: a wrong or unreachable address fails after this
-/// instead of after the operating system gives up (minutes on Linux)
-pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(5);
+/// How a [`Session`] waits on the adapter
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionConfig {
+    /// How long connecting to the adapter may take: a wrong or unreachable address fails after
+    /// this instead of after the operating system gives up (minutes on Linux)
+    pub connect_timeout: Duration,
+    /// How long the adapter may take to answer one request
+    pub reply_timeout: Duration,
+}
 
-/// How long the adapter may take to answer one request
-pub const REPLY_TIMEOUT: Duration = Duration::from_secs(5);
+impl Default for SessionConfig {
+    /// 5 s to connect, 5 s per reply
+    fn default() -> Self {
+        SessionConfig {
+            connect_timeout: Duration::from_secs(5),
+            reply_timeout: Duration::from_secs(5),
+        }
+    }
+}
 
-/// A registered encapsulation session with one adapter
+/// A registered encapsulation session with one adapter. A reply timeout poisons it: later calls
+/// fail with [`Error::SessionPoisoned`].
 #[derive(Debug)]
 pub struct Session {
     stream: TcpStream,
     session_handle: CipUdint,
     peer_ip: Ipv4Addr,
+    config: SessionConfig,
+    poisoned: bool,
 }
 
 // ======= Start of Session impl ========
@@ -47,13 +64,13 @@ pub struct Session {
 impl Session {
     /// Stage 1: connects to the adapter and registers a session with it. Fails with
     /// [`Error::Timeout`] when the adapter does not accept the connection within
-    /// [`CONNECT_TIMEOUT`] or does not answer within [`REPLY_TIMEOUT`].
-    pub async fn register(address: impl ToSocketAddrs) -> Result<Session> {
-        let stream = timeout(CONNECT_TIMEOUT, TcpStream::connect(address))
+    /// `config.connect_timeout` or does not answer within `config.reply_timeout`.
+    pub async fn register(address: impl ToSocketAddrs, config: SessionConfig) -> Result<Session> {
+        let stream = timeout(config.connect_timeout, TcpStream::connect(address))
             .await
             .map_err(|_| Error::Timeout {
                 waiting_for: "the TCP connection",
-                after: CONNECT_TIMEOUT,
+                after: config.connect_timeout,
             })??;
         let peer_ip = match stream.peer_addr()?.ip() {
             IpAddr::V4(ip) => ip,
@@ -64,14 +81,46 @@ impl Session {
             stream,
             session_handle: 0,
             peer_ip,
+            config,
+            poisoned: false,
         };
         session
             .send(&RequestObjectAssembly::new_registration())
             .await?;
         let reply = session.read_reply().await?;
         session.session_handle = reply.header.session_handle;
+        tracing::info!(
+            session_handle = format_args!("{:#010x}", session.session_handle),
+            %peer_ip,
+            "session registered"
+        );
 
         Ok(session)
+    }
+
+    /// [`Session::register`] up to `attempts` times, `delay` apart; fails with the last attempt's error
+    pub async fn register_with_retry(
+        address: impl ToSocketAddrs + Clone,
+        config: SessionConfig,
+        attempts: NonZeroUsize,
+        delay: Duration,
+    ) -> Result<Session> {
+        let mut attempt = 1;
+        loop {
+            match Session::register(address.clone(), config).await {
+                Err(error) if attempt < attempts.get() => {
+                    tracing::warn!(
+                        %error,
+                        attempt,
+                        ?delay,
+                        "session registration failed; retrying"
+                    );
+                    attempt += 1;
+                    sleep(delay).await;
+                }
+                result => return result,
+            }
+        }
     }
 
     /// The handle the adapter gave this session, carried by every packet
@@ -84,8 +133,16 @@ impl Session {
         self.peer_ip
     }
 
+    /// See [`Session`]
+    pub fn is_poisoned(&self) -> bool {
+        self.poisoned
+    }
+
     /// Writes one encapsulation packet to the adapter
     pub async fn send(&mut self, packet: &EnIpPacket) -> Result<()> {
+        if self.poisoned {
+            return Err(Error::SessionPoisoned);
+        }
         let mut bytes = Cursor::new(Vec::new());
         packet.write(&mut bytes)?;
         print_packet_hex("REQUEST", bytes.get_ref());
@@ -95,14 +152,18 @@ impl Session {
 
     /// Reads one encapsulation packet: the header, then its Length in bytes. Fails on a
     /// non-success encapsulation status, and with [`Error::Timeout`] when the whole packet has
-    /// not arrived within [`REPLY_TIMEOUT`]; the session is unusable after a timeout, since part
-    /// of the packet may have been read.
+    /// not arrived within the configured reply timeout.
     pub async fn read_reply(&mut self) -> Result<EnIpPacket> {
-        timeout(REPLY_TIMEOUT, self.read_packet())
+        let reply_timeout: Duration = self.config.reply_timeout;
+        timeout(reply_timeout, self.read_packet())
             .await
-            .map_err(|_| Error::Timeout {
-                waiting_for: "a reply",
-                after: REPLY_TIMEOUT,
+            .map_err(|_| {
+                tracing::debug!(?reply_timeout, "reply timed out; session poisoned");
+                self.poisoned = true;
+                Error::Timeout {
+                    waiting_for: "a reply",
+                    after: reply_timeout,
+                }
             })?
     }
 
@@ -127,7 +188,7 @@ impl Session {
         Ok(EnIpPacket::read(&mut Cursor::new(&bytes))?)
     }
 
-    /// Sends a Message Router request and returns the accepted reply to the same service
+    /// Sends a Message Router request and returns the accepted reply
     pub async fn request(&mut self, packet: &EnIpPacket) -> Result<EnIpPacket> {
         self.send(packet).await?;
         let reply = self.read_reply().await?;
@@ -158,8 +219,13 @@ impl Session {
         self.send(&RequestObjectAssembly::new_unregistration(
             self.session_handle,
         ))
-        .await
+        .await?;
+        tracing::info!(
+            session_handle = format_args!("{:#010x}", self.session_handle),
+            "session unregistered"
+        );
         // The stream is dropped, which closes it
+        Ok(())
     }
 }
 

@@ -10,19 +10,21 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, NetworkConnectionParameters, RealTimeFormat, TransportClass,
-    connection_size,
+    connected_data_header_len,
 };
 use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::error::Result;
 use crate::explicit::decode_reply;
 use crate::session::Session;
 
-/// An open connection: the Forward_Open sent, the adapter's reply, and each direction's
-/// real-time format (agreed off the wire). Everything else is read from these, never copied.
+/// An open class 1 connection: the Forward_Open sent, the adapter's reply, each direction's
+/// real-time format (agreed off the wire) and the adapter's addresses. Everything else is read
+/// from these, never copied.
 ///
 /// Connection IDs and packet intervals come from `response`; the request's are only proposals.
 #[derive(Debug)]
@@ -40,24 +42,39 @@ pub struct ImplicitConnection {
 }
 
 /// Sends `request` (a Forward_Open or Large_Forward_Open, by the width of its connection
-/// parameters) and reads the adapter's reply.
+/// parameters) and reads the adapter's reply. The inputs come to this host on `t2o_port`, named in
+/// a T->O Socket Address Info item unless it is 2222.
 pub async fn forward_open_implicit(
     session: &mut Session,
     request: ForwardOpenRequest,
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
+    t2o_port: u16,
 ) -> Result<ImplicitConnection> {
+    // The item names only the port; 2222 needs none
+    let t2o = (t2o_port != ETHERNET_IP_IO_UDP_PORT)
+        .then(|| SocketAddrInfo::from(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, t2o_port)));
     let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
             request.clone(),
+            SocketAddrInfoItems { o2t: None, t2o },
         ))
         .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;
 
     let target_ip: Ipv4Addr = session.peer_ip();
+    let o2t_endpoint: SocketAddrV4 = o2t_endpoint(&reply, target_ip);
+    tracing::info!(
+        o2t_id = format_args!("{:#010x}", response.o2t_network_connection_id),
+        t2o_id = format_args!("{:#010x}", response.t2o_network_connection_id),
+        o2t_api_us = response.o2t_actual_packet_interval,
+        t2o_api_us = response.t2o_actual_packet_interval,
+        %o2t_endpoint,
+        "class 1 connection opened"
+    );
     Ok(ImplicitConnection {
-        o2t_endpoint: o2t_endpoint(&reply, target_ip),
+        o2t_endpoint,
         request,
         response,
         o2t_real_time_format,
@@ -86,7 +103,12 @@ pub async fn forward_close(
             close_request,
         ))
         .await?;
-    decode_reply(&reply)
+    let response: ForwardCloseResponse = decode_reply(&reply)?;
+    tracing::info!(
+        connection_serial_number = request.connection_triad.connection_serial_number,
+        "connection closed"
+    );
+    Ok(response)
 }
 
 /// Where the outputs go: the reply's O->T Socket Address Info address (`0.0.0.0` meaning the
@@ -124,7 +146,7 @@ pub(crate) fn data_size(
             parameters.connection_size_type(),
         ),
     };
-    let overhead: u16 = connection_size(0, transport_class, real_time_format);
+    let overhead: u16 = connected_data_header_len(transport_class, real_time_format);
     (size.saturating_sub(overhead), size_type)
 }
 
@@ -245,7 +267,6 @@ mod tests {
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
     use eipscanne_rs::cip::message::shared::ServiceCode;
     use eipscanne_rs::cip::path::CipPath;
-    use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
     use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
     use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -255,19 +276,12 @@ mod tests {
 
     /// A SendRRData reply with the given Socket Address Info items
     fn reply_with_items(items: SocketAddrInfoItems) -> EnIpPacket {
-        let mut reply = EnIpPacket::new_send_rr_data(
+        EnIpPacket::new_send_rr_data(
             0x03,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest::new(ServiceCode::ForwardOpen, CipPath::new(0x06, 0x01)),
-        );
-        if let CommandSpecificData::SendRrData(RRPacketData {
-            socket_addr_info_items,
-            ..
-        }) = &mut reply.command_specific_data
-        {
-            *socket_addr_info_items = items;
-        }
-        reply
+            items,
+        )
     }
 
     #[test]

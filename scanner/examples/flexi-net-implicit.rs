@@ -39,16 +39,17 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     NetworkConnectionParameters, PriorityTimeTick, ProductionTrigger, RealTimeFormat,
     RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
-    connection_size,
+    connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
 use eipscanne_rs::cip::path::{
     CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, MajorRevisionCompatibility,
 };
 use eipscanne_rs::cip::types::{CipUint, CipUsint};
-use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, ETHERNET_IP_TCP_PORT};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use scanner::error::Error;
 use scanner::implicit::connection::{ImplicitConnection, forward_close, forward_open_implicit};
@@ -56,7 +57,7 @@ use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Who this scanner is in the Forward_Open (the same as `opener-implicit`). Together they are the
 /// connection triad, which only has to differ from other connections to the device; the
@@ -118,9 +119,9 @@ impl Args {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
         let o2t_size: u16 =
-            connection_size(OUTPUT_SIZE, TransportClass::Class1, O2T_REAL_TIME_FORMAT);
+            OUTPUT_SIZE + connected_data_header_len(TransportClass::Class1, O2T_REAL_TIME_FORMAT);
         let t2o_size: u16 =
-            connection_size(INPUT_SIZE, TransportClass::Class1, T2O_REAL_TIME_FORMAT);
+            INPUT_SIZE + connected_data_header_len(TransportClass::Class1, T2O_REAL_TIME_FORMAT);
 
         ForwardOpenRequest {
             // 5 ticks of 1024 ms (2^10): about 5 s for the device to answer the request itself
@@ -193,21 +194,27 @@ impl Args {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket: UdpSocket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket(ETHERNET_IP_IO_UDP_PORT).await?;
     println!("OPENING the connection");
     let connection: ImplicitConnection = forward_open_implicit(
         &mut session,
         args.forward_open_request(),
         O2T_REAL_TIME_FORMAT,
         T2O_REAL_TIME_FORMAT,
+        ETHERNET_IP_IO_UDP_PORT,
     )
     .await?;
     let established_at = Instant::now();
@@ -289,7 +296,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok((address, inputs)) => {
                         last_sequence_number = Some(address.encapsulation_sequence_number);
                         deadline = Instant::now() + timeout;
@@ -361,7 +368,7 @@ fn count(step: u8) -> [u8; OUTPUT_SIZE as usize] {
     })
 }
 
-/// Sends the outputs in one packet with the run flag set, so the device applies them instead of
+/// Sends the outputs in one packet in run mode, so the device applies them instead of
 /// idling; the encapsulation sequence number advances every packet
 async fn send_outputs(
     socket: &UdpSocket,
@@ -375,7 +382,7 @@ async fn send_outputs(
         *encapsulation_sequence_number,
         cip_sequence_count,
         CipDataOpt::Raw(outputs.to_vec()),
-        true,
+        RunOrIdle::Run,
     )?;
     *encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
     send_io_packet(socket, &packet, connection.o2t_endpoint).await

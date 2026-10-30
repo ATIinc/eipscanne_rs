@@ -4,7 +4,7 @@ use binrw::binrw;
 
 use crate::cip::types::{CipUdint, CipUint};
 
-/// The three values that identify a connection. Every Connection Manager service carries them,
+/// The three values that identify a connection. Forward_Open and Forward_Close carry them,
 /// and a Forward_Close is matched against the ones of the Forward_Open that opened the connection.
 #[binrw]
 #[brw(little)]

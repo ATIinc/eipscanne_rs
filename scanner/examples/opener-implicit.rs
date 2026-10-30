@@ -1,6 +1,6 @@
 //! Opens a class 1 connection to the OpENer sample, exchanges cyclic I/O for a number of cycles
 //! and closes it; `main` is the five stages in order. OpENer echoes the outputs of assembly 150 as
-//! the inputs of assembly 100.
+//! the inputs of assembly 100, idle ones too.
 //!
 //! Start OpENer (`tests/integration`) on the host, then run the example in the devcontainer:
 //!
@@ -23,12 +23,13 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     LargeNetworkConnectionParameters, NetworkConnectionParameters, PriorityTimeTick,
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
-    TransportClass, TransportTypeTrigger, connection_size,
+    TransportClass, TransportTypeTrigger, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, ETHERNET_IP_TCP_PORT};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use scanner::error::Error;
 use scanner::implicit::connection::{ImplicitConnection, forward_close, forward_open_implicit};
@@ -36,7 +37,7 @@ use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{
     FIRST_PACKET_GRACE, accept_t2o_packet, bind_io_socket, input_timeout, recv_io_packet,
 };
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 /// Who this scanner is in the Forward_Open; the Forward_Close repeats it
 const ORIGINATOR_VENDOR_ID: u16 = 342;
@@ -74,6 +75,10 @@ struct Args {
     /// Open with a Large_Forward_Open (32-bit connection parameters)
     #[arg(long)]
     large: bool,
+
+    /// Switch the outputs between run and idle every this many cycles, starting in run
+    #[arg(long, value_parser = clap::value_parser!(u32).range(1..))]
+    toggle_every: Option<u32>,
 }
 
 impl Args {
@@ -82,9 +87,9 @@ impl Args {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
         let o2t_size: u16 =
-            connection_size(DATA_SIZE, TransportClass::Class1, O2T_REAL_TIME_FORMAT);
+            DATA_SIZE + connected_data_header_len(TransportClass::Class1, O2T_REAL_TIME_FORMAT);
         let t2o_size: u16 =
-            connection_size(DATA_SIZE, TransportClass::Class1, T2O_REAL_TIME_FORMAT);
+            DATA_SIZE + connected_data_header_len(TransportClass::Class1, T2O_REAL_TIME_FORMAT);
 
         Ok(ForwardOpenRequest {
             // 5 ticks of 1024 ms until the request itself times out
@@ -148,25 +153,43 @@ impl Args {
             )
         })
     }
+
+    /// Run, then idle and run in turn every `toggle_every` cycles
+    fn run_or_idle(&self, cycle: u32) -> RunOrIdle {
+        if self
+            .toggle_every
+            .is_none_or(|every| ((cycle - 1) / every).is_multiple_of(2))
+        {
+            RunOrIdle::Run
+        } else {
+            RunOrIdle::Idle
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt::init();
     let args = Args::parse();
 
     // ========= 1. Register the session ============
     println!("REGISTERING a session with {}", args.host);
-    let mut session = Session::register((args.host.as_str(), ETHERNET_IP_TCP_PORT)).await?;
+    let mut session = Session::register(
+        (args.host.as_str(), ETHERNET_IP_TCP_PORT),
+        SessionConfig::default(),
+    )
+    .await?;
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket: UdpSocket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket(ETHERNET_IP_IO_UDP_PORT).await?;
     println!("OPENING the connection");
     let connection: ImplicitConnection = forward_open_implicit(
         &mut session,
         args.forward_open_request()?,
         O2T_REAL_TIME_FORMAT,
         T2O_REAL_TIME_FORMAT,
+        ETHERNET_IP_IO_UDP_PORT,
     )
     .await?;
     let established_at = Instant::now();
@@ -216,16 +239,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     *byte = (cycle as u8).wrapping_add(i as u8);
                 }
                 cip_sequence_count = cip_sequence_count.wrapping_add(1);
+                let run_or_idle = args.run_or_idle(cycle);
                 let packet: EnIpIoPacket = build_o2t_packet(
                     &connection,
                     encapsulation_sequence_number,
                     cip_sequence_count,
                     CipDataOpt::Raw(outputs.clone()),
-                    true,
+                    run_or_idle,
                 )?;
                 encapsulation_sequence_number = encapsulation_sequence_number.wrapping_add(1);
                 send_io_packet(&socket, &packet, connection.o2t_endpoint).await?;
-                println!("[{cycle:>3}] SENT     {}", hex(&outputs));
+                println!("[{cycle:>3}] SENT     {} ({run_or_idle:?})", hex(&outputs));
             }
 
             received = recv_io_packet(&socket) => {
@@ -238,7 +262,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(error) => return Err(error.into()),
                 };
-                match accept_t2o_packet(&connection, last_sequence_number, &packet, from) {
+                match accept_t2o_packet(&connection, &packet, from, last_sequence_number) {
                     Ok((address, inputs)) => {
                         last_sequence_number = Some(address.encapsulation_sequence_number);
                         deadline = Instant::now() + timeout;

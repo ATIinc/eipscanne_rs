@@ -3,6 +3,7 @@ name = "hex-assert"
 version = "0.2.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
+description = "assert_eq_hex!: byte buffer assertions that print hex dumps on failure"
 
 [dependencies]
 pretty-hex = "0.4.2"

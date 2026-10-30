@@ -8,10 +8,8 @@ use std::io::Cursor;
 
 use binrw::BinRead;
 
-use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
 use eipscanne_rs::cip::message::shared::ServiceCode;
-use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
@@ -22,14 +20,15 @@ use crate::session::Session;
 /// Sends `service` on `request_path` with optional `data` and returns the accepted reply
 pub async fn send_request(
     session: &mut Session,
-    request_path: CipPath,
+    request_path: &CipPath,
     service: ServiceCode,
     data: Option<Box<dyn CipData>>,
 ) -> Result<EnIpPacket> {
+    tracing::debug!(?service, "sent a request");
     session
         .request(&RequestObjectAssembly::new_service_request(
             session.session_handle(),
-            request_path,
+            request_path.clone(),
             service,
             data,
         ))
@@ -55,14 +54,27 @@ where
     Ok(T::read_le(&mut Cursor::new(raw))?)
 }
 
-/// Get_Attributes_All on the Identity object: who the adapter is
-pub async fn read_identity(session: &mut Session) -> Result<IdentityResponse> {
-    let reply = send_request(
+/// Get_Attribute_Single on `path`, decoded as `T`
+pub async fn get_attribute<T>(session: &mut Session, path: &CipPath) -> Result<T>
+where
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
+    let reply = send_request(session, path, ServiceCode::GetAttributeSingle, None).await?;
+    decode_reply(&reply)
+}
+
+/// Set_Attribute_Single on `path`
+pub async fn set_attribute(
+    session: &mut Session,
+    path: &CipPath,
+    data: impl CipData + 'static,
+) -> Result<()> {
+    send_request(
         session,
-        CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
-        ServiceCode::GetAttributeAll,
-        None,
+        path,
+        ServiceCode::SetAttributeSingle,
+        Some(Box::new(data)),
     )
     .await?;
-    decode_reply(&reply)
+    Ok(())
 }
