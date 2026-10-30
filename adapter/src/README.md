@@ -37,8 +37,8 @@ ImplicitMessageRouter                        the MessageRouter behind serve_impl
 │  └─ the I/O exchange task, one per connection
 │     ├─ O->T: implicit::o2t::receive_outputs
 │     │  ├─ check_output_packet, packet::decode_data, ImplicitDevice::consume_outputs
-│     │  └─ ImplicitDevice::idle_outputs     on a switch to idle and on the timeout
+│     │  └─ ImplicitDevice::enter_idle       on a switch to idle and on the timeout
 │     └─ T->O: implicit::t2o::send_inputs
 │        └─ ImplicitDevice::produce_inputs, one packet every T->O interval
-└─ handle_forward_close                      stops the task, then ImplicitDevice::idle_outputs
+└─ handle_forward_close                      stops the task, then ImplicitDevice::enter_idle
 ```

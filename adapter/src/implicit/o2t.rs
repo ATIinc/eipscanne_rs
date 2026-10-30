@@ -104,7 +104,7 @@ pub(crate) async fn receive_outputs(
             Ok(None) => return,
             Err(_) => {
                 tracing::warn!("the connection timed out: no output packet in time");
-                device.idle_outputs(connection.output_instance);
+                device.enter_idle(connection.output_instance);
                 return;
             }
         };
@@ -131,7 +131,7 @@ pub(crate) async fn receive_outputs(
         }
         // Idle outputs keep the connection open but are not applied; the device hears of the switch
         if running && !run {
-            device.idle_outputs(connection.output_instance);
+            device.enter_idle(connection.output_instance);
         }
         running = run;
         let CipDataOpt::Raw(output_data) = &cip_io_data.data else {

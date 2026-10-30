@@ -107,7 +107,7 @@ impl ImplicitDevice for SampleImplicitAdapter {
             .expect("nothing panics while holding the outputs lock")
     }
 
-    fn idle_outputs(&self, _instance: u16) {
+    fn enter_idle(&self, _instance: u16) {
         tracing::info!("outputs idle");
     }
 }

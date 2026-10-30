@@ -46,8 +46,9 @@ pub trait ImplicitDevice: MessageRouter {
     /// The inputs of the next T->O packet
     fn produce_inputs(&self, instance: u16) -> Self::Inputs;
 
-    /// The outputs of `instance` stopped: a switch to idle, a timeout or a Forward_Close
-    fn idle_outputs(&self, _instance: u16) {}
+    /// Idles the outputs of `instance` until the next `consume_outputs`: a switch to idle, a
+    /// timeout or a Forward_Close
+    fn enter_idle(&self, _instance: u16) {}
 }
 
 /// The device's class 1 connections, as its EDS declares them, and the UDP port of their I/O
