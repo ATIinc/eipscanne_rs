@@ -15,6 +15,13 @@
 //! cargo run --example opener-eds-implicit -- --host 127.0.0.1
 //! ```
 //!
+//! The sample takes an Input Only connection beside it, its inputs on another port:
+//!
+//! ```text
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --cycles 100
+//! cargo run --example opener-eds-implicit -- --host 127.0.0.1 --connection 2 --io-port 2224
+//! ```
+//!
 //! Each cycle prints a `SENT` line, and OpENer answers with a `RECEIVED` line echoing the outputs.
 //! The outputs are zeros, sent in run mode unless `--idle` is given.
 
@@ -37,7 +44,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, ETHERNET_IP_TCP_PORT};
 use scanner::error::Error;
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::eds::{
@@ -52,7 +59,6 @@ use scanner::session::{Session, SessionConfig};
 /// Who this scanner says it is in the Forward_Open (the same values as `opener-implicit`)
 const ORIGINATOR_VENDOR_ID: u16 = 342;
 const ORIGINATOR_SERIAL_NUMBER: u32 = 0x0001_2345;
-const CONNECTION_SERIAL_NUMBER: u16 = 1;
 const T2O_NETWORK_CONNECTION_ID: u32 = 0x1234_5678;
 
 /// The fixture describing the OpENer sample application
@@ -81,6 +87,10 @@ struct Args {
     /// Forward_Open. Default: a Large_Forward_Open only when a direction's size needs it
     #[arg(long)]
     large: Option<bool>,
+
+    /// UDP port the inputs come to; the Forward_Open names any other than 2222
+    #[arg(long, default_value_t = ETHERNET_IP_IO_UDP_PORT)]
+    io_port: u16,
 
     /// Send the outputs idle instead of in run mode, so the adapter does not apply them
     ///
@@ -123,8 +133,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Point-to-point: the adapter chooses the O->T connection ID and returns it
         o2t_network_connection_id: 0,
         t2o_network_connection_id: T2O_NETWORK_CONNECTION_ID,
+        // A new serial number each run, so a second run is a second connection
         connection_triad: ConnectionTriad {
-            connection_serial_number: CONNECTION_SERIAL_NUMBER,
+            connection_serial_number: rand::random(),
             originator_vendor_id: ORIGINATOR_VENDOR_ID,
             originator_serial_number: ORIGINATOR_SERIAL_NUMBER,
         },
@@ -161,13 +172,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket = bind_io_socket().await?;
+    let socket = bind_io_socket(args.io_port).await?;
     println!("OPENING the connection");
     let connection = forward_open_implicit(
         &mut session,
         request,
         o2t_real_time_format,
         t2o_real_time_format,
+        args.io_port,
     )
     .await?;
     let established_at = Instant::now();

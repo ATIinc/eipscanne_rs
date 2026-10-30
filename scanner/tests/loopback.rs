@@ -140,11 +140,7 @@ fn extract_forward_open_request(packet: &EnIpPacket) -> ForwardOpenRequest {
 }
 
 /// Plays the adapter for one connection; returns the output packet's sequence number and data
-async fn fake_adapter(
-    listener: TcpListener,
-    io_socket: UdpSocket,
-    scanner_io_port: u16,
-) -> Vec<u8> {
+async fn fake_adapter(listener: TcpListener, io_socket: UdpSocket) -> Vec<u8> {
     let (mut stream, _) = listener.accept().await.expect("the scanner connects once");
 
     // 1. RegisterSession
@@ -168,6 +164,14 @@ async fn fake_adapter(
         forward_open.t2o_network_connection_id,
         T2O_NETWORK_CONNECTION_ID
     );
+    // The inputs go to the port the T->O Socket Address Info item names
+    let scanner_io_port: u16 = request
+        .command_specific_data
+        .as_send_rr_data()
+        .and_then(|rr_data| rr_data.socket_addr_info_items.t2o)
+        .expect("the scanner names its ephemeral I/O port")
+        .socket_address()
+        .port();
     let io_port = io_socket
         .local_addr()
         .expect("a bound socket has a local address")
@@ -278,7 +282,7 @@ async fn one_connection_against_a_fake_adapter() {
         .expect("a bound socket has a local address")
         .port();
 
-    let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket, scanner_io_port));
+    let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket));
 
     // 1. Session
     let mut session = Session::register((LOCALHOST, adapter_port), SessionConfig::default())
@@ -293,6 +297,7 @@ async fn one_connection_against_a_fake_adapter() {
         request(),
         RealTimeFormat::Header32Bit,
         RealTimeFormat::Modeless,
+        scanner_io_port,
     )
     .await
     .expect("the fake adapter grants the Forward_Open");

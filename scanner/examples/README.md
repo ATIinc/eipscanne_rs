@@ -43,7 +43,9 @@ unregister. `--toggle-every N` switches the outputs between run and idle every N
 ### opener-eds-implicit
 
 `opener-implicit` with the connection read from OpENer's EDS
-(`scanner/tests/fixtures/sample_adapter.eds`). `--idle` sends the outputs idle.
+(`scanner/tests/fixtures/sample_adapter.eds`). `--idle` sends the outputs idle. `--connection 2`
+opens the Input Only connection, and `--io-port N` takes the inputs on port N, so a second run
+can open a connection beside the first.
 
 ## Teknic
 

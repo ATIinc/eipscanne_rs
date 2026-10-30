@@ -15,7 +15,6 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
@@ -24,15 +23,11 @@ use crate::implicit::connection::{ImplicitConnection, data_len_matches_connectio
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
 
-/// Binds the I/O socket to UDP 2222 on every interface, before the Forward_Open: adapters send as
-/// soon as they reply. One socket carries both directions: the Forward_Open names no T->O address,
-/// so the adapter sends the inputs to this host on 2222, and the outputs leave from it.
-pub async fn bind_io_socket() -> Result<UdpSocket> {
-    let socket = UdpSocket::bind(SocketAddrV4::new(
-        Ipv4Addr::UNSPECIFIED,
-        ETHERNET_IP_IO_UDP_PORT,
-    ))
-    .await?;
+/// Binds the I/O socket to UDP `port` on every interface, before the Forward_Open: adapters send
+/// as soon as they reply. One socket carries both directions: the adapter sends the inputs to this
+/// host on `port` (2222 unless the Forward_Open names another), and the outputs leave from it.
+pub async fn bind_io_socket(port: u16) -> Result<UdpSocket> {
+    let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port)).await?;
     tracing::debug!(local = %socket.local_addr()?, "I/O socket bound");
     Ok(socket)
 }
