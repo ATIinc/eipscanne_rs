@@ -420,6 +420,31 @@ async fn idle_outputs_are_not_applied_and_the_device_hears_once() {
 }
 
 #[tokio::test]
+async fn a_connection_is_idle_until_the_scanner_sends_run() {
+    let mut scanner = Scanner::connect().await;
+    let mut request = forward_open_request(1);
+    // 5.12 s without outputs before the connection times out
+    request.connection_timeout_multiplier = ConnectionTimeoutMultiplier::X512;
+    let reply = scanner.forward_open(request).await;
+    let o2t_id = forward_open_response(&reply).o2t_network_connection_id;
+    let o2t_endpoint = o2t_endpoint(&reply);
+
+    let running = [1, 1, 1, 1];
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 1, 1, RunOrIdle::Idle, &running)
+        .await;
+    for _ in 0..5 {
+        assert_eq!(scanner.next_inputs().await, [0; 4]);
+    }
+    // Run with the same CIP sequence count
+    scanner
+        .send_outputs(o2t_endpoint, o2t_id, 2, 1, RunOrIdle::Run, &running)
+        .await;
+    scanner.recv_inputs(&running).await;
+    assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 0);
+}
+
+#[tokio::test]
 async fn a_second_forward_open_is_refused() {
     let mut scanner = Scanner::connect().await;
     forward_open_response(&scanner.forward_open(forward_open_request(1)).await);

@@ -94,8 +94,8 @@ pub(crate) async fn receive_outputs(
     // None until the first accepted packet
     let mut last_sequence_number: Option<CipUdint> = None;
     let mut last_cip_sequence_count: Option<CipUint> = None;
-    // Until the first idle packet
-    let mut running = true;
+    // Idle until the scanner sends run
+    let mut running = false;
 
     loop {
         let (packet, from) = match timeout_at(deadline, output_packet_receiver.recv()).await {
