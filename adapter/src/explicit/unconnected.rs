@@ -17,9 +17,9 @@ pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
     header: &EncapsulationHeader,
     originator_ip: IpAddr,
-    command_specific_data: Option<&CommandSpecificData>,
+    command_specific_data: &CommandSpecificData,
 ) -> EnIpPacket {
-    let Some(CommandSpecificData::SendRrData(request_rr_data)) = command_specific_data else {
+    let CommandSpecificData::SendRrData(request_rr_data) = command_specific_data else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
     let CipMessage::Request(request) = &request_rr_data.cip_message else {
