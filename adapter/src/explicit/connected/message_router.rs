@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
+use std::time::Duration;
 
 use tokio::time::Instant;
 
@@ -204,13 +205,24 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             o2t_api_us = forward_open_response.o2t_actual_packet_interval,
             "class 3 connection opened"
         );
+        let inactivity_timeout = Duration::from_micros(
+            u64::from(
+                forward_open_request
+                    .connection_timeout_multiplier
+                    .multiplier(),
+            ) * u64::from(forward_open_response.o2t_actual_packet_interval),
+        );
         established_connections.insert(
             forward_open_response.o2t_network_connection_id,
-            ExplicitConnection::new(
-                forward_open_request,
-                forward_open_response.clone(),
+            ExplicitConnection {
+                request: forward_open_request,
+                response: forward_open_response.clone(),
                 originator_ip,
-            ),
+                inactivity_timeout,
+                // Its inactivity timer starts now
+                deadline: Instant::now() + inactivity_timeout,
+                last_cip_sequence_count: None,
+            },
         );
         Ok((forward_open_response, SocketAddrInfoItems::empty()))
     }

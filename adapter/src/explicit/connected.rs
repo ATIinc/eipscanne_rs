@@ -40,25 +40,3 @@ pub(crate) struct ExplicitConnection {
     /// The CIP sequence count of the last request; `None` before the first
     last_cip_sequence_count: Option<CipUint>,
 }
-
-impl ExplicitConnection {
-    /// An established connection; its inactivity timer starts now
-    fn new(
-        request: ForwardOpenRequest,
-        response: ForwardOpenResponse,
-        originator_ip: IpAddr,
-    ) -> Self {
-        let inactivity_timeout = Duration::from_micros(
-            u64::from(request.connection_timeout_multiplier.multiplier())
-                * u64::from(response.o2t_actual_packet_interval),
-        );
-        ExplicitConnection {
-            request,
-            response,
-            originator_ip,
-            inactivity_timeout,
-            deadline: Instant::now() + inactivity_timeout,
-            last_cip_sequence_count: None,
-        }
-    }
-}
