@@ -7,7 +7,7 @@ use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode, RRPacket
 use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::handle_request;
+use crate::explicit::handle_message_router_request;
 use crate::message_router::MessageRouter;
 use crate::packet::error_reply;
 
@@ -26,7 +26,7 @@ pub(crate) fn handle_send_rr_data(
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
 
-    let (response, socket_addr_info_items) = handle_request(
+    let (response, socket_addr_info_items) = handle_message_router_request(
         message_router,
         request,
         originator_ip,

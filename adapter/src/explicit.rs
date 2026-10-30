@@ -19,7 +19,7 @@ pub(crate) mod unconnected;
 
 /// The response to `request` from `originator_ip`, and the reply's Socket Address Info items.
 /// Single services need an attribute, All services none
-pub(crate) fn handle_request(
+pub(crate) fn handle_message_router_request(
     message_router: &impl MessageRouter,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
