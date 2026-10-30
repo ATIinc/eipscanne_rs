@@ -524,7 +524,7 @@ async fn a_connection_without_outputs_times_out_and_another_opens() {
     let mut scanner = Scanner::connect().await;
     forward_open_response(&scanner.forward_open(forward_open_request(1)).await);
 
-    // Past the grace for the first output packet
+    // Past the first output packet timeout
     tokio::time::sleep(Duration::from_secs(11)).await;
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
     assert_eq!(scanner.device.idle_count.load(Ordering::SeqCst), 1);

@@ -25,12 +25,12 @@ use crate::implicit::ImplicitDevice;
 use crate::implicit::connection::{ImplicitConnection, OpenConnection};
 use crate::packet::decode_data;
 
-/// The largest UDP payload, so no packet is cut short
+/// UDP's 16-bit length limit, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
 
-/// The least time the scanner gets for its first packet
-const FIRST_PACKET_GRACE: Duration = Duration::from_secs(10);
-/// The smallest allowed sequence number gap
+/// CIP: a target waits at least this long for the first packet after its Forward_Open reply
+const MIN_FIRST_PACKET_TIMEOUT: Duration = Duration::from_secs(10);
+/// EtherNet/IP's least Allowed Sequence Number Gap
 const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 
 /// Hands each O->T packet on `io_socket` to the open connection its connection id names
@@ -92,7 +92,7 @@ pub(crate) async fn receive_outputs(
                 .multiplier(),
         ) * u64::from(connection.response.o2t_actual_packet_interval),
     );
-    let mut deadline = Instant::now() + FIRST_PACKET_GRACE.max(timeout);
+    let mut deadline = Instant::now() + MIN_FIRST_PACKET_TIMEOUT.max(timeout);
     // None until the first accepted packet
     let mut last_sequence_number: Option<CipUdint> = None;
     let mut last_cip_sequence_count: Option<CipUint> = None;
