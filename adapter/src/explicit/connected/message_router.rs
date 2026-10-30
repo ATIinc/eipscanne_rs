@@ -2,7 +2,6 @@
 
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::time::Duration;
 
 use tokio::time::Instant;
 
@@ -47,15 +46,11 @@ impl<M: MessageRouter> ConnectedMessageRouter<M> {
         }
     }
 
-    /// How long the session's connection has until it times out; zero without one
-    pub(crate) fn class_3_time_left(&self) -> Duration {
+    /// When the session's connection times out unless a request comes first; `None` without one
+    pub(crate) fn connection_deadline(&self) -> Option<Instant> {
         self.established_connection()
             .as_ref()
-            .map_or(Duration::ZERO, |connection| {
-                connection
-                    .deadline
-                    .saturating_duration_since(Instant::now())
-            })
+            .map(|connection| connection.deadline)
     }
 
     /// Consumes a request on `connection_id` and restarts the inactivity timer; the T->O

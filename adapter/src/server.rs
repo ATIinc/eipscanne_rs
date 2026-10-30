@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
-use tokio::time::timeout;
+use tokio::time::{Instant, timeout};
 use tracing::Instrument;
 
 use eipscanne_rs::cip::types::CipUdint;
@@ -164,13 +164,16 @@ fn session_inactivity_timeout(
     options: ExplicitOptions,
     message_router: &ConnectedMessageRouter<impl MessageRouter>,
 ) -> Duration {
-    // An open class 3 connection is encapsulation activity until it times out
     let inactivity_timeout = options
         .encapsulation_inactivity_timeout
         .unwrap_or(Duration::MAX);
-    message_router
-        .class_3_time_left()
-        .saturating_add(inactivity_timeout)
+    // An open class 3 connection is encapsulation activity until it times out
+    match message_router.connection_deadline() {
+        Some(deadline) => deadline
+            .saturating_duration_since(Instant::now())
+            .saturating_add(inactivity_timeout),
+        None => inactivity_timeout,
+    }
 }
 
 /// The Register Session reply granting `session_handle`, or refusing another protocol version with ours
