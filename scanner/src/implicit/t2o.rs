@@ -10,12 +10,11 @@ use binrw::BinRead;
 use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionSizeType, RealTimeFormat, TransportClass, connection_size,
+    ConnectionSizeType, RealTimeFormat, TransportClass, connected_data_header_len,
 };
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 
 use crate::error::{Error, Result};
@@ -24,15 +23,13 @@ use crate::implicit::connection::{ImplicitConnection, data_len_matches_connectio
 /// The largest UDP payload, so no packet is cut short
 const MAX_UDP_PAYLOAD: usize = 65_535;
 
-/// Binds the I/O socket to UDP 2222 on every interface, before the Forward_Open: adapters send as
-/// soon as they reply. One socket carries both directions: the Forward_Open names no T->O address,
-/// so the adapter sends the inputs to this host on 2222, and the outputs leave from it.
-pub async fn bind_io_socket() -> Result<UdpSocket> {
-    Ok(UdpSocket::bind(SocketAddrV4::new(
-        Ipv4Addr::UNSPECIFIED,
-        ETHERNET_IP_IO_UDP_PORT,
-    ))
-    .await?)
+/// Binds the I/O socket to UDP `port` on every interface, before the Forward_Open: adapters send
+/// as soon as they reply. One socket carries both directions: the adapter sends the inputs to this
+/// host on `port` (2222 unless the Forward_Open names another), and the outputs leave from it.
+pub async fn bind_io_socket(port: u16) -> Result<UdpSocket> {
+    let socket = UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, port)).await?;
+    tracing::debug!(local = %socket.local_addr()?, "I/O socket bound");
+    Ok(socket)
 }
 
 /// Receives one I/O packet and its sender. Cancel safe.
@@ -56,9 +53,9 @@ const MIN_ALLOWED_SEQUENCE_GAP: u32 = 16;
 /// decode).
 pub fn accept_t2o_packet(
     connection: &ImplicitConnection,
-    last_sequence_number: Option<CipUdint>,
     packet: &EnIpIoPacket,
     from: SocketAddr,
+    last_sequence_number: Option<CipUdint>,
 ) -> Result<(SequencedAddress, CipIoData)> {
     // 1. It is for this connection
     let address: SequencedAddress = packet.sequenced_address;
@@ -114,7 +111,7 @@ pub fn accept_t2o_packet(
         real_time_format,
     );
     // The sequence count and header precede the data
-    let overhead = usize::from(connection_size(0, transport_class, real_time_format));
+    let overhead = usize::from(connected_data_header_len(transport_class, real_time_format));
     let data_len = bytes.len().saturating_sub(overhead);
     if bytes.len() < overhead || !data_len_matches_connection(data_len, expected, size_type) {
         return Err(Error::UnexpectedPacket(format!(
@@ -151,7 +148,7 @@ mod tests {
     use eipscanne_rs::cip::connection_manager::parameters::{
         ConnectionSizeType, ConnectionTimeoutMultiplier, RealTimeFormat,
     };
-    use eipscanne_rs::cip::io_data::RunIdleHeader;
+    use eipscanne_rs::cip::io_data::{OutputControlHeader, RunOrIdle};
     use eipscanne_rs::cip::types::CipUint;
 
     use crate::implicit::connection::test_support::{
@@ -184,9 +181,9 @@ mod tests {
     ) -> Result<(SequencedAddress, CipIoData)> {
         accept_t2o_packet(
             connection,
-            Some(last),
             &input_packet(received, 1, &[0; 32]),
             from_adapter(),
+            Some(last),
         )
     }
 
@@ -208,9 +205,9 @@ mod tests {
         let any_port = SocketAddr::V4(SocketAddrV4::new(TARGET_IP, 49152));
         let (address, inputs) = accept_t2o_packet(
             &sample_connection(),
-            None,
             &input_packet(0xdead_beef, 7, &data),
             any_port,
+            None,
         )
         .unwrap();
         assert_eq!(
@@ -224,7 +221,7 @@ mod tests {
             inputs,
             CipIoData {
                 cip_sequence_count: Some(7),
-                run_idle_header: None,
+                output_control_header: None,
                 data: CipDataOpt::Raw(data),
             }
         );
@@ -235,32 +232,32 @@ mod tests {
             standard_parameters(34, ConnectionSizeType::Variable);
         let (_, inputs) = accept_t2o_packet(
             &variable,
-            None,
             &input_packet(1, 1, &[7; 3]),
             from_adapter(),
+            None,
         )
         .unwrap();
         assert_eq!(inputs.data, CipDataOpt::Raw(vec![7; 3]));
 
-        // A run/idle header: the same 32 bytes of data behind it
+        // A 32-bit header: the same 32 bytes of data behind it
         let mut header = sample_connection();
         header.t2o_real_time_format = RealTimeFormat::Header32Bit;
         header.request.t2o_network_connection_parameters =
             standard_parameters(38, ConnectionSizeType::Fixed);
-        let idle_header = RunIdleHeader::builder()
-            .run_idle(false)
+        let idle_header = OutputControlHeader::builder()
+            .run_or_idle(RunOrIdle::Idle)
             .claim_output_ownership(false)
             .ready_for_ownership_of_outputs(u2::new(0))
             .build();
         let mut bytes = u32::from(idle_header).to_le_bytes().to_vec();
         bytes.extend_from_slice(&[0; 32]);
         let (_, inputs) =
-            accept_t2o_packet(&header, None, &input_packet(1, 1, &bytes), from_adapter()).unwrap();
+            accept_t2o_packet(&header, &input_packet(1, 1, &bytes), from_adapter(), None).unwrap();
         assert_eq!(
             inputs,
             CipIoData {
                 cip_sequence_count: Some(1),
-                run_idle_header: Some(idle_header),
+                output_control_header: Some(idle_header),
                 data: CipDataOpt::Raw(vec![0; 32]),
             }
         );
@@ -304,7 +301,7 @@ mod tests {
 
         for (packet, from, reason) in cases {
             assert_eq!(
-                accept_t2o_packet(&sample_connection(), None, &packet, from)
+                accept_t2o_packet(&sample_connection(), &packet, from, None)
                     .unwrap_err()
                     .to_string(),
                 format!("unexpected packet: {reason}")

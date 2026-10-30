@@ -5,7 +5,7 @@ use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 use bilge::prelude::{u4, u9};
-use binrw::{BinRead, BinWrite};
+use binrw::{BinRead, BinResult, BinWrite};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 
@@ -19,28 +19,25 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     RedundantOwner, StandardNetworkConnectionParameters, TransportClass, TransportTypeTrigger,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::io_data::RunOrIdle;
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
+use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
 use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipUdint;
-use eipscanne_rs::eip::command::{
-    CommandSpecificData, EnIpCommand, EncapsStatusCode, RRPacketData, RegisterData,
-};
-use eipscanne_rs::eip::constants::{
-    CIP_INTERFACE_HANDLE, DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT,
-    ENCAPSULATION_PROTOCOL_VERSION, NO_ENCAPSULATION_TIMEOUT, REGISTER_SESSION_OPTION_FLAGS,
-};
+use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
+use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use scanner::implicit::connection::{forward_close, forward_open_implicit};
 use scanner::implicit::o2t::{build_o2t_packet, send_io_packet};
 use scanner::implicit::t2o::{accept_t2o_packet, recv_io_packet};
-use scanner::session::Session;
+use scanner::session::{Session, SessionConfig};
 
 const SESSION_HANDLE: CipUdint = 0x0000_0042;
 const O2T_NETWORK_CONNECTION_ID: CipUdint = 0xa1b2_c3d4;
@@ -92,29 +89,31 @@ fn request() -> ForwardOpenRequest {
 // ======= The fake adapter ========
 
 /// Reads one encapsulation packet the way an adapter does: the header, then its Length
-async fn read_request(stream: &mut TcpStream) -> EnIpPacket {
+async fn read_packet(stream: &mut TcpStream) -> BinResult<EnIpPacket> {
     let mut bytes = vec![0u8; 24];
-    stream.read_exact(&mut bytes).await.unwrap();
-    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes)).unwrap();
-    bytes.resize(24 + usize::from(header.length.unwrap()), 0);
-    stream.read_exact(&mut bytes[24..]).await.unwrap();
-    EnIpPacket::read(&mut Cursor::new(&bytes)).unwrap()
+    stream.read_exact(&mut bytes).await?;
+    let header = EncapsulationHeader::read(&mut Cursor::new(&bytes))?;
+    bytes.resize(24 + usize::from(header.length.unwrap_or(0)), 0);
+    stream.read_exact(&mut bytes[24..]).await?;
+    EnIpPacket::read(&mut Cursor::new(&bytes))
 }
 
-async fn write_reply(stream: &mut TcpStream, reply: &EnIpPacket) {
+/// Writes one encapsulation packet
+async fn write_packet(stream: &mut TcpStream, packet: &EnIpPacket) -> BinResult<()> {
     let mut bytes = Cursor::new(Vec::new());
-    reply.write(&mut bytes).unwrap();
-    stream.write_all(bytes.get_ref()).await.unwrap();
+    packet.write(&mut bytes)?;
+    stream.write_all(bytes.get_ref()).await?;
+    Ok(())
 }
 
-fn header(command: EnIpCommand) -> EncapsulationHeader {
-    EncapsulationHeader {
-        command,
-        length: None,
-        session_handle: SESSION_HANDLE,
-        status_code: EncapsStatusCode::Success,
-        sender_context: EMPTY_SENDER_CONTEXT,
-        options: DEFAULT_ENCAPSULATION_OPTIONS,
+/// The Message Router request a Send RR Data packet carries
+fn extract_message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
+    let CommandSpecificData::SendRrData(rr_data) = &packet.command_specific_data else {
+        return None;
+    };
+    match &rr_data.cip_message {
+        CipMessage::Request(request) => Some(request),
+        CipMessage::Response(_) => None,
     }
 }
 
@@ -124,33 +123,26 @@ fn connection_manager_reply(
     data: impl CipData + 'static,
     socket_addr_info_items: SocketAddrInfoItems,
 ) -> EnIpPacket {
-    let mut rr_data = RRPacketData::new_unconnected(
-        CIP_INTERFACE_HANDLE,
-        NO_ENCAPSULATION_TIMEOUT,
-        MessageRouterResponse {
-            service_container: ServiceContainer::new_response(service),
-            response_data: ResponseData {
-                status: ResponseStatusCode::Success,
-                additional_status_size: 0,
-                additional_status: vec![],
-                data: CipDataOpt::Typed(Box::new(data)),
-            },
+    let response = MessageRouterResponse {
+        service_container: ServiceContainer::new_response(service),
+        response_data: ResponseData {
+            status: ResponseStatusCode::Success,
+            additional_status_size: 0,
+            additional_status: vec![],
+            data: CipDataOpt::Typed(Box::new(data)),
         },
-    );
-    rr_data.socket_addr_info_items = socket_addr_info_items;
-    EnIpPacket {
-        header: header(EnIpCommand::SendRrData),
-        command_specific_data: CommandSpecificData::SendRrData(rr_data),
-    }
+    };
+    EnIpPacket::new_send_rr_data(
+        SESSION_HANDLE,
+        NO_ENCAPSULATION_TIMEOUT,
+        response,
+        socket_addr_info_items,
+    )
 }
 
 /// The Forward_Open request inside a packet, as the adapter parses it
-fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(CipMessage::Request(message)) = packet
-        .command_specific_data
-        .as_send_rr_data()
-        .map(|rr_data| &rr_data.cip_message)
-    else {
+fn extract_forward_open_request(packet: &EnIpPacket) -> ForwardOpenRequest {
+    let Some(message) = extract_message_router_request(packet) else {
         panic!("expected a request, got {:?}", packet.command_specific_data);
     };
     assert_eq!(
@@ -160,42 +152,48 @@ fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
     let CipDataOpt::Raw(data) = &message.request_data.additional_data else {
         panic!("expected raw request data");
     };
-    ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (false,)).unwrap()
+    ForwardOpenRequest::read_le_args(&mut Cursor::new(data), (false,))
+        .expect("the scanner sends a well-formed Forward_Open")
 }
 
 /// Plays the adapter for one connection; returns the output packet's sequence number and data
-async fn fake_adapter(
-    listener: TcpListener,
-    io_socket: UdpSocket,
-    scanner_io_port: u16,
-) -> Vec<u8> {
-    let (mut stream, _) = listener.accept().await.unwrap();
+async fn fake_adapter(listener: TcpListener, io_socket: UdpSocket) -> Vec<u8> {
+    let (mut stream, _) = listener.accept().await.expect("the scanner connects once");
 
     // 1. RegisterSession
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Register Session");
     assert_eq!(request.header.command, EnIpCommand::RegisterSession);
-    write_reply(
-        &mut stream,
-        &EnIpPacket {
-            header: header(EnIpCommand::RegisterSession),
-            command_specific_data: CommandSpecificData::RegisterSession(RegisterData {
-                protocol_version: ENCAPSULATION_PROTOCOL_VERSION,
-                option_flags: REGISTER_SESSION_OPTION_FLAGS,
-            }),
-        },
-    )
-    .await;
+    let mut reply = EnIpPacket::new_registration();
+    reply.header.session_handle = SESSION_HANDLE;
+    write_packet(&mut stream, &reply)
+        .await
+        .expect("the scanner waits for the Register Session reply");
 
     // 2. Forward_Open: grant the intervals, pick the O->T ID and the outputs' port
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Forward_Open");
     assert_eq!(request.header.session_handle, SESSION_HANDLE);
-    let forward_open = forward_open_request_of(&request);
+    let forward_open = extract_forward_open_request(&request);
     assert_eq!(
         forward_open.t2o_network_connection_id,
         T2O_NETWORK_CONNECTION_ID
     );
-    let io_port = io_socket.local_addr().unwrap().port();
-    write_reply(
+    // The inputs go to the port the T->O Socket Address Info item names
+    let scanner_io_port: u16 = request
+        .command_specific_data
+        .as_send_rr_data()
+        .and_then(|rr_data| rr_data.socket_addr_info_items.t2o)
+        .expect("the scanner names its ephemeral I/O port")
+        .socket_address()
+        .port();
+    let io_port = io_socket
+        .local_addr()
+        .expect("a bound socket has a local address")
+        .port();
+    write_packet(
         &mut stream,
         &connection_manager_reply(
             ServiceCode::ForwardOpen,
@@ -217,10 +215,13 @@ async fn fake_adapter(
             },
         ),
     )
-    .await;
+    .await
+    .expect("the scanner waits for the Forward_Open reply");
 
     // 3. One output packet in, the same bytes back as an input packet
-    let (packet, _) = recv_io_packet(&io_socket).await.unwrap();
+    let (packet, _) = recv_io_packet(&io_socket)
+        .await
+        .expect("the scanner sends one output packet");
     assert_eq!(
         packet.sequenced_address.connection_id,
         O2T_NETWORK_CONNECTION_ID
@@ -238,22 +239,20 @@ async fn fake_adapter(
         SocketAddrV4::new(LOCALHOST, scanner_io_port),
     )
     .await
-    .unwrap();
+    .expect("UDP sends to the scanner's bound loopback port");
 
     // 4. Forward_Close
-    let request = read_request(&mut stream).await;
-    let Some(CipMessage::Request(message)) = request
-        .command_specific_data
-        .as_send_rr_data()
-        .map(|rr_data| &rr_data.cip_message)
-    else {
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Forward_Close");
+    let Some(message) = extract_message_router_request(&request) else {
         panic!("expected a Forward_Close request");
     };
     assert_eq!(
         message.service_container.service(),
         ServiceCode::ForwardClose
     );
-    write_reply(
+    write_packet(
         &mut stream,
         &connection_manager_reply(
             ServiceCode::ForwardClose,
@@ -265,10 +264,13 @@ async fn fake_adapter(
             SocketAddrInfoItems::empty(),
         ),
     )
-    .await;
+    .await
+    .expect("the scanner waits for the Forward_Close reply");
 
     // 5. UnregisterSession
-    let request = read_request(&mut stream).await;
+    let request = read_packet(&mut stream)
+        .await
+        .expect("the scanner sends Unregister Session");
     assert_eq!(request.header.command, EnIpCommand::UnRegisterSession);
 
     outputs
@@ -278,17 +280,31 @@ async fn fake_adapter(
 
 #[tokio::test]
 async fn one_connection_against_a_fake_adapter() {
-    let listener = TcpListener::bind((LOCALHOST, 0)).await.unwrap();
-    let adapter_port = listener.local_addr().unwrap().port();
-    let adapter_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
+    let listener = TcpListener::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let adapter_port = listener
+        .local_addr()
+        .expect("a bound listener has a local address")
+        .port();
+    let adapter_io_socket = UdpSocket::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
     // An ephemeral port, so the test never collides with a running scanner
-    let scanner_io_socket = UdpSocket::bind((LOCALHOST, 0)).await.unwrap();
-    let scanner_io_port = scanner_io_socket.local_addr().unwrap().port();
+    let scanner_io_socket = UdpSocket::bind((LOCALHOST, 0))
+        .await
+        .expect("port 0 lets the OS pick a free loopback port");
+    let scanner_io_port = scanner_io_socket
+        .local_addr()
+        .expect("a bound socket has a local address")
+        .port();
 
-    let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket, scanner_io_port));
+    let adapter = tokio::spawn(fake_adapter(listener, adapter_io_socket));
 
     // 1. Session
-    let mut session = Session::register((LOCALHOST, adapter_port)).await.unwrap();
+    let mut session = Session::register((LOCALHOST, adapter_port), SessionConfig::default())
+        .await
+        .expect("the fake adapter grants Register Session");
     assert_eq!(session.session_handle(), SESSION_HANDLE);
     assert_eq!(session.peer_ip(), LOCALHOST);
 
@@ -298,9 +314,10 @@ async fn one_connection_against_a_fake_adapter() {
         request(),
         RealTimeFormat::Header32Bit,
         RealTimeFormat::Modeless,
+        scanner_io_port,
     )
     .await
-    .unwrap();
+    .expect("the fake adapter grants the Forward_Open");
     assert_eq!(
         connection.response.o2t_network_connection_id,
         O2T_NETWORK_CONNECTION_ID
@@ -314,24 +331,39 @@ async fn one_connection_against_a_fake_adapter() {
 
     // 3. One cycle each way
     let outputs = [0xde, 0xad, 0xbe, 0xef];
-    let packet =
-        build_o2t_packet(&connection, 7, 1, CipDataOpt::Raw(outputs.to_vec()), true).unwrap();
+    let packet = build_o2t_packet(
+        &connection,
+        7,
+        1,
+        CipDataOpt::Raw(outputs.to_vec()),
+        RunOrIdle::Run,
+    )
+    .expect("the four output bytes fit the O->T size");
     send_io_packet(&scanner_io_socket, &packet, connection.o2t_endpoint)
         .await
-        .unwrap();
+        .expect("UDP sends to the fake adapter's bound loopback port");
 
-    let (packet, from) = recv_io_packet(&scanner_io_socket).await.unwrap();
-    let (address, inputs) = accept_t2o_packet(&connection, None, &packet, from).unwrap();
+    let (packet, from) = recv_io_packet(&scanner_io_socket)
+        .await
+        .expect("the fake adapter echoes the outputs as one input packet");
+    let (address, inputs) = accept_t2o_packet(&connection, &packet, from, None)
+        .expect("the fake adapter sends on the granted T->O connection ID");
     assert_eq!(address.encapsulation_sequence_number, 1);
     assert_eq!(inputs.cip_sequence_count, Some(1));
-    assert_eq!(inputs.run_idle_header, None);
+    assert_eq!(inputs.output_control_header, None);
     assert_eq!(inputs.data, CipDataOpt::Raw(outputs.to_vec()));
 
     // 4. Close, 5. End session
     forward_close(&mut session, &connection.request)
         .await
-        .unwrap();
-    session.unregister().await.unwrap();
+        .expect("the fake adapter grants the Forward_Close");
+    session
+        .unregister()
+        .await
+        .expect("the fake adapter reads Unregister Session");
 
-    assert_eq!(adapter.await.unwrap(), outputs);
+    assert_eq!(
+        adapter.await.expect("the fake adapter's asserts hold"),
+        outputs
+    );
 }

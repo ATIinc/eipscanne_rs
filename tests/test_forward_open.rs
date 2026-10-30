@@ -14,7 +14,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     LargeNetworkConnectionParameters, NetworkConnectionParameters, PriorityTimeTick,
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
-    TransportClass, TransportTypeTrigger, connection_size,
+    TransportClass, TransportTypeTrigger, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
@@ -36,6 +36,7 @@ use eipscanne_rs::eip::constants::{
     NO_ENCAPSULATION_TIMEOUT,
 };
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::{RequestObjectAssembly, ResponseObjectAssembly};
 
 use common::{
@@ -100,7 +101,7 @@ fn sample_network_connection_parameters(
     large: bool,
     real_time_format: RealTimeFormat,
 ) -> NetworkConnectionParameters {
-    let size = connection_size(IO_DATA_SIZE, TransportClass::Class1, real_time_format);
+    let size = IO_DATA_SIZE + connected_data_header_len(TransportClass::Class1, real_time_format);
     if large {
         NetworkConnectionParameters::Large(sample_large_parameters(size))
     } else {
@@ -306,6 +307,7 @@ fn test_serialize_forward_open_request() {
                     additional_data: CipDataOpt::Typed(Box::new(request.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -316,8 +318,11 @@ fn test_serialize_forward_open_request() {
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // The constructor builds the same packet, computing the lengths while writing
-    let request_object =
-        RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
+    let request_object = RequestObjectAssembly::new_forward_open(
+        CLEARLINK_IO_SESSION_HANDLE,
+        request.clone(),
+        SocketAddrInfoItems::empty(),
+    );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = Cursor::new(&mut byte_array_buffer);
@@ -477,6 +482,7 @@ fn test_serialize_large_forward_open_request() {
                     additional_data: CipDataOpt::Typed(Box::new(request.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -487,8 +493,11 @@ fn test_serialize_large_forward_open_request() {
     assert_eq_hex!(expected_byte_array, byte_array_buffer);
 
     // The constructor picks the Large_Forward_Open service from the parameter width
-    let request_object =
-        RequestObjectAssembly::new_forward_open(CLEARLINK_IO_SESSION_HANDLE, request.clone());
+    let request_object = RequestObjectAssembly::new_forward_open(
+        CLEARLINK_IO_SESSION_HANDLE,
+        request.clone(),
+        SocketAddrInfoItems::empty(),
+    );
 
     let mut byte_array_buffer: Vec<u8> = Vec::new();
     let mut writer = Cursor::new(&mut byte_array_buffer);
@@ -627,6 +636,7 @@ fn test_deserialize_forward_open_success_response() {
                     data: CipDataOpt::Typed(Box::new(expected_response.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 

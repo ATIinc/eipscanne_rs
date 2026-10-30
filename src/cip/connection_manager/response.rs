@@ -124,7 +124,7 @@ impl Rejection {
             return None;
         }
         let word = self.additional_status.first()?;
-        // Reading a 16-bit word cannot fail: every value without a variant of its own is `Unknown`
+        // Read, not cast: the codes exist only as binrw magics, and any other word is `Unknown`
         ConnectionManagerExtendedStatus::read_le(&mut Cursor::new(word.to_le_bytes())).ok()
     }
 }

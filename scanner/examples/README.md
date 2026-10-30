@@ -2,14 +2,14 @@
 
 The examples of the [`scanner`](../) crate, each a single file. Run one from the
 repository root: `cargo run --example <name>`; `-- --help` lists its flags.
+`RUST_LOG=scanner=debug` shows the scanner's log lines.
 
 | Example | Device | Messaging | Moves hardware |
 |---|---|---|---|
 | `read-identity` | any adapter | explicit | no |
 | `read-identity-connected` | any class 3 adapter | explicit (connected) | no |
 | `opener-implicit` | OpENer | implicit | no |
-| `opener-eds-implicit` | OpENer, from its EDS | implicit | no |
-| `clearlink-explicit-outputs` | Teknic ClearLink | explicit | digital outputs |
+| `opener-eds-implicit` | OpENer, from a sample EDS | implicit | no |
 | `io-hub-explicit-homing` | Teknic IO-HUB-4-E | explicit | a motor |
 | `io-hub-eds-implicit` | Teknic IO-HUB-4-E, from its EDS | implicit | no |
 | `flexi-net-implicit` | SICK flexi-net | implicit | safety logic inputs |
@@ -31,26 +31,22 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 
 ## OpENer
 
-OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100).
+OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100), idle ones too.
 
 ### opener-implicit
 
 Opens a class 1 connection, exchanges I/O for a number of cycles and closes it. `main` is the five
 stages in order: register the session, open the connection, exchange I/O, close the connection,
-unregister.
+unregister. `--toggle-every N` switches the outputs between run and idle every N cycles.
 
 ### opener-eds-implicit
 
-`opener-implicit` with the connection read from OpENer's EDS
-(`scanner/tests/fixtures/sample_adapter.eds`). The outputs are sent idle.
+`opener-implicit` with the connection read from a sample EDS
+(`scanner/tests/fixtures/sample_adapter.eds`). `--idle` sends the outputs idle. `--connection 2`
+opens the Input Only connection, and `--io-port N` takes the inputs on port N, so a second run
+can open a connection beside the first.
 
 ## Teknic
-
-### clearlink-explicit-outputs
-
-Sets one digital output of a ClearLink and checks it in the input assembly, using the assemblies
-of Teknic's
-[object reference](https://www.teknic.com/files/downloads/clearlink_ethernet-ip_object_reference.pdf#page=18).
 
 ### io-hub-explicit-homing
 
@@ -60,7 +56,8 @@ included.
 ### io-hub-eds-implicit
 
 Opens the IO-HUB-4-E's connection from its EDS and prints one motor's status whenever it
-changes. Every output stays off, sent idle.
+changes. Every output stays off; `--toggle-every N` switches them between run and idle every N
+cycles.
 
 ## SICK
 
@@ -74,4 +71,4 @@ to 0 before the connection closes.
 Write plain `binrw` structs in `scanner/assemblies/<device>/`. The same struct decodes an explicit
 reply and implicit inputs, and is sent as implicit outputs. An EDS's `AssemN` members are
 `ParamN`s, each with a type, name and units: write the structs from them (or hand the EDS to
-Claude), name reserved bytes `_reserved`, and test against the real device's packet bytes.
+Claude), skip reserved bytes with `pad_before`/`pad_after`, and test against the real device's packet bytes.

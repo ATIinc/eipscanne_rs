@@ -1,13 +1,13 @@
 # Tests
 
-`cargo test` from the repository root runs the byte-exact packet tests here, one file per packet
-type. [integration](./integration/) runs the examples against an OpENer adapter.
+`cargo test` from the repository root runs the byte-exact packet tests here, grouped by packet or
+field type. [integration](./integration/) starts an OpENer adapter for the examples.
 
 ## Packet tests
 
-Each test holds one packet four ways: its Wireshark dissection and hex dump (a comment), its
-bytes, and the struct they decode to. It serializes the struct and compares the bytes with
-`assert_eq_hex!`, then deserializes the bytes and compares the struct. Values shared between
+Most tests hold one packet four ways: its Wireshark dissection and hex dump (a comment), its
+bytes, and the struct they decode to. They serialize the struct and compare the bytes with
+`assert_eq_hex!`, deserialize the bytes and compare the struct, or both. Values shared between
 files, such as session handles and connection IDs, live in `common.rs`.
 
 The bytes are known packet bytes, from one of:

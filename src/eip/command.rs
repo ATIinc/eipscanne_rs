@@ -90,11 +90,13 @@ pub struct RRPacketData {
 // ======= Start of RRPacketData impl ========
 
 impl RRPacketData {
-    /// An unconnected message: the Null Address Item followed by the Unconnected Data Item
+    /// An unconnected message: the Null Address Item, the Unconnected Data Item, then
+    /// `socket_addr_info_items`
     pub fn new_unconnected(
         interface_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
+        socket_addr_info_items: SocketAddrInfoItems,
     ) -> Self {
         RRPacketData {
             interface_handle,
@@ -108,7 +110,7 @@ impl RRPacketData {
                 packet_length: None,
             },
             cip_message: message.into(),
-            socket_addr_info_items: SocketAddrInfoItems::empty(),
+            socket_addr_info_items,
         }
     }
 }
@@ -204,8 +206,9 @@ pub struct RegisterData {
 #[derive(Debug, PartialEq)]
 #[br(import(command_type: EnIpCommand))]
 pub enum CommandSpecificData {
-    #[br(pre_assert(command_type == EnIpCommand::UnRegisterSession))]
-    UnregisterSession,
+    /// No data, Length 0
+    #[br(pre_assert(matches!(command_type, EnIpCommand::UnRegisterSession | EnIpCommand::NOP)))]
+    NoData,
 
     #[br(pre_assert(command_type == EnIpCommand::RegisterSession))]
     RegisterSession(RegisterData),
@@ -234,11 +237,13 @@ impl CommandSpecificData {
         interface_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
+        socket_addr_info_items: SocketAddrInfoItems,
     ) -> Self {
         Self::SendRrData(RRPacketData::new_unconnected(
             interface_handle,
             timeout,
             message,
+            socket_addr_info_items,
         ))
     }
 
