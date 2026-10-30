@@ -12,6 +12,7 @@ use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_I
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use common::{CLEARLINK_IO_SESSION_HANDLE, CLEARLINK_OUTPUT_ASSEMBLY_INSTANCE};
@@ -93,6 +94,7 @@ fn test_write_output_assembly_object_request() {
         provided_session_handle,
         NO_ENCAPSULATION_TIMEOUT,
         full_path_request,
+        SocketAddrInfoItems::empty(),
     );
 
     // Write the object_assembly binary data to the buffer

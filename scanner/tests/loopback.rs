@@ -114,13 +114,12 @@ fn connection_manager_reply(
             data: CipDataOpt::Typed(Box::new(data)),
         },
     };
-    let mut reply =
-        EnIpPacket::new_send_rr_data(SESSION_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
-    let CommandSpecificData::SendRrData(rr_data) = &mut reply.command_specific_data else {
-        unreachable!("a Send RR Data packet");
-    };
-    rr_data.socket_addr_info_items = socket_addr_info_items;
-    reply
+    EnIpPacket::new_send_rr_data(
+        SESSION_HANDLE,
+        NO_ENCAPSULATION_TIMEOUT,
+        response,
+        socket_addr_info_items,
+    )
 }
 
 /// The Forward_Open request inside a packet, as the adapter parses it

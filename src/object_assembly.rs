@@ -9,8 +9,7 @@ use crate::cip::object_ids::{
 };
 use crate::cip::path::CipPath;
 use crate::cip::types::CipUdint;
-use crate::eip::command::{CommandSpecificData, EnIpCommand, RRPacketData};
-use crate::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
+use crate::eip::constants::NO_ENCAPSULATION_TIMEOUT;
 use crate::eip::packet::EnIpPacket;
 use crate::eip::socket_addr::SocketAddrInfoItems;
 
@@ -44,6 +43,7 @@ impl RequestObjectAssembly {
             session_handle,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest::new_data(service_code, request_path, data),
+            SocketAddrInfoItems::empty(),
         )
     }
 
@@ -54,22 +54,15 @@ impl RequestObjectAssembly {
         request: ForwardOpenRequest,
         socket_addr_info_items: SocketAddrInfoItems,
     ) -> Self {
-        let message = MessageRouterRequest::new_data(
-            request.service_code(),
-            CipPath::new_u8(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
-            Some(Box::new(request)),
-        );
-        Self::new(
-            EnIpCommand::SendRrData,
+        Self::new_send_rr_data(
             session_handle,
-            CommandSpecificData::SendRrData(RRPacketData {
-                socket_addr_info_items,
-                ..RRPacketData::new_unconnected(
-                    CIP_INTERFACE_HANDLE,
-                    NO_ENCAPSULATION_TIMEOUT,
-                    message,
-                )
-            }),
+            NO_ENCAPSULATION_TIMEOUT,
+            MessageRouterRequest::new_data(
+                request.service_code(),
+                CipPath::new_u8(CONNECTION_MANAGER_CLASS_ID, CONNECTION_MANAGER_INSTANCE_ID),
+                Some(Box::new(request)),
+            ),
+            socket_addr_info_items,
         )
     }
 
