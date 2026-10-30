@@ -22,7 +22,7 @@ cargo run --example io-hub-explicit-homing -- --host 127.0.0.1 --motor 0
 cargo run --example io-hub-eds-implicit -- --host 127.0.0.1 --motor 0
 ```
 
-`read-identity` prints `Product Name: "Sample IO-HUB"`; `io-hub-explicit-homing` prints `HOMED`; `io-hub-eds-implicit` prints a burst of `position=` lines every 4 s. `--host 0.0.0.0` serves other hosts too.
+`read-identity` prints `Product Name: "Sample IO-HUB"`; `io-hub-explicit-homing` prints `HOMED`; `io-hub-eds-implicit` prints a burst of `position=` lines every 4 s; with `--toggle-every 400` it switches between run and idle every 4 s, and no burst comes while idle. `--host 0.0.0.0` serves other hosts too.
 
 ## Sample implicit adapter
 
