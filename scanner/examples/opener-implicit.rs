@@ -23,7 +23,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     LargeNetworkConnectionParameters, NetworkConnectionParameters, PriorityTimeTick,
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
-    TransportClass, TransportTypeTrigger, connection_size,
+    TransportClass, TransportTypeTrigger, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::RunOrIdle;
@@ -87,9 +87,9 @@ impl Args {
         let requested_packet_interval = self.rpi * 1000;
         // Each connection size counts the 16-bit sequence count and the real-time header too
         let o2t_size: u16 =
-            connection_size(DATA_SIZE, TransportClass::Class1, O2T_REAL_TIME_FORMAT);
+            DATA_SIZE + connected_data_header_len(TransportClass::Class1, O2T_REAL_TIME_FORMAT);
         let t2o_size: u16 =
-            connection_size(DATA_SIZE, TransportClass::Class1, T2O_REAL_TIME_FORMAT);
+            DATA_SIZE + connected_data_header_len(TransportClass::Class1, T2O_REAL_TIME_FORMAT);
 
         Ok(ForwardOpenRequest {
             // 5 ticks of 1024 ms until the request itself times out
