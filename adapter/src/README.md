@@ -21,7 +21,7 @@ server::serve
    │  └─ explicit::connected::send_unit_data::handle_send_unit_data
    │     ├─ MessageRouter::extract_t2o_info_from_connected_request  a discarded request has no reply
    │     ├─ explicit::handle_message_router_request                 as above
-   │     └─ reply_unit_data
+   │     └─ refuse_if_too_large
    ├─ any other command
    │  └─ packet::error_reply
    └─ packet::write_packet
