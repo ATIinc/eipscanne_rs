@@ -10,7 +10,7 @@ use binrw::BinRead;
 use tokio::net::UdpSocket;
 
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionSizeType, RealTimeFormat, TransportClass, connection_size,
+    ConnectionSizeType, RealTimeFormat, TransportClass, connected_data_header_len,
 };
 use eipscanne_rs::cip::io_data::CipIoData;
 use eipscanne_rs::cip::message::data::CipDataOpt;
@@ -116,7 +116,7 @@ pub fn accept_t2o_packet(
         real_time_format,
     );
     // The sequence count and header precede the data
-    let overhead = usize::from(connection_size(0, transport_class, real_time_format));
+    let overhead = usize::from(connected_data_header_len(transport_class, real_time_format));
     let data_len = bytes.len().saturating_sub(overhead);
     if bytes.len() < overhead || !data_len_matches_connection(data_len, expected, size_type) {
         return Err(Error::UnexpectedPacket(format!(
