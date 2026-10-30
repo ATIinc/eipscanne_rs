@@ -14,8 +14,10 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionTimeoutMultiplier, PriorityTimeTick,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipByte;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
+use scanner::error::Error;
 use scanner::implicit::eds::forward_open_request;
 
 const SAMPLE_ADAPTER: &str = include_str!("fixtures/sample_adapter.eds");
@@ -60,4 +62,28 @@ fn the_exclusive_owner_connection_builds_the_known_forward_open() {
     let bytes = bytes.into_inner();
 
     assert_eq_hex!(expected_byte_array, bytes);
+}
+
+#[test]
+fn the_input_only_connection_opens_the_heartbeat_point() {
+    let eds = Eds::parse(SAMPLE_ADAPTER).unwrap();
+
+    let request = forward_open_request(&eds, &eds.connections[&2], None).unwrap();
+
+    // 20 04 24 97 2C FE 2C 64: configuration 0x97, heartbeat 0xFE, inputs 0x64
+    assert_eq!(
+        request.connection_path,
+        CipPath::new_assembly_connection(0x97, 0xfe, 0x64)
+    );
+}
+
+#[test]
+fn an_input_only_connection_without_heartbeats_is_refused() {
+    // Connection2 with a modeless O->T format
+    let text = SAMPLE_ADAPTER.replace("0x44440305", "0x44440005");
+    let eds = Eds::parse(&text).unwrap();
+
+    let refused = forward_open_request(&eds, &eds.connections[&2], None);
+
+    assert!(matches!(refused, Err(Error::UnsupportedConnection(_))));
 }
