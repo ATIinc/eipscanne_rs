@@ -38,7 +38,7 @@ pub(crate) fn handle_send_unit_data(
     let cip_sequence_count = request_unit_data.cip_sequence_count;
     // The reply goes out on this connection, even when the request closes it
     let (t2o_network_connection_id, t2o_connection_size) = match message_router
-        .accept_connected_request(
+        .extract_t2o_info_from_connected_request(
             request_unit_data.connection_id,
             cip_sequence_count,
             originator_ip,

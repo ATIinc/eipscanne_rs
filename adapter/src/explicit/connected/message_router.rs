@@ -247,10 +247,11 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
         })
     }
 
-    /// Consumes a request on the established connection `connection_id`, when `originator_ip`
-    /// opened it, and restarts its inactivity timer; `Error::UnexpectedPacket` when
-    /// `cip_sequence_count` repeats the last one. Any other connection is `message_router`'s
-    fn accept_connected_request(
+    /// The T->O connection ID and size of the reply to a request on the established connection
+    /// `connection_id`, when `originator_ip` opened it, after restarting its inactivity timer;
+    /// `Error::UnexpectedPacket` when `cip_sequence_count` repeats the last one. Any other
+    /// connection is `message_router`'s
+    fn extract_t2o_info_from_connected_request(
         &self,
         connection_id: CipUdint,
         cip_sequence_count: CipUint,
@@ -258,7 +259,7 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
     ) -> Result<(CipUdint, u16)> {
         let mut established_connections = self.established_connections();
         let Some(connection) = established_connections.get_mut(&connection_id) else {
-            return self.message_router.accept_connected_request(
+            return self.message_router.extract_t2o_info_from_connected_request(
                 connection_id,
                 cip_sequence_count,
                 originator_ip,

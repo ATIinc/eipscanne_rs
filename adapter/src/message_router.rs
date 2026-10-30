@@ -89,10 +89,10 @@ pub trait MessageRouter: Send + Sync + 'static {
         })
     }
 
-    /// Connection Manager: accepts a request on the class 3 connection `connection_id` from
-    /// `originator_ip`; the T->O connection ID and size of its reply, or
-    /// `Error::UnexpectedPacket` when the request is discarded
-    fn accept_connected_request(
+    /// Connection Manager: the T->O connection ID and size of the reply to a request on the class 3
+    /// connection `connection_id` from `originator_ip`; `Error::UnexpectedPacket` when the request is
+    /// discarded
+    fn extract_t2o_info_from_connected_request(
         &self,
         connection_id: CipUdint,
         _cip_sequence_count: CipUint,
