@@ -20,6 +20,8 @@ default = ["eds"]
 eds = ["dep:eds_parser"]
 
 [dev-dependencies]
+# The loopback test's packet framing
+adapter = { path = "../adapter" }
 # Used by the examples only
 clap = { version = "4.6.7", features = ["derive"] }
 rand = "0.9"

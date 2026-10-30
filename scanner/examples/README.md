@@ -32,6 +32,7 @@ Opens a class 3 connection, reads the Identity object over it a number of times 
 ## OpENer
 
 OpENer echoes the outputs it receives (assembly 150) as its inputs (assembly 100), idle ones too.
+The adapter crate's `sample-implicit-adapter` stands in for OpENer and echoes run outputs only.
 
 ### opener-implicit
 
@@ -51,13 +52,13 @@ can open a connection beside the first.
 ### io-hub-explicit-homing
 
 Homes one ClearPath-IP motor on an IO-HUB-4-E, then disables it however it ended, Ctrl+C
-included.
+included. The adapter crate's `sample-io-hub-adapter` stands in for the hub.
 
 ### io-hub-eds-implicit
 
 Opens the IO-HUB-4-E's connection from its EDS and prints one motor's status whenever it
 changes. Every output stays off; `--toggle-every N` switches them between run and idle every N
-cycles.
+cycles. Against `sample-io-hub-adapter` the position moves in spurts while run and holds while idle.
 
 ## SICK
 

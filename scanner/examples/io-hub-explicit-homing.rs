@@ -4,6 +4,13 @@
 //!
 //! On a real hub this moves a motor, so `--host` has no default:
 //! `cargo run --example io-hub-explicit-homing -- --host 172.31.19.18 --motor 0`
+//!
+//! Without a hub, run it against the adapter crate's sample:
+//!
+//! ```text
+//! cargo run --example sample-io-hub-adapter
+//! cargo run --example io-hub-explicit-homing -- --host 127.0.0.1 --motor 0
+//! ```
 
 use std::time::{Duration, Instant};
 
