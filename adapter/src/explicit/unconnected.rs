@@ -8,9 +8,9 @@ use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode, RRPacket
 use eipscanne_rs::eip::constants::{CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::Class3Connection;
 use crate::explicit::handle_message_router_request;
-use crate::message_router::{ExplicitOptions, MessageRouter};
+use crate::message_router::MessageRouter;
 use crate::packet::error_reply;
 
 /// The Send RR Data reply carrying the response to the request inside: the class 3 connection's
@@ -18,11 +18,10 @@ use crate::packet::error_reply;
 /// without a request
 pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
-    options: ExplicitOptions,
     header: &EncapsulationHeader,
     command_specific_data: &CommandSpecificData,
     originator_ip: IpAddr,
-    class_3_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Class3Connection,
 ) -> EnIpPacket {
     let CommandSpecificData::SendRrData(request_rr_data) = command_specific_data else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
@@ -33,11 +32,10 @@ pub(crate) fn handle_send_rr_data(
 
     let (response, socket_addr_info_items) = handle_message_router_request(
         message_router,
-        options,
         request,
         originator_ip,
-        request_rr_data.socket_addr_info_items.t2o,
         class_3_connection,
+        request_rr_data.socket_addr_info_items.t2o,
     );
 
     let mut reply_rr_data =

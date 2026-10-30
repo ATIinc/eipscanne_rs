@@ -6,6 +6,9 @@ use std::net::IpAddr;
 
 use binrw::BinWrite;
 
+use eipscanne_rs::cip::connection_manager::parameters::{
+    RealTimeFormat, TransportClass, connected_data_header_len,
+};
 use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
@@ -13,24 +16,18 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, UnitPacketData};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::connected::ExplicitConnection;
+use crate::explicit::connected::Class3Connection;
 use crate::explicit::handle_message_router_request;
-use crate::message_router::{
-    ExplicitOptions, MessageRouter, message_router_response, network_connection_size,
-};
-
-/// Bytes of the CIP sequence count in front of each message
-const CIP_SEQUENCE_COUNT_LEN: usize = 2;
+use crate::message_router::{MessageRouter, message_router_response, network_connection_size};
 
 /// The Send Unit Data reply carrying the response to the connected request inside; `None` when the
 /// request is discarded
 pub(crate) fn handle_send_unit_data(
     message_router: &impl MessageRouter,
-    options: ExplicitOptions,
     header: &EncapsulationHeader,
     command_specific_data: &CommandSpecificData,
     originator_ip: IpAddr,
-    class_3_connection: &mut Option<ExplicitConnection>,
+    class_3_connection: &mut Class3Connection,
 ) -> Option<EnIpPacket> {
     let CommandSpecificData::SendUnitData(request_unit_data) = command_specific_data else {
         tracing::warn!("discarded a Send Unit Data packet that did not decode");
@@ -41,7 +38,7 @@ pub(crate) fn handle_send_unit_data(
         return None;
     };
     let cip_sequence_count = request_unit_data.cip_sequence_count;
-    let Some(connection) = class_3_connection.as_mut() else {
+    let Some(connection) = class_3_connection.established.as_mut() else {
         tracing::debug!("discarded a request: no class 3 connection");
         return None;
     };
@@ -59,11 +56,10 @@ pub(crate) fn handle_send_unit_data(
     // Over a connection: no Socket Address Info
     let (response, _) = handle_message_router_request(
         message_router,
-        options,
         request,
         originator_ip,
-        None,
         class_3_connection,
+        None,
     );
     Some(EnIpPacket {
         header: EncapsulationHeader {
@@ -92,7 +88,9 @@ fn reply_unit_data(
     response
         .write_le(&mut Cursor::new(&mut response_bytes))
         .expect("a Message Router response writes to memory");
-    if CIP_SEQUENCE_COUNT_LEN + response_bytes.len() > usize::from(t2o_connection_size) {
+    // A class 3 message has no real-time header
+    let header_len = connected_data_header_len(TransportClass::Class3, RealTimeFormat::Modeless);
+    if usize::from(header_len) + response_bytes.len() > usize::from(t2o_connection_size) {
         let service = response.service_container.service();
         tracing::warn!(?service, t2o_connection_size, "reply data too large");
         response = message_router_response(

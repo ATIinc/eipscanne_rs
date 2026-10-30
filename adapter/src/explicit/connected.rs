@@ -28,6 +28,12 @@ use crate::error::{Error, Result};
 pub(crate) mod open_close;
 pub(crate) mod send_unit_data;
 
+/// The session's class 3 connection; `established` only when `accepted`
+pub(crate) struct Class3Connection {
+    pub accepted: bool,
+    pub established: Option<ExplicitConnection>,
+}
+
 /// An established class 3 connection: the Forward_Open received and the reply sent
 #[derive(Debug)]
 pub(crate) struct ExplicitConnection {
