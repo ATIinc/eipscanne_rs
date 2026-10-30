@@ -74,12 +74,12 @@ pub trait MessageRouter: Send + Sync + 'static {
     /// Info items
     fn handle_forward_open(
         &self,
-        forward_open: ForwardOpenRequest,
+        forward_open_request: ForwardOpenRequest,
         _originator_ip: IpAddr,
         _t2o_socket_addr_info: Option<SocketAddrInfo>,
     ) -> Result<(ForwardOpenResponse, SocketAddrInfoItems), Rejection> {
         Err(Rejection {
-            service: forward_open.service_code(),
+            service: forward_open_request.service_code(),
             general_status: ResponseStatusCode::ServiceNotSupported,
             additional_status: vec![],
         })
@@ -88,7 +88,7 @@ pub trait MessageRouter: Send + Sync + 'static {
     /// Implicit messaging only: Forward_Close
     fn handle_forward_close(
         &self,
-        _forward_close: ForwardCloseRequest,
+        _forward_close_request: ForwardCloseRequest,
         _originator_ip: IpAddr,
     ) -> Result<ForwardCloseResponse, Rejection> {
         Err(Rejection {

@@ -266,7 +266,6 @@ mod tests {
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
     use eipscanne_rs::cip::message::shared::ServiceCode;
     use eipscanne_rs::cip::path::CipPath;
-    use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
     use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
     use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -276,19 +275,12 @@ mod tests {
 
     /// A SendRRData reply with the given Socket Address Info items
     fn reply_with_items(items: SocketAddrInfoItems) -> EnIpPacket {
-        let mut reply = EnIpPacket::new_send_rr_data(
+        EnIpPacket::new_send_rr_data(
             0x03,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest::new(ServiceCode::ForwardOpen, CipPath::new(0x06, 0x01)),
-        );
-        if let CommandSpecificData::SendRrData(RRPacketData {
-            socket_addr_info_items,
-            ..
-        }) = &mut reply.command_specific_data
-        {
-            *socket_addr_info_items = items;
-        }
-        reply
+            items,
+        )
     }
 
     #[test]

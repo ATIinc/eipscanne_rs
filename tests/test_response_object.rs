@@ -23,6 +23,7 @@ use eipscanne_rs::eip::constants::{
     NO_ENCAPSULATION_TIMEOUT,
 };
 use eipscanne_rs::eip::packet::EncapsulationHeader;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::ResponseObjectAssembly;
 
 use common::IDENTITY_SESSION_HANDLE;
@@ -47,6 +48,7 @@ fn test_serialize_rr_data() {
         CIP_INTERFACE_HANDLE,
         NO_ENCAPSULATION_TIMEOUT,
         identity_message,
+        SocketAddrInfoItems::empty(),
     ));
 
     let mut rr_data_byte_array: Vec<u8> = Vec::new();
@@ -180,6 +182,7 @@ fn test_serialize_generic_response() {
                     })),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 

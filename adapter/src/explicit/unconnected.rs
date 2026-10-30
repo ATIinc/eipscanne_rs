@@ -38,9 +38,12 @@ pub(crate) fn handle_send_rr_data(
         request_rr_data.socket_addr_info_items.t2o,
     );
 
-    let mut reply_rr_data =
-        RRPacketData::new_unconnected(CIP_INTERFACE_HANDLE, NO_ENCAPSULATION_TIMEOUT, response);
-    reply_rr_data.socket_addr_info_items = socket_addr_info_items;
+    let reply_rr_data = RRPacketData::new_unconnected(
+        CIP_INTERFACE_HANDLE,
+        NO_ENCAPSULATION_TIMEOUT,
+        response,
+        socket_addr_info_items,
+    );
     EnIpPacket {
         header: EncapsulationHeader {
             length: None,

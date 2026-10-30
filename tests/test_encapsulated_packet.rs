@@ -124,6 +124,7 @@ fn test_serialize_identity_ethernet_ip_component_request() {
                 ServiceCode::GetAttributeAll,
                 CipPath::new(IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID),
             ),
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -154,6 +155,7 @@ fn test_serialize_message_router_generated_identity_ethernet_ip_component_reques
         IDENTITY_SESSION_HANDLE,
         NO_ENCAPSULATION_TIMEOUT,
         message_router_request,
+        SocketAddrInfoItems::empty(),
     );
 
     let mut identity_byte_array: Vec<u8> = Vec::new();

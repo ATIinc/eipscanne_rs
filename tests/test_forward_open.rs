@@ -307,6 +307,7 @@ fn test_serialize_forward_open_request() {
                     additional_data: CipDataOpt::Typed(Box::new(request.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -481,6 +482,7 @@ fn test_serialize_large_forward_open_request() {
                     additional_data: CipDataOpt::Typed(Box::new(request.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
@@ -634,6 +636,7 @@ fn test_deserialize_forward_open_success_response() {
                     data: CipDataOpt::Typed(Box::new(expected_response.clone())),
                 },
             },
+            SocketAddrInfoItems::empty(),
         )),
     };
 
