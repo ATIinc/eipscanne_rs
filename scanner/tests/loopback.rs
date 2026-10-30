@@ -8,7 +8,7 @@ use bilge::prelude::{u4, u9};
 use binrw::BinRead;
 use tokio::net::{TcpListener, UdpSocket};
 
-use adapter::packet::{message_router_request, read_packet, write_packet};
+use adapter::packet::{read_packet, write_packet};
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseResponse;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
@@ -20,7 +20,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::RunOrIdle;
+use eipscanne_rs::cip::message::CipMessage;
 use eipscanne_rs::cip::message::data::{CipData, CipDataOpt};
+use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{
     MessageRouterResponse, ResponseData, ResponseStatusCode,
 };
@@ -86,6 +88,17 @@ fn request() -> ForwardOpenRequest {
 
 // ======= The fake adapter ========
 
+/// The Message Router request a Send RR Data packet carries
+fn extract_message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
+    let CommandSpecificData::SendRrData(rr_data) = &packet.command_specific_data else {
+        return None;
+    };
+    match &rr_data.cip_message {
+        CipMessage::Request(request) => Some(request),
+        CipMessage::Response(_) => None,
+    }
+}
+
 /// A successful Connection Manager reply carrying `data` and `socket_addr_info_items`
 fn connection_manager_reply(
     service: ServiceCode,
@@ -111,8 +124,8 @@ fn connection_manager_reply(
 }
 
 /// The Forward_Open request inside a packet, as the adapter parses it
-fn forward_open_request_of(packet: &EnIpPacket) -> ForwardOpenRequest {
-    let Some(message) = message_router_request(packet) else {
+fn extract_forward_open_request(packet: &EnIpPacket) -> ForwardOpenRequest {
+    let Some(message) = extract_message_router_request(packet) else {
         panic!("expected a request, got {:?}", packet.command_specific_data);
     };
     assert_eq!(
@@ -150,7 +163,7 @@ async fn fake_adapter(
         .await
         .expect("the scanner sends Forward_Open");
     assert_eq!(request.header.session_handle, SESSION_HANDLE);
-    let forward_open = forward_open_request_of(&request);
+    let forward_open = extract_forward_open_request(&request);
     assert_eq!(
         forward_open.t2o_network_connection_id,
         T2O_NETWORK_CONNECTION_ID
@@ -211,7 +224,7 @@ async fn fake_adapter(
     let request = read_packet(&mut stream)
         .await
         .expect("the scanner sends Forward_Close");
-    let Some(message) = message_router_request(&request) else {
+    let Some(message) = extract_message_router_request(&request) else {
         panic!("expected a Forward_Close request");
     };
     assert_eq!(

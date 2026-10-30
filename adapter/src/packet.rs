@@ -5,9 +5,8 @@ use std::io::Cursor;
 use binrw::{BinRead, BinWrite};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-use eipscanne_rs::cip::message::CipMessage;
-use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::eip::command::CommandSpecificData;
+use eipscanne_rs::cip::message::response::ResponseStatusCode;
+use eipscanne_rs::eip::command::{CommandSpecificData, EncapsStatusCode};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
@@ -41,15 +40,54 @@ pub async fn write_packet(
     Ok(())
 }
 
-/// The Message Router request a Send RR Data or Send Unit Data packet carries
-pub fn message_router_request(packet: &EnIpPacket) -> Option<&MessageRouterRequest> {
-    let cip_message = match &packet.command_specific_data {
-        CommandSpecificData::SendRrData(rr_data) => &rr_data.cip_message,
-        CommandSpecificData::SendUnitData(unit_data) => &unit_data.cip_message,
-        _ => return None,
-    };
-    match cip_message {
-        CipMessage::Request(request) => Some(request),
-        CipMessage::Response(_) => None,
+/// The reply refusing the packet with `header`
+pub(crate) fn error_reply(
+    header: &EncapsulationHeader,
+    status_code: EncapsStatusCode,
+) -> EnIpPacket {
+    tracing::warn!(command = ?header.command, status = ?status_code, "refused a packet");
+    EnIpPacket {
+        header: EncapsulationHeader {
+            length: None,
+            status_code,
+            ..*header
+        },
+        command_specific_data: CommandSpecificData::NoData,
+    }
+}
+
+/// Decodes `data` as `T`, or returns the General Status saying why it can't
+pub fn decode_data<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
+where
+    T: for<'a> BinRead<Args<'a> = ()>,
+{
+    let mut reader = Cursor::new(data);
+    let value = T::read_le(&mut reader).map_err(|error| {
+        if error.is_eof() {
+            ResponseStatusCode::NotEnoughData
+        } else {
+            ResponseStatusCode::InvalidAttributeValue
+        }
+    })?;
+    if reader.position() < data.len() as u64 {
+        return Err(ResponseStatusCode::TooMuchData);
+    }
+    Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn decode_data_refuses_short_and_long_data() {
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe]),
+            Err(ResponseStatusCode::NotEnoughData)
+        );
+        assert_eq!(
+            decode_data::<u32>(&[0xef, 0xbe, 0xad, 0xde, 0x00]),
+            Err(ResponseStatusCode::TooMuchData)
+        );
     }
 }

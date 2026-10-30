@@ -1,11 +1,14 @@
 # adapter
 
-The adapter side of EtherNet/IP, built on `eipscanne_rs`: an explicit messaging server over TCP 44818. A device implements `device::Device`, and `server::serve` takes care of the encapsulation session and the Message Router:
+The adapter side of EtherNet/IP, built on `eipscanne_rs`: explicit messaging over TCP 44818. A device implements `message_router::MessageRouter`, and `server::serve` takes care of the encapsulation session and of decoding each request:
 
-* `server`: accepts connections, registers sessions and hands Get_Attribute and Set_Attribute requests, Single and All, to the device.
-* `device`: the trait a device implements, and `decode_request` for the data of a Set.
-* `packet`: reads and writes one encapsulation packet on a stream, and finds the request it carries.
+* `server`: accepts connections, registers sessions, hands Send RR Data to `explicit::unconnected`, and closes a session without encapsulation activity for its inactivity timeout.
+* `message_router`: the `MessageRouter` trait, the services a scanner's requests reach, and the paths and responses of those services.
+* `explicit`: the decoding and answering of each request; `unconnected` answers Send RR Data.
+* `packet`: reads and writes one encapsulation packet on a stream; `error_reply` refuses one; `decode_data` decodes the data of a Set.
 * `error`: the one error type of every fallible call.
+
+[src/README.md](src/README.md) follows a packet through these modules.
 
 ## Sample ClearLink
 
