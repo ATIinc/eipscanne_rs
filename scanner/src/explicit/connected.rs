@@ -26,6 +26,7 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::path::CipPath;
 use eipscanne_rs::cip::types::CipUint;
 use eipscanne_rs::eip::packet::EnIpPacket;
+use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::error::Result;
@@ -50,6 +51,7 @@ pub async fn forward_open_explicit(
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
             request.clone(),
+            SocketAddrInfoItems::empty(),
         ))
         .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;

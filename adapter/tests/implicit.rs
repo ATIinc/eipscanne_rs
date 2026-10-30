@@ -30,7 +30,7 @@ use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::EnIpPacket;
-use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use adapter::implicit::{ImplicitDevice, ImplicitOptions};
@@ -158,10 +158,6 @@ impl Scanner {
 
     /// Sends a Forward_Open whose T->O Socket Address Info names this scanner's I/O socket
     async fn forward_open(&mut self, request: ForwardOpenRequest) -> EnIpPacket {
-        let mut packet = RequestObjectAssembly::new_forward_open(SESSION_HANDLE, request);
-        let CommandSpecificData::SendRrData(rr_data) = &mut packet.command_specific_data else {
-            unreachable!("a Forward_Open is a Send RR Data packet");
-        };
         let SocketAddr::V4(local) = self
             .io_socket
             .local_addr()
@@ -169,8 +165,15 @@ impl Scanner {
         else {
             unreachable!("the socket is bound to an IPv4 address");
         };
-        rr_data.socket_addr_info_items.t2o = Some(SocketAddrInfo::from(local));
-        self.request(&packet).await
+        self.request(&RequestObjectAssembly::new_forward_open(
+            SESSION_HANDLE,
+            request,
+            SocketAddrInfoItems {
+                o2t: None,
+                t2o: Some(SocketAddrInfo::from(local)),
+            },
+        ))
+        .await
     }
 
     /// The inputs of the next T->O packet

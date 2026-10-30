@@ -67,6 +67,7 @@ use crate::cip::types::{CipByte, CipUdint, CipUint};
 
 use super::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode, UnitPacketData};
 use super::constants as eip_constants;
+use super::socket_addr::SocketAddrInfoItems;
 
 #[binwrite]
 #[binread]
@@ -148,16 +149,23 @@ impl EnIpPacket {
         )
     }
 
-    /// A SendRRData packet carrying `message` as an unconnected message
+    /// A SendRRData packet carrying `message` as an unconnected message, followed by
+    /// `socket_addr_info_items`
     pub fn new_send_rr_data(
         session_handle: CipUdint,
         timeout: CipUint,
         message: impl Into<CipMessage>,
+        socket_addr_info_items: SocketAddrInfoItems,
     ) -> Self {
         EnIpPacket::new(
             EnIpCommand::SendRrData,
             session_handle,
-            CommandSpecificData::new_request(eip_constants::CIP_INTERFACE_HANDLE, timeout, message),
+            CommandSpecificData::new_request(
+                eip_constants::CIP_INTERFACE_HANDLE,
+                timeout,
+                message,
+                socket_addr_info_items,
+            ),
         )
     }
 

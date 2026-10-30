@@ -15,6 +15,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::packet::EnIpPacket;
+use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
 use crate::error::Result;
@@ -40,17 +41,23 @@ pub struct ImplicitConnection {
 }
 
 /// Sends `request` (a Forward_Open or Large_Forward_Open, by the width of its connection
-/// parameters) and reads the adapter's reply.
+/// parameters) and reads the adapter's reply. The inputs come to this host on `t2o_port`, named in
+/// a T->O Socket Address Info item unless it is 2222.
 pub async fn forward_open_implicit(
     session: &mut Session,
     request: ForwardOpenRequest,
     o2t_real_time_format: RealTimeFormat,
     t2o_real_time_format: RealTimeFormat,
+    t2o_port: u16,
 ) -> Result<ImplicitConnection> {
+    // The item names only the port; 2222 needs none
+    let t2o = (t2o_port != ETHERNET_IP_IO_UDP_PORT)
+        .then(|| SocketAddrInfo::from(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, t2o_port)));
     let reply: EnIpPacket = session
         .request(&RequestObjectAssembly::new_forward_open(
             session.session_handle(),
             request.clone(),
+            SocketAddrInfoItems { o2t: None, t2o },
         ))
         .await?;
     let response: ForwardOpenResponse = decode_reply(&reply)?;
@@ -259,7 +266,6 @@ mod tests {
     use eipscanne_rs::cip::message::request::MessageRouterRequest;
     use eipscanne_rs::cip::message::shared::ServiceCode;
     use eipscanne_rs::cip::path::CipPath;
-    use eipscanne_rs::eip::command::{CommandSpecificData, RRPacketData};
     use eipscanne_rs::eip::constants::NO_ENCAPSULATION_TIMEOUT;
     use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -269,19 +275,12 @@ mod tests {
 
     /// A SendRRData reply with the given Socket Address Info items
     fn reply_with_items(items: SocketAddrInfoItems) -> EnIpPacket {
-        let mut reply = EnIpPacket::new_send_rr_data(
+        EnIpPacket::new_send_rr_data(
             0x03,
             NO_ENCAPSULATION_TIMEOUT,
             MessageRouterRequest::new(ServiceCode::ForwardOpen, CipPath::new(0x06, 0x01)),
-        );
-        if let CommandSpecificData::SendRrData(RRPacketData {
-            socket_addr_info_items,
-            ..
-        }) = &mut reply.command_specific_data
-        {
-            *socket_addr_info_items = items;
-        }
-        reply
+            items,
+        )
     }
 
     #[test]

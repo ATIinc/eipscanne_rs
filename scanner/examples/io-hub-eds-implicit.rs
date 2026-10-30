@@ -37,7 +37,7 @@ use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
+use eipscanne_rs::eip::constants::{ETHERNET_IP_IO_UDP_PORT, ETHERNET_IP_TCP_PORT};
 use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
 use scanner::error::Error;
 use scanner::implicit::connection::{ImplicitConnection, forward_close, forward_open_implicit};
@@ -167,13 +167,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ========= 2. Open the connection ============
     // The socket first: the adapter starts sending as soon as it has replied
-    let socket: UdpSocket = bind_io_socket().await?;
+    let socket: UdpSocket = bind_io_socket(ETHERNET_IP_IO_UDP_PORT).await?;
     println!("OPENING the connection");
     let connection: ImplicitConnection = forward_open_implicit(
         &mut session,
         request,
         o2t_real_time_format,
         t2o_real_time_format,
+        ETHERNET_IP_IO_UDP_PORT,
     )
     .await?;
     let established_at = Instant::now();
