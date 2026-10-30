@@ -18,7 +18,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
-use eipscanne_rs::eip::io_packet::{EnIpIoPacket, SequencedAddress};
+use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 
 use crate::error::{Error, Result};
 use crate::implicit::ImplicitDevice;
@@ -113,15 +113,15 @@ pub(crate) async fn receive_outputs(
                 return;
             }
         };
-        let (sequenced_address, cip_io_data) =
-            match check_output_packet(connection, packet, from, last_sequence_number) {
-                Ok(accepted) => accepted,
-                Err(error) => {
-                    tracing::debug!(%error, "discarded an output packet");
-                    continue;
-                }
-            };
-        last_sequence_number = Some(sequenced_address.encapsulation_sequence_number);
+        let cip_io_data = match extract_cip_io_data(connection, &packet, from, last_sequence_number)
+        {
+            Ok(cip_io_data) => cip_io_data,
+            Err(error) => {
+                tracing::debug!(%error, "discarded an output packet");
+                continue;
+            }
+        };
+        last_sequence_number = Some(packet.sequenced_address.encapsulation_sequence_number);
         // Each accepted packet restarts the timeout
         deadline = Instant::now() + timeout;
 
@@ -152,17 +152,15 @@ pub(crate) async fn receive_outputs(
     }
 }
 
-/// Checks a `packet` of `connection` from `from`, given the last accepted encapsulation sequence
-/// number (`None` before the first). Returns its Sequenced Address and Connected Data Item, or
-/// `Error::UnexpectedPacket` saying why it was discarded.
-fn check_output_packet(
+/// Extracts the CIP I/O data of a `packet` of `connection` from `from`, given the last accepted
+/// encapsulation sequence number (`None` before the first), or `Error::UnexpectedPacket` saying
+/// why it was discarded.
+fn extract_cip_io_data(
     connection: &ImplicitConnection,
-    packet: EnIpIoPacket,
+    packet: &EnIpIoPacket,
     from: SocketAddr,
     last_sequence_number: Option<CipUdint>,
-) -> Result<(SequencedAddress, CipIoData)> {
-    let sequenced_address: SequencedAddress = packet.sequenced_address;
-
+) -> Result<CipIoData> {
     // 1. It comes from the scanner (whatever port it chose)
     if from.ip() != connection.originator_ip {
         return Err(Error::UnexpectedPacket(format!(
@@ -173,7 +171,7 @@ fn check_output_packet(
     // 2. It is newer than the last accepted one (gap modulo 2^32 in 1..2^31), by at most
     //    the timeout multiplier plus one (never under 16). Any first number is accepted
     if let Some(last) = last_sequence_number {
-        let sequence_number: CipUdint = sequenced_address.encapsulation_sequence_number;
+        let sequence_number: CipUdint = packet.sequenced_address.encapsulation_sequence_number;
         let gap: u32 = sequence_number.wrapping_sub(last);
         if gap == 0 || gap >= 1 << 31 {
             return Err(Error::UnexpectedPacket(format!(
@@ -215,5 +213,5 @@ fn check_output_packet(
         ),
     )?;
 
-    Ok((sequenced_address, cip_io_data))
+    Ok(cip_io_data)
 }
