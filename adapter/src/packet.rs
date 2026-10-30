@@ -1,5 +1,4 @@
-//! Bytes on the wire: encapsulation packets on a stream, read whole however the bytes arrive, the
-//! bare reply refusing one, and the data a request or an I/O packet carries.
+//! Encapsulation packets on a stream, read whole however the bytes arrive.
 
 use std::io::Cursor;
 
@@ -57,8 +56,7 @@ pub(crate) fn error_reply(
     }
 }
 
-/// The data of a Set, or a connection's outputs, as `T`, or the General Status refusing it; mirrors
-/// the scanner's `decode_reply`
+/// Decodes `data` as `T`, or returns the General Status saying why it can't
 pub fn decode_data<T>(data: &[u8]) -> Result<T, ResponseStatusCode>
 where
     T: for<'a> BinRead<Args<'a> = ()>,
