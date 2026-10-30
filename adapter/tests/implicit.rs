@@ -50,7 +50,7 @@ const T2O_CONNECTION_SIZE: u16 = 6;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
-/// Implicit messaging only: echoes its outputs as its inputs and counts how often they stop
+/// Implicit messaging only: echoes its outputs as its inputs and counts its `enter_idle` calls
 struct EchoDevice {
     outputs: Mutex<[u8; DATA_SIZE as usize]>,
     idle_count: AtomicUsize,
@@ -193,7 +193,7 @@ impl Scanner {
         while self.next_inputs().await != inputs {}
     }
 
-    /// Sends an O->T packet of connection `o2t_id` to `o2t_endpoint`, in run mode when `run`
+    /// Sends an O->T packet of connection `o2t_id` to `o2t_endpoint`, in `run_or_idle` mode
     async fn send_outputs(
         &self,
         o2t_endpoint: SocketAddrV4,
@@ -517,6 +517,20 @@ async fn a_forward_open_the_device_cannot_serve_is_refused() {
         extended_status(&scanner.forward_open(too_fast).await),
         Some(ConnectionManagerExtendedStatus::RequestedPacketIntervalNotSupported)
     );
+}
+
+#[tokio::test]
+async fn a_forward_close_of_no_open_connection_is_refused() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request(1);
+
+    let reply = scanner.request(&forward_close(&request)).await;
+    let (rejection, triad) = refusal(&reply);
+    assert_eq!(
+        rejection.extended_status(),
+        Some(ConnectionManagerExtendedStatus::TargetConnectionNotFound)
+    );
+    assert_eq!(triad, request.connection_triad);
 }
 
 #[tokio::test(start_paused = true)]

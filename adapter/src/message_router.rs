@@ -7,8 +7,12 @@ use std::time::Duration;
 
 use binrw::BinWrite;
 
-use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
-use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::forward_close::{
+    ForwardCloseRequest, ForwardCloseResponse,
+};
+use eipscanne_rs::cip::connection_manager::forward_open::{
+    ForwardOpenRequest, ForwardOpenResponse,
+};
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, ConnectionType, NetworkConnectionParameters,
 };
@@ -73,18 +77,12 @@ pub trait MessageRouter: Send + Sync + 'static {
         forward_open: ForwardOpenRequest,
         _originator_ip: IpAddr,
         _t2o_socket_addr_info: Option<SocketAddrInfo>,
-    ) -> (MessageRouterResponse, SocketAddrInfoItems) {
-        let service = forward_open.service_code();
-        tracing::warn!(?service, "refused a service that is not supported");
-        (
-            message_router_response(
-                service,
-                ResponseStatusCode::ServiceNotSupported,
-                vec![],
-                CipDataOpt::Raw(vec![]),
-            ),
-            SocketAddrInfoItems::empty(),
-        )
+    ) -> Result<(ForwardOpenResponse, SocketAddrInfoItems), Rejection> {
+        Err(Rejection {
+            service: forward_open.service_code(),
+            general_status: ResponseStatusCode::ServiceNotSupported,
+            additional_status: vec![],
+        })
     }
 
     /// Implicit messaging only: Forward_Close
@@ -92,15 +90,12 @@ pub trait MessageRouter: Send + Sync + 'static {
         &self,
         _forward_close: ForwardCloseRequest,
         _originator_ip: IpAddr,
-    ) -> MessageRouterResponse {
-        let service = ServiceCode::ForwardClose;
-        tracing::warn!(?service, "refused a service that is not supported");
-        message_router_response(
-            service,
-            ResponseStatusCode::ServiceNotSupported,
-            vec![],
-            CipDataOpt::Raw(vec![]),
-        )
+    ) -> Result<ForwardCloseResponse, Rejection> {
+        Err(Rejection {
+            service: ServiceCode::ForwardClose,
+            general_status: ResponseStatusCode::ServiceNotSupported,
+            additional_status: vec![],
+        })
     }
 }
 
@@ -158,6 +153,7 @@ pub(crate) fn rejection_response(
         rejection.service,
         rejection.general_status,
         rejection.additional_status,
+        // Incomplete: Forward_Close refusals lack the trailing Remaining Path Size and reserved byte
         CipDataOpt::Typed(Box::new(triad)),
     )
 }

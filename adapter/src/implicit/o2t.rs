@@ -1,5 +1,5 @@
-//! O->T: the outputs, always as bytes. [`route_outputs`] hands each packet to its connection, and
-//! [`receive_outputs`] checks every packet of one connection and keeps the deadline.
+//! O->T: the outputs. [`route_outputs`] hands each packet to its connection, and
+//! [`receive_outputs`] checks it, hands the device its outputs and keeps the deadline.
 
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -152,9 +152,8 @@ pub(crate) async fn receive_outputs(
     }
 }
 
-/// Extracts the CIP I/O data of a `packet` of `connection` from `from`, given the last accepted
-/// encapsulation sequence number (`None` before the first), or `Error::UnexpectedPacket` saying
-/// why it was discarded.
+/// The CIP I/O data of `packet` from `from`, or why `connection` discards it;
+/// `last_sequence_number` is the last accepted one (`None` before the first)
 fn extract_cip_io_data(
     connection: &ImplicitConnection,
     packet: &EnIpIoPacket,
