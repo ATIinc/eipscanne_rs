@@ -32,10 +32,11 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipShortString, CipUsint};
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
+use adapter::implicit::message_router::ImplicitMessageRouter;
 use adapter::implicit::{ImplicitDevice, ImplicitOptions};
 use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::decode_data;
-use adapter::server::serve_implicit;
+use adapter::server::serve;
 
 // The IO-HUB assemblies the scanner's examples use, in scanner/assemblies/
 #[allow(dead_code)]
@@ -319,16 +320,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         hub: Mutex::new(Hub::default()),
     };
 
+    let message_router = ImplicitMessageRouter::bind(
+        Arc::new(adapter),
+        listener.local_addr()?.ip(),
+        ImplicitOptions {
+            io_port: args.io_port,
+            ..Default::default()
+        },
+    )
+    .await?;
+
     tokio::select! {
-        served = serve_implicit(
-            Arc::new(adapter),
-            listener,
-            ExplicitOptions::default(),
-            ImplicitOptions {
-                io_port: args.io_port,
-                ..Default::default()
-            },
-        ) => served?,
+        served = serve(Arc::new(message_router), listener, ExplicitOptions::default()) => served?,
         stopped = tokio::signal::ctrl_c() => stopped?,
     }
     tracing::info!("stopped");

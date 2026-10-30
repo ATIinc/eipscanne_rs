@@ -36,12 +36,10 @@ explicit::connected::message_router::ConnectedMessageRouter    a MessageRouter p
 ## UDP: implicit messaging
 
 ```text
-server::serve_implicit
-├─ implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
-│  └─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
-└─ server::serve                                            the path above
+implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
+└─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
 
-ImplicitMessageRouter                        the MessageRouter behind serve_implicit
+ImplicitMessageRouter                        an ImplicitDevice plus class 1 connections
 ├─ Get, Set                                  the device's
 ├─ handle_forward_open
 │  ├─ implicit::connection::connection_from_forward_open

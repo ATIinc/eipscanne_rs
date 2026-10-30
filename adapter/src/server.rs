@@ -20,23 +20,8 @@ use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 use crate::error::{Error, Result};
 use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
-use crate::implicit::message_router::ImplicitMessageRouter;
-use crate::implicit::{ImplicitDevice, ImplicitOptions};
 use crate::message_router::{ExplicitOptions, MessageRouter};
 use crate::packet::{error_reply, read_packet, write_packet};
-
-/// [`serve`], plus the class 1 connections `implicit_options` allows on an I/O socket at the
-/// listener's address
-pub async fn serve_implicit(
-    device: Arc<impl ImplicitDevice>,
-    listener: TcpListener,
-    explicit_options: ExplicitOptions,
-    implicit_options: ImplicitOptions,
-) -> Result<()> {
-    let message_router =
-        ImplicitMessageRouter::bind(device, listener.local_addr()?.ip(), implicit_options).await?;
-    serve(Arc::new(message_router), listener, explicit_options).await
-}
 
 /// Serves every connecting scanner with `message_router` until accepting fails; dropping it closes
 /// every connection

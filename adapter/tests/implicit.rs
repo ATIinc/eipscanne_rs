@@ -33,10 +33,11 @@ use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use eipscanne_rs::object_assembly::RequestObjectAssembly;
 
+use adapter::implicit::message_router::ImplicitMessageRouter;
 use adapter::implicit::{ImplicitDevice, ImplicitOptions};
 use adapter::message_router::{ExplicitOptions, MessageRouter};
 use adapter::packet::{read_packet, write_packet};
-use adapter::server::serve_implicit;
+use adapter::server::serve;
 
 /// The handle of the first session a server grants
 const SESSION_HANDLE: CipUdint = 1;
@@ -114,16 +115,22 @@ impl Scanner {
             outputs: Mutex::new([0; DATA_SIZE as usize]),
             idle_count: AtomicUsize::new(0),
         });
-        tokio::spawn(serve_implicit(
+        let message_router = ImplicitMessageRouter::bind(
             Arc::clone(&device),
-            listener,
-            ExplicitOptions::default(),
+            address.ip(),
             // Any free port, RPIs from 1 ms to 1 s
             ImplicitOptions {
                 io_port: 0,
                 packet_interval: 1_000..=1_000_000,
                 ..Default::default()
             },
+        )
+        .await
+        .expect("port 0 lets the OS pick a free I/O port");
+        tokio::spawn(serve(
+            Arc::new(message_router),
+            listener,
+            ExplicitOptions::default(),
         ));
 
         let mut stream = TcpStream::connect(address)
