@@ -8,17 +8,12 @@ use binrw::BinRead;
 
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
-use eipscanne_rs::cip::connection_manager::parameters::TransportClass;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::explicit::connected::Class3Connection;
-use crate::explicit::connected::open_close::{
-    handle_connected_forward_close, handle_connected_forward_open,
-};
 use crate::message_router::{
     MessageRouter, class_instance_and_attribute, message_router_response, rejection_response,
 };
@@ -26,14 +21,12 @@ use crate::message_router::{
 pub(crate) mod connected;
 pub(crate) mod unconnected;
 
-/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items; a
-/// class 3 Forward_Open and Forward_Close open and close `class_3_connection` when it is accepted.
+/// The response to `request` from `originator_ip`, and the reply's Socket Address Info items.
 /// Single services need an attribute, All services none
 pub(crate) fn handle_message_router_request(
     message_router: &impl MessageRouter,
     request: &MessageRouterRequest,
     originator_ip: IpAddr,
-    class_3_connection: &mut Class3Connection,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
 ) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
@@ -87,24 +80,11 @@ pub(crate) fn handle_message_router_request(
                 }
             };
             let triad = forward_open_request.connection_triad;
-            let is_class_3 = forward_open_request
-                .transport_type_trigger
-                .transport_class()
-                == TransportClass::Class3;
-            // Class 3 opens the session's connection when it is accepted; any other Forward_Open
-            // goes to the Message Router
-            let forward_open_result = if class_3_connection.accepted && is_class_3 {
-                handle_connected_forward_open(forward_open_request, class_3_connection).map(
-                    |forward_open_response| (forward_open_response, SocketAddrInfoItems::empty()),
-                )
-            } else {
-                message_router.handle_forward_open(
-                    forward_open_request,
-                    originator_ip,
-                    t2o_socket_addr_info,
-                )
-            };
-            return match forward_open_result {
+            return match message_router.handle_forward_open(
+                forward_open_request,
+                originator_ip,
+                t2o_socket_addr_info,
+            ) {
                 Ok((forward_open_response, socket_addr_info_items)) => (
                     message_router_response(
                         service,
@@ -133,23 +113,16 @@ pub(crate) fn handle_message_router_request(
                     }
                 };
             let triad = forward_close_request.connection_triad;
-            // The session's class 3 connection first; any other goes to the Message Router
-            let forward_close_result =
-                match handle_connected_forward_close(&forward_close_request, class_3_connection) {
-                    Some(forward_close_response) => Ok(forward_close_response),
-                    None => {
-                        message_router.handle_forward_close(forward_close_request, originator_ip)
-                    }
+            let response =
+                match message_router.handle_forward_close(forward_close_request, originator_ip) {
+                    Ok(forward_close_response) => message_router_response(
+                        service,
+                        ResponseStatusCode::Success,
+                        vec![],
+                        CipDataOpt::Typed(Box::new(forward_close_response)),
+                    ),
+                    Err(rejection) => rejection_response(rejection, triad),
                 };
-            let response = match forward_close_result {
-                Ok(forward_close_response) => message_router_response(
-                    service,
-                    ResponseStatusCode::Success,
-                    vec![],
-                    CipDataOpt::Typed(Box::new(forward_close_response)),
-                ),
-                Err(rejection) => rejection_response(rejection, triad),
-            };
             return (response, SocketAddrInfoItems::empty());
         }
         _ => Err(ResponseStatusCode::ServiceNotSupported),

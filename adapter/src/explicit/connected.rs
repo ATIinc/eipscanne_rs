@@ -3,9 +3,9 @@
 //! ```text
 //! Stage    What happens on the wire                                         Module
 //! -------  ---------------------------------------------------------------  --------------
-//! Open     SendRRData(Forward_Open) -> the reply                            open_close
+//! Open     SendRRData(Forward_Open) -> the reply                            message_router
 //! Request  SendUnitData(request) on O->T -> SendUnitData(response) on T->O  send_unit_data
-//! Close    SendRRData(Forward_Close) -> the reply                           open_close
+//! Close    SendRRData(Forward_Close) -> the reply                           message_router
 //! ```
 //!
 //! Only a server whose [`ExplicitOptions`] accept explicit connections opens one. A request whose
@@ -21,18 +21,10 @@ use tokio::time::Instant;
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
-use eipscanne_rs::cip::types::{CipUdint, CipUint};
+use eipscanne_rs::cip::types::CipUint;
 
-use crate::error::{Error, Result};
-
-pub(crate) mod open_close;
+pub(crate) mod message_router;
 pub(crate) mod send_unit_data;
-
-/// The session's class 3 connection; `established` only when `accepted`
-pub(crate) struct Class3Connection {
-    pub accepted: bool,
-    pub established: Option<ExplicitConnection>,
-}
 
 /// An established class 3 connection: the Forward_Open received and the reply sent
 #[derive(Debug)]
@@ -61,35 +53,5 @@ impl ExplicitConnection {
             deadline: Instant::now() + inactivity_timeout,
             last_cip_sequence_count: None,
         }
-    }
-
-    pub(crate) fn deadline(&self) -> Instant {
-        self.deadline
-    }
-
-    /// Consumes a connected request on `connection_id`: restarts the inactivity timer;
-    /// `Error::UnexpectedPacket` when the connection has another O->T ID or `cip_sequence_count`
-    /// repeats the last one
-    fn consume_request(
-        &mut self,
-        connection_id: CipUdint,
-        cip_sequence_count: CipUint,
-    ) -> Result<()> {
-        if self.response.o2t_network_connection_id != connection_id {
-            return Err(Error::UnexpectedPacket(format!(
-                "request for another connection ({connection_id:#010x})"
-            )));
-        }
-
-        self.deadline = Instant::now() + self.inactivity_timeout;
-
-        if self.last_cip_sequence_count == Some(cip_sequence_count) {
-            return Err(Error::UnexpectedPacket(format!(
-                "repeated CIP sequence count {cip_sequence_count}"
-            )));
-        }
-
-        self.last_cip_sequence_count = Some(cip_sequence_count);
-        Ok(())
     }
 }

@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use tokio::task::JoinSet;
-use tokio::time::{Instant, timeout};
+use tokio::time::timeout;
 use tracing::Instrument;
 
 use eipscanne_rs::cip::types::CipUdint;
@@ -18,7 +18,7 @@ use eipscanne_rs::eip::constants::ENCAPSULATION_PROTOCOL_VERSION;
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
 use crate::error::{Error, Result};
-use crate::explicit::connected::Class3Connection;
+use crate::explicit::connected::message_router::ConnectedMessageRouter;
 use crate::explicit::connected::send_unit_data::handle_send_unit_data;
 use crate::explicit::unconnected::handle_send_rr_data;
 use crate::implicit::message_router::ImplicitMessageRouter;
@@ -78,14 +78,12 @@ async fn serve_session(
     session_handle: CipUdint,
     originator_ip: IpAddr,
 ) -> Result<()> {
+    let message_router =
+        ConnectedMessageRouter::new(message_router, options.accepts_explicit_connections);
     let mut registered = false;
-    let mut class_3_connection = Class3Connection {
-        accepted: options.accepts_explicit_connections,
-        established: None,
-    };
     loop {
         let Ok(packet) = timeout(
-            session_inactivity_timeout(options, &class_3_connection),
+            session_inactivity_timeout(options, &message_router),
             read_packet(&mut stream),
         )
         .await
@@ -93,10 +91,6 @@ async fn serve_session(
             tracing::warn!("the session timed out: no encapsulation activity in time");
             return Ok(());
         };
-        // The session keeps its class 3 connection only until it times out
-        class_3_connection
-            .established
-            .take_if(|connection| connection.deadline() <= Instant::now());
         let (header, command_specific_data) = match packet {
             Ok(packet) => (packet.header, packet.command_specific_data),
             // Answered as a packet without data
@@ -140,19 +134,17 @@ async fn serve_session(
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
             EnIpCommand::SendRrData => handle_send_rr_data(
-                message_router.as_ref(),
+                &message_router,
                 &header,
                 &command_specific_data,
                 originator_ip,
-                &mut class_3_connection,
             ),
             EnIpCommand::SendUnitData => {
                 let Some(reply) = handle_send_unit_data(
-                    message_router.as_ref(),
+                    &message_router,
                     &header,
                     &command_specific_data,
                     originator_ip,
-                    &mut class_3_connection,
                 ) else {
                     // A discarded request has no reply
                     continue;
@@ -166,23 +158,19 @@ async fn serve_session(
     }
 }
 
-/// How long the session waits for a packet: the `options` inactivity timeout, after the time
-/// `class_3_connection` has left
+/// How long the session waits for a packet: the `options` inactivity timeout, after the time its
+/// class 3 connection has left
 fn session_inactivity_timeout(
     options: ExplicitOptions,
-    class_3_connection: &Class3Connection,
+    message_router: &ConnectedMessageRouter<impl MessageRouter>,
 ) -> Duration {
     // An open class 3 connection is encapsulation activity until it times out
-    let class_3_time_left = match &class_3_connection.established {
-        Some(connection) => connection
-            .deadline()
-            .saturating_duration_since(Instant::now()),
-        None => Duration::ZERO,
-    };
     let inactivity_timeout = options
         .encapsulation_inactivity_timeout
         .unwrap_or(Duration::MAX);
-    class_3_time_left.saturating_add(inactivity_timeout)
+    message_router
+        .class_3_time_left()
+        .saturating_add(inactivity_timeout)
 }
 
 /// The Register Session reply granting `session_handle`, or refusing another protocol version with ours
