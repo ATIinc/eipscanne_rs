@@ -104,7 +104,7 @@ pub(crate) async fn receive_outputs(
             Ok(None) => return,
             Err(_) => {
                 tracing::warn!("the connection timed out: no output packet in time");
-                device.enter_idle(connection.output_instance);
+                device.enter_idle(connection.o2t.instance);
                 return;
             }
         };
@@ -131,7 +131,7 @@ pub(crate) async fn receive_outputs(
         }
         // Idle outputs keep the connection open but are not applied; the device hears of the switch
         if running && !run {
-            device.enter_idle(connection.output_instance);
+            device.enter_idle(connection.o2t.instance);
         }
         running = run;
         let CipDataOpt::Raw(output_data) = &cip_io_data.data else {
@@ -141,7 +141,7 @@ pub(crate) async fn receive_outputs(
             continue;
         }
         match decode_data(output_data) {
-            Ok(outputs) => device.consume_outputs(connection.output_instance, outputs),
+            Ok(outputs) => device.consume_outputs(connection.o2t.instance, outputs),
             Err(status) => tracing::warn!(?status, "outputs not consumed"),
         }
     }
@@ -192,9 +192,9 @@ fn check_output_packet(
     let CipDataOpt::Raw(connected_data) = &packet.connected_data else {
         unreachable!("data read from the wire is always raw");
     };
-    let real_time_format = connection.o2t_real_time_format;
+    let real_time_format = connection.o2t.real_time_format;
     let o2t_connection_size = connection_size(
-        connection.output_size,
+        connection.o2t.size,
         TransportClass::Class1,
         real_time_format,
     );

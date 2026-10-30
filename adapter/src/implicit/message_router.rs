@@ -124,16 +124,16 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             .handle_set_attribute_single(class, instance, attribute, data)
     }
 
-    /// Opens the connection `forward_open` asks for when a place is free and no other connection
-    /// owns its outputs
+    /// Opens the connection `forward_open_request` asks for when a place is free and no other
+    /// connection owns its outputs
     fn handle_forward_open(
         &self,
-        forward_open: ForwardOpenRequest,
+        forward_open_request: ForwardOpenRequest,
         originator_ip: IpAddr,
         t2o_socket_addr_info: Option<SocketAddrInfo>,
     ) -> (MessageRouterResponse, SocketAddrInfoItems) {
-        let service = forward_open.service_code();
-        let triad = forward_open.connection_triad;
+        let service = forward_open_request.service_code();
+        let triad = forward_open_request.connection_triad;
         let mut open_connections = self
             .open_connections
             .lock()
@@ -162,7 +162,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         // Checks the Forward_Open against the device's assemblies
         let mut connection = match connection_from_forward_open(
             self.device.as_ref(),
-            forward_open,
+            forward_open_request,
             &self.packet_interval,
             originator_ip,
             t2o_socket_addr_info,
@@ -176,10 +176,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             }
         };
         // Outputs have one owner; heartbeats carry none
-        if connection.output_size > 0
-            && open_connections.values().any(|open_connection| {
-                open_connection.output_instance == connection.output_instance
-            })
+        if connection.o2t.size > 0
+            && open_connections
+                .values()
+                .any(|open_connection| open_connection.output_instance == connection.o2t.instance)
         {
             return (
                 rejection_response(
@@ -202,12 +202,12 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             t2o_id = format_args!("{:#010x}", forward_open_response.t2o_network_connection_id),
             o2t_api_us = forward_open_response.o2t_actual_packet_interval,
             t2o_api_us = forward_open_response.t2o_actual_packet_interval,
-            output_instance = connection.output_instance,
-            input_instance = connection.input_instance,
+            output_instance = connection.o2t.instance,
+            input_instance = connection.t2o.instance,
             t2o_endpoint = %connection.t2o_endpoint,
             "class 1 connection opened"
         );
-        let output_instance = connection.output_instance;
+        let output_instance = connection.o2t.instance;
         let device = Arc::clone(&self.device);
         let io_socket = Arc::clone(&self.io_socket);
         let (output_packet_sender, mut output_packet_receiver) = mpsc::channel(OUTPUT_PACKET_QUEUE);

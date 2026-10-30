@@ -33,7 +33,7 @@ pub(crate) async fn send_inputs(
     let mut cip_sequence_count: CipUint = 0;
     let mut last_inputs: Option<Vec<u8>> = None;
     // Always run mode
-    let output_control_header = match connection.t2o_real_time_format {
+    let output_control_header = match connection.t2o.real_time_format {
         RealTimeFormat::Header32Bit => Some(
             OutputControlHeader::builder()
                 .run_or_idle(RunOrIdle::Run)
@@ -48,17 +48,17 @@ pub(crate) async fn send_inputs(
         t2o_interval.tick().await;
         let mut inputs = Vec::new();
         if let Err(error) = device
-            .produce_inputs(connection.input_instance)
+            .produce_inputs(connection.t2o.instance)
             .write_le(&mut Cursor::new(&mut inputs))
         {
             tracing::warn!(%error, "inputs not sent");
             continue;
         }
         // Only inputs of the input assembly's size are sent
-        if inputs.len() != usize::from(connection.input_size) {
+        if inputs.len() != usize::from(connection.t2o.size) {
             tracing::warn!(
                 len = inputs.len(),
-                input_size = connection.input_size,
+                input_size = connection.t2o.size,
                 "inputs not sent: not the size of the input assembly"
             );
             continue;
