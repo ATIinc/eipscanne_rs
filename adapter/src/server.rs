@@ -3,6 +3,7 @@
 
 use std::io::ErrorKind;
 use std::sync::Arc;
+use std::time::Duration;
 
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
@@ -57,21 +58,21 @@ async fn serve_session(
     mut stream: impl AsyncRead + AsyncWrite + Unpin,
     session_handle: CipUdint,
 ) -> Result<()> {
+    let inactivity_timeout = options
+        .encapsulation_inactivity_timeout
+        .unwrap_or(Duration::MAX);
     let mut registered = false;
     loop {
-        let packet = match options.encapsulation_inactivity_timeout {
-            Some(inactivity_timeout) => timeout(inactivity_timeout, read_packet(&mut stream)).await,
-            None => Ok(read_packet(&mut stream).await),
-        };
-        let Ok(packet) = packet else {
+        let Ok(packet) = timeout(inactivity_timeout, read_packet(&mut stream)).await else {
             tracing::warn!("the session timed out: no encapsulation activity in time");
             return Ok(());
         };
         let (header, command_specific_data) = match packet {
-            Ok(packet) => (packet.header, Some(packet.command_specific_data)),
+            Ok(packet) => (packet.header, packet.command_specific_data),
+            // Answered as a packet without data
             Err(Error::Undecodable { header, error }) => {
                 tracing::warn!(%error, "packet did not decode");
-                (header, None)
+                (header, CommandSpecificData::NoData)
             }
             Err(Error::Io(error)) if error.kind() == ErrorKind::UnexpectedEof => {
                 tracing::info!("scanner closed the stream");
@@ -94,11 +95,8 @@ async fn serve_session(
                 continue;
             }
             EnIpCommand::RegisterSession => {
-                let reply = handle_register_session(
-                    &header,
-                    session_handle,
-                    command_specific_data.as_ref(),
-                );
+                let reply =
+                    handle_register_session(session_handle, &header, &command_specific_data);
                 if reply.header.status_code == EncapsStatusCode::Success {
                     tracing::info!("session registered");
                     registered = true;
@@ -109,11 +107,9 @@ async fn serve_session(
             EnIpCommand::SendRrData if !registered || header.session_handle != session_handle => {
                 error_reply(&header, EncapsStatusCode::InvalidSessionHandle)
             }
-            EnIpCommand::SendRrData => handle_send_rr_data(
-                message_router.as_ref(),
-                &header,
-                command_specific_data.as_ref(),
-            ),
+            EnIpCommand::SendRrData => {
+                handle_send_rr_data(message_router.as_ref(), &header, &command_specific_data)
+            }
             _ => error_reply(&header, EncapsStatusCode::UnsupportedCommand),
         };
         reply.header.sender_context = header.sender_context;
@@ -123,11 +119,11 @@ async fn serve_session(
 
 /// The Register Session reply granting `session_handle`, or refusing another protocol version with ours
 fn handle_register_session(
-    header: &EncapsulationHeader,
     session_handle: CipUdint,
-    command_specific_data: Option<&CommandSpecificData>,
+    header: &EncapsulationHeader,
+    command_specific_data: &CommandSpecificData,
 ) -> EnIpPacket {
-    let Some(CommandSpecificData::RegisterSession(register_data)) = command_specific_data else {
+    let CommandSpecificData::RegisterSession(register_data) = command_specific_data else {
         return error_reply(header, EncapsStatusCode::InvalidFormatOrData);
     };
     let mut reply = EnIpPacket::new_registration();
