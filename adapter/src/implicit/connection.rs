@@ -29,17 +29,17 @@ use crate::message_router::{
     network_connection_type, segment_id,
 };
 
-/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, where the I/O
-/// goes and each direction's assembly (from the device)
+/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, then per
+/// direction where the I/O comes from or goes and its assembly (from the device)
 #[derive(Debug)]
 pub(crate) struct ImplicitConnection {
     pub request: ForwardOpenRequest,
     pub response: ForwardOpenResponse,
     /// The scanner's IP address: where the outputs come from
     pub originator_ip: IpAddr,
+    pub o2t: ConnectionPoint,
     /// Where the inputs are sent
     pub t2o_endpoint: SocketAddr,
-    pub o2t: ConnectionPoint,
     pub t2o: ConnectionPoint,
 }
 
@@ -174,12 +174,12 @@ pub(crate) fn connection_from_forward_open(
         request: forward_open_request,
         response: forward_open_response,
         originator_ip,
+        o2t,
         // The scanner, on the port its T->O item names; the item's address is ignored
         t2o_endpoint: SocketAddr::new(
             originator_ip,
             t2o_socket_addr_info.map_or(ETHERNET_IP_IO_UDP_PORT, |info| info.sin_port),
         ),
-        o2t,
         t2o,
     })
 }
