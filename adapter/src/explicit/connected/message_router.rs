@@ -140,7 +140,8 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
     }
 
     /// Opens the session's connection when `forward_open_request` asks for class 3, the server
-    /// accepts it and none is established; any other Forward_Open is the server's
+    /// accepts it and none is established: point-to-point both ways, to the Message Router as
+    /// server, with a packet interval. Any other Forward_Open is the server's
     fn handle_forward_open(
         &self,
         forward_open_request: ForwardOpenRequest,
@@ -174,15 +175,66 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             return Err(connection_failure_rejection(service, refusal_status));
         }
 
-        let connection = explicit_connection_from_forward_open(forward_open_request)?;
-        let forward_open_response = connection.response.clone();
+        // The production trigger is ignored
+        if forward_open_request.transport_type_trigger.direction() != Direction::Server {
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
+            ));
+        }
+        if network_connection_type(&forward_open_request.o2t_network_connection_parameters)
+            != ConnectionType::PointToPoint
+            || network_connection_type(&forward_open_request.t2o_network_connection_parameters)
+                != ConnectionType::PointToPoint
+        {
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter,
+            ));
+        }
+        if forward_open_request.o2t_requested_packet_interval == 0
+            || forward_open_request.t2o_requested_packet_interval == 0
+        {
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::RequestedPacketIntervalNotSupported,
+            ));
+        }
+        let message_router = (
+            u16::from(MESSAGE_ROUTER_CLASS_ID),
+            u16::from(MESSAGE_ROUTER_INSTANCE_ID),
+            None,
+        );
+        if class_instance_and_attribute(&forward_open_request.connection_path)
+            != Some(message_router)
+        {
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::InvalidSegmentInConnectionPath,
+            ));
+        }
+
+        let forward_open_response = ForwardOpenResponse {
+            // Chosen by the target; the T->O id is the scanner's
+            o2t_network_connection_id: rand::random(),
+            t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
+            connection_triad: triad,
+            // Granted as requested
+            o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
+            t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
+            application_reply_size: 0,
+            application_reply: vec![],
+        };
         tracing::info!(
             o2t_id = format_args!("{:#010x}", forward_open_response.o2t_network_connection_id),
             t2o_id = format_args!("{:#010x}", forward_open_response.t2o_network_connection_id),
             o2t_api_us = forward_open_response.o2t_actual_packet_interval,
             "class 3 connection opened"
         );
-        *established = Some(connection);
+        *established = Some(ExplicitConnection::new(
+            forward_open_request,
+            forward_open_response.clone(),
+        ));
         Ok((forward_open_response, SocketAddrInfoItems::empty()))
     }
 
@@ -212,65 +264,4 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             application_reply: vec![],
         })
     }
-}
-
-/// The connection `forward_open_request` asks for: point-to-point both ways, to the Message Router
-/// as server, with a packet interval
-fn explicit_connection_from_forward_open(
-    forward_open_request: ForwardOpenRequest,
-) -> Result<ExplicitConnection, Rejection> {
-    let service = forward_open_request.service_code();
-
-    // The production trigger is ignored
-    if forward_open_request.transport_type_trigger.direction() != Direction::Server {
-        return Err(connection_failure_rejection(
-            service,
-            ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
-        ));
-    }
-    if network_connection_type(&forward_open_request.o2t_network_connection_parameters)
-        != ConnectionType::PointToPoint
-        || network_connection_type(&forward_open_request.t2o_network_connection_parameters)
-            != ConnectionType::PointToPoint
-    {
-        return Err(connection_failure_rejection(
-            service,
-            ConnectionManagerExtendedStatus::InvalidNetworkConnectionParameter,
-        ));
-    }
-    if forward_open_request.o2t_requested_packet_interval == 0
-        || forward_open_request.t2o_requested_packet_interval == 0
-    {
-        return Err(connection_failure_rejection(
-            service,
-            ConnectionManagerExtendedStatus::RequestedPacketIntervalNotSupported,
-        ));
-    }
-    let message_router = (
-        u16::from(MESSAGE_ROUTER_CLASS_ID),
-        u16::from(MESSAGE_ROUTER_INSTANCE_ID),
-        None,
-    );
-    if class_instance_and_attribute(&forward_open_request.connection_path) != Some(message_router) {
-        return Err(connection_failure_rejection(
-            service,
-            ConnectionManagerExtendedStatus::InvalidSegmentInConnectionPath,
-        ));
-    }
-
-    let forward_open_response = ForwardOpenResponse {
-        // Chosen by the target; the T->O id is the scanner's
-        o2t_network_connection_id: rand::random(),
-        t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
-        connection_triad: forward_open_request.connection_triad,
-        // Granted as requested
-        o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
-        t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
-        application_reply_size: 0,
-        application_reply: vec![],
-    };
-    Ok(ExplicitConnection::new(
-        forward_open_request,
-        forward_open_response,
-    ))
 }

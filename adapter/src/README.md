@@ -30,7 +30,6 @@ server::serve
 explicit::connected::message_router::ConnectedMessageRouter    the MessageRouter of each session
 ├─ Get, Set                                  the server's
 ├─ handle_forward_open                       class 3 when the server accepts it, otherwise the server's
-│  └─ explicit_connection_from_forward_open
 └─ handle_forward_close                      the session's connection, otherwise the server's
 ```
 
