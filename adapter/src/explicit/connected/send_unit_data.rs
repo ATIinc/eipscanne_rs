@@ -16,8 +16,8 @@ use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, UnitPacketData};
 use eipscanne_rs::eip::packet::{EnIpPacket, EncapsulationHeader};
 
-use crate::explicit::handle_message_router_request;
-use crate::message_router::{MessageRouter, message_router_response};
+use crate::explicit::{handle_message_router_request, message_router_response};
+use crate::message_router::MessageRouter;
 
 /// The Send Unit Data reply carrying the response to the connected request inside; `None` when the
 /// request is discarded

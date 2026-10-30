@@ -8,15 +8,18 @@ use binrw::BinRead;
 
 use eipscanne_rs::cip::connection_manager::forward_close::ForwardCloseRequest;
 use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, ResponseStatusCode};
-use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::message::response::{
+    MessageRouterResponse, Rejection, ResponseData, ResponseStatusCode,
+};
+use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
+use eipscanne_rs::cip::types::CipUint;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::message_router::{
-    MessageRouter, class_instance_and_attribute, message_router_response, rejection_response,
-};
+use crate::connection_helpers::class_instance_and_attribute;
+use crate::message_router::MessageRouter;
 
 pub mod connected;
 pub(crate) mod unconnected;
@@ -154,4 +157,39 @@ fn decode_failure_response(service: ServiceCode, error: &binrw::Error) -> Messag
         "refused a Connection Manager request"
     );
     message_router_response(service, general_status, vec![], CipDataOpt::Raw(vec![]))
+}
+
+/// The response carrying `rejection` and the triad of the request it refuses
+fn rejection_response(rejection: Rejection, triad: ConnectionTriad) -> MessageRouterResponse {
+    tracing::warn!(
+        service = ?rejection.service,
+        general_status = ?rejection.general_status,
+        extended_status = ?rejection.extended_status(),
+        "refused a Connection Manager request"
+    );
+    message_router_response(
+        rejection.service,
+        rejection.general_status,
+        rejection.additional_status,
+        // Incomplete: Forward_Close refusals lack the trailing Remaining Path Size and reserved byte
+        CipDataOpt::Typed(Box::new(triad)),
+    )
+}
+
+/// The response to a `service` request
+pub(crate) fn message_router_response(
+    service: ServiceCode,
+    status: ResponseStatusCode,
+    additional_status: Vec<CipUint>,
+    data: CipDataOpt,
+) -> MessageRouterResponse {
+    MessageRouterResponse {
+        service_container: ServiceContainer::new_response(service),
+        response_data: ResponseData {
+            status,
+            additional_status_size: additional_status.len() as u8,
+            additional_status,
+            data,
+        },
+    }
 }

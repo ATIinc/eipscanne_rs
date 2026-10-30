@@ -20,10 +20,10 @@ use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 
+use crate::connection_helpers::o2t_timeout;
 use crate::error::{Error, Result};
 use crate::implicit::ImplicitDevice;
 use crate::implicit::connection::{ImplicitConnection, OpenConnection};
-use crate::message_router::o2t_timeout;
 use crate::packet::decode_data;
 
 /// UDP's 16-bit length limit, so no packet is cut short

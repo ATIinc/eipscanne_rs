@@ -4,6 +4,7 @@
 //!
 //! A reply is an encapsulation packet; a response is a CIP Message Router response.
 
+mod connection_helpers;
 pub mod error;
 pub mod explicit;
 pub mod implicit;

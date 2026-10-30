@@ -23,13 +23,14 @@ use eipscanne_rs::cip::object_ids::{MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INST
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
+use crate::connection_helpers::{
+    class_instance_and_attribute, connection_failure_rejection, network_connection_size,
+    network_connection_type, o2t_timeout, successful_forward_close_response,
+    successful_forward_open_response,
+};
 use crate::error::{Error, Result};
 use crate::explicit::connected::ExplicitConnection;
-use crate::message_router::{
-    MessageRouter, class_instance_and_attribute, connection_failure_rejection,
-    network_connection_size, network_connection_type, o2t_timeout,
-    successful_forward_close_response, successful_forward_open_response,
-};
+use crate::message_router::MessageRouter;
 
 /// `message_router`, plus the class 3 Forward_Open, Forward_Close and requests of up to
 /// `max_explicit_connections` connections

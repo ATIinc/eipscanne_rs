@@ -10,8 +10,8 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
-    ConnectionSizeType, ConnectionType, ProductionTrigger, RealTimeFormat, TransportClass,
-    connected_data_header_len,
+    ConnectionSizeType, ConnectionType, NetworkConnectionParameters, ProductionTrigger,
+    RealTimeFormat, TransportClass, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
@@ -23,11 +23,11 @@ use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 
-use crate::implicit::ImplicitDevice;
-use crate::message_router::{
-    connection_failure_rejection, network_connection_size, network_connection_size_type,
-    network_connection_type, segment_id, successful_forward_open_response,
+use crate::connection_helpers::{
+    connection_failure_rejection, network_connection_size, network_connection_type, segment_id,
+    successful_forward_open_response,
 };
+use crate::implicit::ImplicitDevice;
 
 /// What the I/O exchange task runs on: the Forward_Open request and response, then per direction
 /// where the I/O comes from or goes and its assembly (from the device)
@@ -172,6 +172,14 @@ pub(crate) fn connection_from_forward_open(
         ),
         t2o,
     })
+}
+
+/// Whether the connection size of a direction is fixed or variable
+fn network_connection_size_type(parameters: &NetworkConnectionParameters) -> ConnectionSizeType {
+    match parameters {
+        NetworkConnectionParameters::Standard(parameters) => parameters.connection_size_type(),
+        NetworkConnectionParameters::Large(parameters) => parameters.connection_size_type(),
+    }
 }
 
 /// The O->T and T->O connection points of an assembly connection path: class, configuration

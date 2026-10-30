@@ -25,14 +25,13 @@ use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
+use crate::connection_helpers::{connection_failure_rejection, successful_forward_close_response};
 use crate::error::Result;
 use crate::implicit::connection::{OpenConnection, connection_from_forward_open};
 use crate::implicit::o2t::{receive_outputs, route_outputs};
 use crate::implicit::t2o::send_inputs;
 use crate::implicit::{ImplicitDevice, ImplicitOptions};
-use crate::message_router::{
-    MessageRouter, connection_failure_rejection, successful_forward_close_response,
-};
+use crate::message_router::MessageRouter;
 
 /// O->T packets waiting for their connection; more are lost, like on the network
 const OUTPUT_PACKET_QUEUE: usize = 8;
