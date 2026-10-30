@@ -5,14 +5,13 @@ use std::net::{IpAddr, SocketAddr};
 use std::ops::RangeInclusive;
 
 use tokio::sync::mpsc::Sender;
-use tokio::task::AbortHandle;
 
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, ConnectionType, ProductionTrigger, RealTimeFormat, TransportClass,
-    connection_size,
+    connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
@@ -30,62 +29,57 @@ use crate::message_router::{
     network_connection_type, segment_id,
 };
 
-/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, each direction's
-/// assembly (from the device) and where the I/O goes
+/// What the I/O exchange task runs on: the Forward_Open received, the reply sent, where the I/O
+/// goes and each direction's assembly (from the device)
 #[derive(Debug)]
 pub(crate) struct ImplicitConnection {
     pub request: ForwardOpenRequest,
     pub response: ForwardOpenResponse,
-    /// How the outputs signal run/idle
-    pub o2t_real_time_format: RealTimeFormat,
-    /// How the inputs signal run/idle
-    pub t2o_real_time_format: RealTimeFormat,
     /// The scanner's IP address: where the outputs come from
     pub originator_ip: IpAddr,
     /// Where the inputs are sent
     pub t2o_endpoint: SocketAddr,
-    /// The O->T connection point
-    pub output_instance: u16,
-    /// Data bytes of each output
-    pub output_size: u16,
-    /// The T->O connection point
-    pub input_instance: u16,
-    /// Data bytes of each input
-    pub input_size: u16,
+    pub o2t: ConnectionPoint,
+    pub t2o: ConnectionPoint,
+}
+
+/// One direction's assembly: its connection point, data size and run/idle signalling
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ConnectionPoint {
+    pub instance: u16,
+    /// Data bytes of each packet
+    pub size: u16,
+    /// How the packets signal run/idle
+    pub real_time_format: RealTimeFormat,
 }
 
 /// What the Message Router keeps of a connection: the triad a Forward_Close names, the IP address
-/// that opened it, and its I/O exchange task, which dropping it stops
+/// that opened it, and the sender its I/O exchange task receives from, which dropping it closes
 pub(crate) struct OpenConnection {
     pub connection_triad: ConnectionTriad,
     pub originator_ip: IpAddr,
     pub output_instance: u16,
-    /// Where [`route_outputs`](crate::implicit::o2t::route_outputs) hands its O->T packets
+    /// Where [`route_outputs`](crate::implicit::o2t::route_outputs) hands its O->T packets;
+    /// closed once the I/O exchange task ends
     pub output_packet_sender: Sender<(EnIpIoPacket, SocketAddr)>,
-    pub io_exchange_task: AbortHandle,
-}
-
-impl Drop for OpenConnection {
-    fn drop(&mut self) {
-        self.io_exchange_task.abort();
-    }
 }
 
 /// `sin_family` of an IPv4 Socket Address Info
 const AF_INET: CipInt = 2;
 
-/// The connection `forward_open` asks for: class 1, cyclic, point-to-point and fixed size both
-/// ways, at RPIs within `packet_interval`, between assemblies the device exchanges at those sizes
+/// The connection `forward_open_request` asks for: class 1, cyclic, point-to-point and fixed size
+/// both ways, at RPIs within `packet_interval`, between assemblies the device exchanges at those
+/// sizes
 pub(crate) fn connection_from_forward_open(
     device: &impl ImplicitDevice,
-    forward_open: ForwardOpenRequest,
+    forward_open_request: ForwardOpenRequest,
     packet_interval: &RangeInclusive<u32>,
     originator_ip: IpAddr,
     t2o_socket_addr_info: Option<SocketAddrInfo>,
 ) -> Result<ImplicitConnection, Rejection> {
-    let service = forward_open.service_code();
+    let service = forward_open_request.service_code();
 
-    let trigger = forward_open.transport_type_trigger;
+    let trigger = forward_open_request.transport_type_trigger;
     if trigger.transport_class() != TransportClass::Class1
         || trigger.production_trigger() != ProductionTrigger::Cyclic
     {
@@ -94,8 +88,8 @@ pub(crate) fn connection_from_forward_open(
             ConnectionManagerExtendedStatus::TransportClassAndTriggerCombinationNotSupported,
         ));
     }
-    let o2t_parameters = &forward_open.o2t_network_connection_parameters;
-    let t2o_parameters = &forward_open.t2o_network_connection_parameters;
+    let o2t_parameters = &forward_open_request.o2t_network_connection_parameters;
+    let t2o_parameters = &forward_open_request.t2o_network_connection_parameters;
     if network_connection_size_type(o2t_parameters) != ConnectionSizeType::Fixed
         || network_connection_size_type(t2o_parameters) != ConnectionSizeType::Fixed
         || network_connection_type(o2t_parameters) != ConnectionType::PointToPoint
@@ -107,10 +101,10 @@ pub(crate) fn connection_from_forward_open(
         ));
     }
     // Never 0, whatever `packet_interval` allows
-    if forward_open.o2t_requested_packet_interval == 0
-        || forward_open.t2o_requested_packet_interval == 0
-        || !packet_interval.contains(&forward_open.o2t_requested_packet_interval)
-        || !packet_interval.contains(&forward_open.t2o_requested_packet_interval)
+    if forward_open_request.o2t_requested_packet_interval == 0
+        || forward_open_request.t2o_requested_packet_interval == 0
+        || !packet_interval.contains(&forward_open_request.o2t_requested_packet_interval)
+        || !packet_interval.contains(&forward_open_request.t2o_requested_packet_interval)
     {
         return Err(connection_failure_rejection(
             service,
@@ -125,7 +119,7 @@ pub(crate) fn connection_from_forward_open(
     }
 
     let Some((output_instance, input_instance)) =
-        output_and_input_instances(&forward_open.connection_path)
+        output_and_input_instances(&forward_open_request.connection_path)
     else {
         return Err(connection_failure_rejection(
             service,
@@ -141,13 +135,20 @@ pub(crate) fn connection_from_forward_open(
             ConnectionManagerExtendedStatus::InvalidProducedOrConsumedApplicationPath,
         ));
     };
+    let o2t = ConnectionPoint {
+        instance: output_instance,
+        size: output_size,
+        real_time_format: o2t_real_time_format,
+    };
+    let t2o = ConnectionPoint {
+        instance: input_instance,
+        size: input_size,
+        real_time_format: t2o_real_time_format,
+    };
     // Each size is its assembly's plus headers; a refusal names the size that fits
-    for (parameters, assembly_size, real_time_format) in [
-        (o2t_parameters, output_size, o2t_real_time_format),
-        (t2o_parameters, input_size, t2o_real_time_format),
-    ] {
-        let supported_size =
-            connection_size(assembly_size, TransportClass::Class1, real_time_format);
+    for (parameters, connection_point) in [(o2t_parameters, o2t), (t2o_parameters, t2o)] {
+        let supported_size = connection_point.size
+            + connected_data_header_len(TransportClass::Class1, connection_point.real_time_format);
         if network_connection_size(parameters) != supported_size {
             let mut rejection = connection_failure_rejection(
                 service,
@@ -161,29 +162,25 @@ pub(crate) fn connection_from_forward_open(
     let forward_open_response = ForwardOpenResponse {
         // Chosen by the target; the T->O id is the scanner's
         o2t_network_connection_id: rand::random(),
-        t2o_network_connection_id: forward_open.t2o_network_connection_id,
-        connection_triad: forward_open.connection_triad,
+        t2o_network_connection_id: forward_open_request.t2o_network_connection_id,
+        connection_triad: forward_open_request.connection_triad,
         // Granted as requested
-        o2t_actual_packet_interval: forward_open.o2t_requested_packet_interval,
-        t2o_actual_packet_interval: forward_open.t2o_requested_packet_interval,
+        o2t_actual_packet_interval: forward_open_request.o2t_requested_packet_interval,
+        t2o_actual_packet_interval: forward_open_request.t2o_requested_packet_interval,
         application_reply_size: 0,
         application_reply: vec![],
     };
     Ok(ImplicitConnection {
-        request: forward_open,
+        request: forward_open_request,
         response: forward_open_response,
-        o2t_real_time_format,
-        t2o_real_time_format,
         originator_ip,
         // The scanner, on the port its T->O item names; the item's address is ignored
         t2o_endpoint: SocketAddr::new(
             originator_ip,
             t2o_socket_addr_info.map_or(ETHERNET_IP_IO_UDP_PORT, |info| info.sin_port),
         ),
-        output_instance,
-        output_size,
-        input_instance,
-        input_size,
+        o2t,
+        t2o,
     })
 }
 

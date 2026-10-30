@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
-use tokio::task::AbortHandle;
+use tokio_util::task::AbortOnDropHandle;
 
 use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
@@ -48,7 +48,8 @@ pub(crate) struct ImplicitMessageRouter<D> {
     open_connections: Arc<Mutex<HashMap<CipUdint, OpenConnection>>>,
     max_io_connections: usize,
     packet_interval: RangeInclusive<u32>,
-    output_routing_task: AbortHandle,
+    /// Dropping it stops the routing task, which closes every connection
+    _output_routing_task: AbortOnDropHandle<()>,
 }
 
 impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
@@ -58,11 +59,10 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
         let io_address = io_socket.local_addr()?;
         tracing::info!(io = %io_address, "implicit messaging");
         let open_connections = Arc::new(Mutex::new(HashMap::new()));
-        let output_routing_task = tokio::spawn(route_outputs(
+        let _output_routing_task = AbortOnDropHandle::new(tokio::spawn(route_outputs(
             Arc::clone(&io_socket),
             Arc::clone(&open_connections),
-        ))
-        .abort_handle();
+        )));
         Ok(ImplicitMessageRouter {
             device,
             io_socket,
@@ -72,15 +72,8 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
             open_connections,
             max_io_connections: options.max_io_connections,
             packet_interval: options.packet_interval,
-            output_routing_task,
+            _output_routing_task,
         })
-    }
-}
-
-/// Dropping it stops the routing task, which closes every connection
-impl<D> Drop for ImplicitMessageRouter<D> {
-    fn drop(&mut self) {
-        self.output_routing_task.abort();
     }
 }
 
@@ -124,23 +117,23 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             .handle_set_attribute_single(class, instance, attribute, data)
     }
 
-    /// Opens the connection `forward_open` asks for when a place is free and no other connection
-    /// owns its outputs
+    /// Opens the connection `forward_open_request` asks for when a place is free and no other
+    /// connection owns its outputs
     fn handle_forward_open(
         &self,
-        forward_open: ForwardOpenRequest,
+        forward_open_request: ForwardOpenRequest,
         originator_ip: IpAddr,
         t2o_socket_addr_info: Option<SocketAddrInfo>,
     ) -> (MessageRouterResponse, SocketAddrInfoItems) {
-        let service = forward_open.service_code();
-        let triad = forward_open.connection_triad;
+        let service = forward_open_request.service_code();
+        let triad = forward_open_request.connection_triad;
         let mut open_connections = self
             .open_connections
             .lock()
             .expect("nothing panics while holding the connections lock");
         // Timed-out connections free their place
         open_connections
-            .retain(|_, open_connection| !open_connection.io_exchange_task.is_finished());
+            .retain(|_, open_connection| !open_connection.output_packet_sender.is_closed());
         // A duplicate, or one too many, is refused before it is checked
         let refusal_status = if open_connections
             .values()
@@ -162,7 +155,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         // Checks the Forward_Open against the device's assemblies
         let mut connection = match connection_from_forward_open(
             self.device.as_ref(),
-            forward_open,
+            forward_open_request,
             &self.packet_interval,
             originator_ip,
             t2o_socket_addr_info,
@@ -176,10 +169,10 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             }
         };
         // Outputs have one owner; heartbeats carry none
-        if connection.output_size > 0
-            && open_connections.values().any(|open_connection| {
-                open_connection.output_instance == connection.output_instance
-            })
+        if connection.o2t.size > 0
+            && open_connections
+                .values()
+                .any(|open_connection| open_connection.output_instance == connection.o2t.instance)
         {
             return (
                 rejection_response(
@@ -202,23 +195,22 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
             t2o_id = format_args!("{:#010x}", forward_open_response.t2o_network_connection_id),
             o2t_api_us = forward_open_response.o2t_actual_packet_interval,
             t2o_api_us = forward_open_response.t2o_actual_packet_interval,
-            output_instance = connection.output_instance,
-            input_instance = connection.input_instance,
+            output_instance = connection.o2t.instance,
+            input_instance = connection.t2o.instance,
             t2o_endpoint = %connection.t2o_endpoint,
             "class 1 connection opened"
         );
-        let output_instance = connection.output_instance;
+        let output_instance = connection.o2t.instance;
         let device = Arc::clone(&self.device);
         let io_socket = Arc::clone(&self.io_socket);
         let (output_packet_sender, mut output_packet_receiver) = mpsc::channel(OUTPUT_PACKET_QUEUE);
         // Exchanges the I/O until the outputs time out or the connection is closed
-        let io_exchange_task = tokio::spawn(async move {
+        tokio::spawn(async move {
             tokio::select! {
                 () = receive_outputs(device.as_ref(), &connection, &mut output_packet_receiver) => {}
                 () = send_inputs(device.as_ref(), &connection, &io_socket) => {}
             }
-        })
-        .abort_handle();
+        });
         open_connections.insert(
             forward_open_response.o2t_network_connection_id,
             OpenConnection {
@@ -226,7 +218,6 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                 originator_ip,
                 output_instance,
                 output_packet_sender,
-                io_exchange_task,
             },
         );
         (
@@ -259,7 +250,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         if let Some((&o2t_network_connection_id, current)) =
             open_connections.iter().find(|(_, open_connection)| {
                 open_connection.connection_triad == triad
-                    && !open_connection.io_exchange_task.is_finished()
+                    && !open_connection.output_packet_sender.is_closed()
             })
         {
             if current.originator_ip != originator_ip {
@@ -272,10 +263,8 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                     triad,
                 );
             }
-            let output_instance = current.output_instance;
-            // Dropping it stops the I/O exchange task
+            // Dropping its sender makes the I/O exchange task idle the outputs and end
             open_connections.remove(&o2t_network_connection_id);
-            self.device.enter_idle(output_instance);
             tracing::info!(
                 connection_serial_number = triad.connection_serial_number,
                 "connection closed"

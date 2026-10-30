@@ -32,7 +32,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionPriority, ConnectionSizeType, ConnectionTimeoutMultiplier, ConnectionType, Direction,
     LargeNetworkConnectionParameters, NetworkConnectionParameters, PriorityTimeTick,
     ProductionTrigger, RealTimeFormat, RedundantOwner, StandardNetworkConnectionParameters,
-    TransportClass, TransportTypeTrigger, connection_size,
+    TransportClass, TransportTypeTrigger, connected_data_header_len,
 };
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::path::CipPath;
@@ -146,9 +146,9 @@ pub fn forward_open_request(
     // Sizes on the wire: the data plus the sequence count and the real-time header. O->T in the
     // example: 32 + 2 + 4 = 38; T->O: 32 + 2 = 34
     let o2t_connection_size: u16 =
-        connection_size(o2t_size, TransportClass::Class1, o2t_real_time_format);
+        o2t_size + connected_data_header_len(TransportClass::Class1, o2t_real_time_format);
     let t2o_connection_size: u16 =
-        connection_size(t2o_size, TransportClass::Class1, t2o_real_time_format);
+        t2o_size + connected_data_header_len(TransportClass::Class1, t2o_real_time_format);
     let large: bool =
         large.unwrap_or(o2t_connection_size.max(t2o_connection_size) > u9::MAX.value());
     let o2t_network_connection_parameters = network_connection_parameters(

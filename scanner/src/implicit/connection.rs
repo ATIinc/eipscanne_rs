@@ -10,7 +10,7 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
 };
 use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionSizeType, NetworkConnectionParameters, RealTimeFormat, TransportClass,
-    connection_size,
+    connected_data_header_len,
 };
 use eipscanne_rs::eip::command::RRPacketData;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
@@ -138,7 +138,7 @@ pub(crate) fn data_size(
             parameters.connection_size_type(),
         ),
     };
-    let overhead: u16 = connection_size(0, transport_class, real_time_format);
+    let overhead: u16 = connected_data_header_len(transport_class, real_time_format);
     (size.saturating_sub(overhead), size_type)
 }
 

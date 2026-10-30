@@ -55,7 +55,7 @@ pub enum RedundantOwner {
 #[br(map = u16::into)]
 #[bw(map = |&x| u16::from(x))]
 pub struct StandardNetworkConnectionParameters {
-    /// Bytes per packet, including the sequence count and real-time header (see [`connection_size`])
+    /// Bytes per packet: the application data plus [`connected_data_header_len`]
     pub connection_size: u9,
     pub connection_size_type: ConnectionSizeType,
     pub priority: ConnectionPriority,
@@ -70,7 +70,7 @@ pub struct StandardNetworkConnectionParameters {
 #[br(map = u32::into)]
 #[bw(map = |&x| u32::from(x))]
 pub struct LargeNetworkConnectionParameters {
-    /// Bytes per packet, including the sequence count and real-time header (see [`connection_size`])
+    /// Bytes per packet: the application data plus [`connected_data_header_len`]
     pub connection_size: u16,
     reserved: u9,
     pub connection_size_type: ConnectionSizeType,
@@ -95,7 +95,7 @@ pub enum NetworkConnectionParameters {
 }
 
 /// How an end point moves data over the connection. Classes 1, 2 and 3 put a 16-bit sequence
-/// count in front of every packet ([`connection_size`]).
+/// count in front of every packet ([`connected_data_header_len`]).
 #[bitsize(4)]
 #[derive(FromBits, PartialEq, Debug, Clone, Copy, Default)]
 #[repr(u8)]
@@ -242,10 +242,9 @@ impl RealTimeFormat {
 
 // ^^^^^^^^ End of RealTimeFormat impl ^^^^^^^^
 
-/// Connection size as sent on the wire: the application data, the 16-bit sequence count that
-/// transport classes 1, 2 and 3 prepend to every packet, and the real-time header, if any.
-pub fn connection_size(
-    data_size: u16,
+/// Bytes in front of the application data: the 16-bit sequence count of transport classes 1, 2
+/// and 3, and the real-time header, if any
+pub fn connected_data_header_len(
     transport_class: TransportClass,
     real_time_format: RealTimeFormat,
 ) -> u16 {
@@ -253,5 +252,5 @@ pub fn connection_size(
         TransportClass::Class1 | TransportClass::Class2 | TransportClass::Class3 => 2,
         TransportClass::Class0 | TransportClass::Unknown(_) => 0,
     };
-    data_size + sequence_count_len + real_time_format.header_len()
+    sequence_count_len + real_time_format.header_len()
 }

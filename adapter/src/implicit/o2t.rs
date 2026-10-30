@@ -12,7 +12,9 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc::Receiver;
 use tokio::time::{Instant, timeout_at};
 
-use eipscanne_rs::cip::connection_manager::parameters::{TransportClass, connection_size};
+use eipscanne_rs::cip::connection_manager::parameters::{
+    TransportClass, connected_data_header_len,
+};
 use eipscanne_rs::cip::io_data::{CipIoData, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
@@ -73,8 +75,8 @@ pub(crate) async fn route_outputs(
     }
 }
 
-/// Hands the device the new run mode outputs of `connection` until no packet comes in time, and
-/// tells it when they switch to idle or time out
+/// Hands the device the new run mode outputs of `connection` until no packet comes in time or the
+/// connection is closed, and tells it when they switch to idle, time out or close
 pub(crate) async fn receive_outputs(
     device: &impl ImplicitDevice,
     connection: &ImplicitConnection,
@@ -100,11 +102,14 @@ pub(crate) async fn receive_outputs(
     loop {
         let (packet, from) = match timeout_at(deadline, output_packet_receiver.recv()).await {
             Ok(Some(received)) => received,
-            // The connection was closed
-            Ok(None) => return,
+            // The connection was closed; queued outputs come first
+            Ok(None) => {
+                device.enter_idle(connection.o2t.instance);
+                return;
+            }
             Err(_) => {
                 tracing::warn!("the connection timed out: no output packet in time");
-                device.enter_idle(connection.output_instance);
+                device.enter_idle(connection.o2t.instance);
                 return;
             }
         };
@@ -131,7 +136,7 @@ pub(crate) async fn receive_outputs(
         }
         // Idle outputs keep the connection open but are not applied; the device hears of the switch
         if running && !run {
-            device.enter_idle(connection.output_instance);
+            device.enter_idle(connection.o2t.instance);
         }
         running = run;
         let CipDataOpt::Raw(output_data) = &cip_io_data.data else {
@@ -141,7 +146,7 @@ pub(crate) async fn receive_outputs(
             continue;
         }
         match decode_data(output_data) {
-            Ok(outputs) => device.consume_outputs(connection.output_instance, outputs),
+            Ok(outputs) => device.consume_outputs(connection.o2t.instance, outputs),
             Err(status) => tracing::warn!(?status, "outputs not consumed"),
         }
     }
@@ -192,12 +197,9 @@ fn check_output_packet(
     let CipDataOpt::Raw(connected_data) = &packet.connected_data else {
         unreachable!("data read from the wire is always raw");
     };
-    let real_time_format = connection.o2t_real_time_format;
-    let o2t_connection_size = connection_size(
-        connection.output_size,
-        TransportClass::Class1,
-        real_time_format,
-    );
+    let real_time_format = connection.o2t.real_time_format;
+    let o2t_connection_size =
+        connection.o2t.size + connected_data_header_len(TransportClass::Class1, real_time_format);
     if connected_data.len() != usize::from(o2t_connection_size) {
         return Err(Error::UnexpectedPacket(format!(
             "{} connected data bytes, the connection carries {o2t_connection_size}",

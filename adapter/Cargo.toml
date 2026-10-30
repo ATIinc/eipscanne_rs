@@ -12,6 +12,7 @@ bilge = "0.5.0"
 binrw = "0.15.2"
 rand = "0.9"
 tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
 tracing = "0.1"
 
 [dev-dependencies]
