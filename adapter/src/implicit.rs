@@ -48,7 +48,7 @@ pub trait ImplicitDevice: MessageRouter {
     fn produce_inputs(&self, instance: u16) -> Self::Inputs;
 
     /// Idles the outputs of `instance` until the next `consume_outputs`: a switch to idle, a
-    /// timeout or a Forward_Close
+    /// timeout or a Forward_Close; never for a heartbeat point, which has no outputs
     fn enter_idle(&self, _instance: u16) {}
 
     /// The device's run or idle mode, sent in the T->O 32-bit header of `instance`

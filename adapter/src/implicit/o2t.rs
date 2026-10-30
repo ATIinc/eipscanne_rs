@@ -103,14 +103,10 @@ pub(crate) async fn receive_outputs(
         let (packet, from) = match timeout_at(deadline, output_packet_receiver.recv()).await {
             Ok(Some(received)) => received,
             // The connection was closed; queued outputs come first
-            Ok(None) => {
-                device.enter_idle(connection.o2t.instance);
-                return;
-            }
+            Ok(None) => break,
             Err(_) => {
                 tracing::warn!("the connection timed out: no output packet in time");
-                device.enter_idle(connection.o2t.instance);
-                return;
+                break;
             }
         };
         let cip_io_data = match extract_cip_io_data(connection, &packet, from, last_sequence_number)
@@ -149,6 +145,10 @@ pub(crate) async fn receive_outputs(
             Ok(outputs) => device.consume_outputs(connection.o2t.instance, outputs),
             Err(status) => tracing::warn!(?status, "outputs not consumed"),
         }
+    }
+    // A heartbeat connection owns no outputs to idle
+    if connection.o2t.size > 0 {
+        device.enter_idle(connection.o2t.instance);
     }
 }
 
