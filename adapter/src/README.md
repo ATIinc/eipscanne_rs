@@ -12,7 +12,7 @@ server::serve
    │  └─ server::handle_register_session
    ├─ Send RR Data
    │  └─ explicit::unconnected::handle_send_rr_data
-   │     └─ explicit::handle_request
+   │     └─ explicit::handle_message_router_request
    │        └─ Get, Set
    │           └─ MessageRouter::handle_get_* / handle_set_*
    ├─ any other command
