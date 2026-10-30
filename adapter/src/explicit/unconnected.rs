@@ -20,8 +20,8 @@ pub(crate) fn handle_send_rr_data(
     message_router: &impl MessageRouter,
     options: ExplicitOptions,
     header: &EncapsulationHeader,
-    originator_ip: IpAddr,
     command_specific_data: &CommandSpecificData,
+    originator_ip: IpAddr,
     class_3_connection: &mut Option<ExplicitConnection>,
 ) -> EnIpPacket {
     let CommandSpecificData::SendRrData(request_rr_data) = command_specific_data else {

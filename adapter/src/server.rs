@@ -150,8 +150,8 @@ async fn serve_session(
                     message_router.as_ref(),
                     options,
                     &header,
-                    originator_ip,
                     &command_specific_data,
+                    originator_ip,
                     &mut class_3_connection,
                 )
             }
