@@ -14,10 +14,12 @@ use tokio_util::task::AbortOnDropHandle;
 use eipscanne_rs::cip::connection_manager::forward_close::{
     ForwardCloseRequest, ForwardCloseResponse,
 };
-use eipscanne_rs::cip::connection_manager::forward_open::ForwardOpenRequest;
+use eipscanne_rs::cip::connection_manager::forward_open::{
+    ForwardOpenRequest, ForwardOpenResponse,
+};
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::message::response::{MessageRouterResponse, Rejection, ResponseStatusCode};
+use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::constants::ETHERNET_IP_IO_UDP_PORT;
@@ -28,9 +30,7 @@ use crate::implicit::connection::{OpenConnection, connection_from_forward_open};
 use crate::implicit::o2t::{receive_outputs, route_outputs};
 use crate::implicit::t2o::send_inputs;
 use crate::implicit::{ImplicitDevice, ImplicitOptions};
-use crate::message_router::{
-    MessageRouter, connection_failure_rejection, message_router_response, rejection_response,
-};
+use crate::message_router::{MessageRouter, connection_failure_rejection};
 
 /// O->T packets waiting for their connection; more are lost, like on the network
 const OUTPUT_PACKET_QUEUE: usize = 8;
@@ -124,7 +124,7 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         forward_open_request: ForwardOpenRequest,
         originator_ip: IpAddr,
         t2o_socket_addr_info: Option<SocketAddrInfo>,
-    ) -> (MessageRouterResponse, SocketAddrInfoItems) {
+    ) -> Result<(ForwardOpenResponse, SocketAddrInfoItems), Rejection> {
         let service = forward_open_request.service_code();
         let triad = forward_open_request.connection_triad;
         let mut open_connections = self
@@ -135,55 +135,40 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         open_connections
             .retain(|_, open_connection| !open_connection.output_packet_sender.is_closed());
         // A duplicate, or one too many, is refused before it is checked
-        let refusal_status = if open_connections
+        if open_connections
             .values()
             .any(|open_connection| open_connection.connection_triad == triad)
         {
-            Some(ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen)
-        } else if open_connections.len() >= self.max_io_connections {
-            Some(ConnectionManagerExtendedStatus::OutOfConnections)
-        } else {
-            None
-        };
-        if let Some(refusal_status) = refusal_status {
-            return (
-                rejection_response(connection_failure_rejection(service, refusal_status), triad),
-                SocketAddrInfoItems::empty(),
-            );
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::ConnectionInUseOrDuplicateForwardOpen,
+            ));
+        }
+        if open_connections.len() >= self.max_io_connections {
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::OutOfConnections,
+            ));
         }
 
         // Checks the Forward_Open against the device's assemblies
-        let mut connection = match connection_from_forward_open(
+        let mut connection = connection_from_forward_open(
             self.device.as_ref(),
             forward_open_request,
             &self.packet_interval,
             originator_ip,
             t2o_socket_addr_info,
-        ) {
-            Ok(connection) => connection,
-            Err(rejection) => {
-                return (
-                    rejection_response(rejection, triad),
-                    SocketAddrInfoItems::empty(),
-                );
-            }
-        };
+        )?;
         // Outputs have one owner; heartbeats carry none
         if connection.o2t.size > 0
             && open_connections
                 .values()
                 .any(|open_connection| open_connection.output_instance == connection.o2t.instance)
         {
-            return (
-                rejection_response(
-                    connection_failure_rejection(
-                        service,
-                        ConnectionManagerExtendedStatus::OwnershipConflict,
-                    ),
-                    triad,
-                ),
-                SocketAddrInfoItems::empty(),
-            );
+            return Err(connection_failure_rejection(
+                service,
+                ConnectionManagerExtendedStatus::OwnershipConflict,
+            ));
         }
         // Each open connection has its own O->T id
         while open_connections.contains_key(&connection.response.o2t_network_connection_id) {
@@ -220,18 +205,13 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
                 output_packet_sender,
             },
         );
-        (
-            message_router_response(
-                service,
-                ResponseStatusCode::Success,
-                vec![],
-                CipDataOpt::Typed(Box::new(forward_open_response)),
-            ),
+        Ok((
+            forward_open_response,
             SocketAddrInfoItems {
                 o2t: self.o2t_socket_addr_info,
                 t2o: None,
             },
-        )
+        ))
     }
 
     /// Closes the open connection `forward_close` names, when `originator_ip` opened it, and idles
@@ -240,53 +220,42 @@ impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
         &self,
         forward_close: ForwardCloseRequest,
         originator_ip: IpAddr,
-    ) -> MessageRouterResponse {
+    ) -> Result<ForwardCloseResponse, Rejection> {
         let service = ServiceCode::ForwardClose;
         let triad = forward_close.connection_triad;
         let mut open_connections = self
             .open_connections
             .lock()
             .expect("nothing panics while holding the connections lock");
-        if let Some((&o2t_network_connection_id, current)) =
+        // A timed-out connection is not found
+        let Some((&o2t_network_connection_id, current)) =
             open_connections.iter().find(|(_, open_connection)| {
                 open_connection.connection_triad == triad
                     && !open_connection.output_packet_sender.is_closed()
             })
-        {
-            if current.originator_ip != originator_ip {
-                return rejection_response(
-                    Rejection {
-                        service,
-                        general_status: ResponseStatusCode::PrivilegeViolation,
-                        additional_status: vec![],
-                    },
-                    triad,
-                );
-            }
-            // Dropping its sender makes the I/O exchange task idle the outputs and end
-            open_connections.remove(&o2t_network_connection_id);
-            tracing::info!(
-                connection_serial_number = triad.connection_serial_number,
-                "connection closed"
-            );
-            return message_router_response(
-                service,
-                ResponseStatusCode::Success,
-                vec![],
-                CipDataOpt::Typed(Box::new(ForwardCloseResponse {
-                    connection_triad: triad,
-                    application_reply_size: 0,
-                    application_reply: vec![],
-                })),
-            );
-        }
-        // A timed-out connection is not found
-        rejection_response(
-            connection_failure_rejection(
+        else {
+            return Err(connection_failure_rejection(
                 service,
                 ConnectionManagerExtendedStatus::TargetConnectionNotFound,
-            ),
-            triad,
-        )
+            ));
+        };
+        if current.originator_ip != originator_ip {
+            return Err(Rejection {
+                service,
+                general_status: ResponseStatusCode::PrivilegeViolation,
+                additional_status: vec![],
+            });
+        }
+        // Dropping its sender makes the I/O exchange task idle the outputs and end
+        open_connections.remove(&o2t_network_connection_id);
+        tracing::info!(
+            connection_serial_number = triad.connection_serial_number,
+            "connection closed"
+        );
+        Ok(ForwardCloseResponse {
+            connection_triad: triad,
+            application_reply_size: 0,
+            application_reply: vec![],
+        })
     }
 }

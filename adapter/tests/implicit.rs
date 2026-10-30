@@ -519,6 +519,20 @@ async fn a_forward_open_the_device_cannot_serve_is_refused() {
     );
 }
 
+#[tokio::test]
+async fn a_forward_close_of_no_open_connection_is_refused() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request(1);
+
+    let reply = scanner.request(&forward_close(&request)).await;
+    let (rejection, triad) = refusal(&reply);
+    assert_eq!(
+        rejection.extended_status(),
+        Some(ConnectionManagerExtendedStatus::TargetConnectionNotFound)
+    );
+    assert_eq!(triad, request.connection_triad);
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_connection_without_outputs_times_out_and_another_opens() {
     let mut scanner = Scanner::connect().await;
