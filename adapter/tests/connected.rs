@@ -4,7 +4,7 @@ use std::io::Cursor;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
-use bilge::prelude::{u4, u9};
+use bilge::prelude::{u4, u7, u9};
 use binrw::BinRead;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -26,7 +26,9 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{
     IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID, MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INSTANCE_ID,
 };
-use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, MajorRevisionCompatibility,
+};
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::packet::EnIpPacket;
@@ -250,6 +252,31 @@ async fn open_request_and_close() {
     assert_eq!(reply.header.command, EnIpCommand::SendRrData);
     // The session takes another connection
     scanner.forward_open(forward_open_request(2)).await;
+}
+
+#[tokio::test]
+async fn a_leading_electronic_key_is_accepted() {
+    let mut scanner = Scanner::connect(Arc::new(ConnectedMessageRouter::new(
+        Arc::new(SampleDevice),
+        1,
+    )))
+    .await;
+    let mut request = forward_open_request(1);
+    request.connection_path.segments.insert(
+        0,
+        LogicalPathSegment::new_electronic_key(ElectronicKey {
+            vendor_id: 342,
+            device_type: 0x2b,
+            product_code: 1,
+            major_revision_compatibility: MajorRevisionCompatibility::builder()
+                .major_revision(u7::new(1))
+                .compatibility(false)
+                .build(),
+            minor_revision: 1,
+        }),
+    );
+
+    scanner.forward_open(request).await;
 }
 
 #[tokio::test]

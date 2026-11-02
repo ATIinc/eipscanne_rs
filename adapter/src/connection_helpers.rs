@@ -15,7 +15,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
-use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, PathData,
+};
 use eipscanne_rs::cip::types::CipUint;
 
 // ======= Responses ========
@@ -100,6 +102,24 @@ pub(crate) fn o2t_timeout(
 }
 
 // ======= Ids in paths ========
+
+/// `path` without its first electronic key, and that key
+pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<ElectronicKey>) {
+    let mut segments = Vec::new();
+    let mut electronic_key = None;
+    for (index, segment) in path.segments.iter().enumerate() {
+        match segment.data {
+            PathData::ElectronicKey(key) if electronic_key.is_none() => {
+                if index != 0 {
+                    tracing::warn!(index, ?path,"electronic key is not the path's first segment");
+                }
+                electronic_key = Some(key);
+            }
+            _ => segments.push(*segment),
+        }
+    }
+    (CipPath::from_segments(segments), electronic_key)
+}
 
 /// The class, instance and optional attribute of a logical path
 pub(crate) fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {

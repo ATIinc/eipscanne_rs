@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use bilge::prelude::{u2, u4, u9};
+use bilge::prelude::{u2, u4, u7, u9};
 use binrw::{BinRead, BinWrite};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::time::timeout;
@@ -25,7 +25,10 @@ use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
 use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
-use eipscanne_rs::cip::path::CipPath;
+use eipscanne_rs::cip::object_ids::ASSEMBLY_CLASS_ID;
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, MajorRevisionCompatibility,
+};
 use eipscanne_rs::cip::types::CipUdint;
 use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
@@ -396,6 +399,30 @@ async fn open_echo_and_close() {
     .expect("closing a connection idles its outputs");
     // The Connection Manager takes another connection
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+}
+
+#[tokio::test]
+async fn a_leading_electronic_key_and_any_configuration_instance_are_accepted() {
+    let mut scanner = Scanner::connect().await;
+    let mut request = forward_open_request(1);
+    request.connection_path = CipPath::from_segments(vec![
+        LogicalPathSegment::new_electronic_key(ElectronicKey {
+            vendor_id: 342,
+            device_type: 0x2b,
+            product_code: 1,
+            major_revision_compatibility: MajorRevisionCompatibility::builder()
+                .major_revision(u7::new(1))
+                .compatibility(false)
+                .build(),
+            minor_revision: 1,
+        }),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
+        LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, 1278),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, OUTPUT_INSTANCE),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, INPUT_INSTANCE),
+    ]);
+
+    forward_open_response(&scanner.forward_open(request).await);
 }
 
 #[tokio::test]
