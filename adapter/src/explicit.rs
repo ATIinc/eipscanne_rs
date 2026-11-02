@@ -18,7 +18,10 @@ use eipscanne_rs::cip::message::shared::{ServiceCode, ServiceContainer};
 use eipscanne_rs::cip::types::CipUint;
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
-use crate::connection_helpers::class_instance_and_attribute;
+use crate::connection_helpers::{
+    class_instance_and_attribute, encoded_word_from_binrw_magic, split_electronic_key,
+    verify_electronic_key,
+};
 use crate::message_router::MessageRouter;
 
 pub mod connected;
@@ -33,7 +36,25 @@ pub(crate) fn handle_message_router_request(
     t2o_socket_addr_info: Option<SocketAddrInfo>,
 ) -> (MessageRouterResponse, SocketAddrInfoItems) {
     let service = request.service_container.service();
-    let path_ids = class_instance_and_attribute(&request.request_data.cip_path);
+    let (request_path, electronic_key) = split_electronic_key(&request.request_data.cip_path);
+    if let Some(electronic_key) = electronic_key
+        && let Err(mismatch) = verify_electronic_key(message_router, &electronic_key)
+    {
+        tracing::warn!(
+            ?service,
+            ?electronic_key,
+            ?mismatch,
+            "refused a request's electronic key"
+        );
+        let response = message_router_response(
+            service,
+            ResponseStatusCode::KeyFailureInPath,
+            vec![encoded_word_from_binrw_magic(&mismatch)],
+            CipDataOpt::Raw(vec![]),
+        );
+        return (response, SocketAddrInfoItems::empty());
+    }
+    let path_ids = class_instance_and_attribute(&request_path);
     let CipDataOpt::Raw(request_data) = &request.request_data.additional_data else {
         unreachable!("data read from the wire is always raw");
     };

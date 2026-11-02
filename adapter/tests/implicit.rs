@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use bilge::prelude::{u2, u4, u9};
+use bilge::prelude::{u2, u4, u7, u9};
 use binrw::{BinRead, BinWrite};
 use tokio::net::{TcpListener, TcpStream, UdpSocket};
 use tokio::time::timeout;
@@ -22,11 +22,18 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::identity::{
+    DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
+};
 use eipscanne_rs::cip::io_data::{CipIoData, OutputControlHeader, RunOrIdle};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
-use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::cip::types::CipUdint;
+use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, MajorRevisionCompatibility,
+};
+use eipscanne_rs::cip::types::{CipShortString, CipUdint};
 use eipscanne_rs::eip::command::CommandSpecificData;
 use eipscanne_rs::eip::io_packet::EnIpIoPacket;
 use eipscanne_rs::eip::packet::EnIpPacket;
@@ -55,13 +62,26 @@ const HEARTBEAT_CONNECTION_SIZE: u16 = 2;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
-/// Implicit messaging only: echoes its outputs as its inputs and counts its `enter_idle` calls
+/// Echoes its outputs as its inputs and counts its `enter_idle` calls
 struct EchoDevice {
     outputs: Mutex<[u8; DATA_SIZE as usize]>,
     idle_count: AtomicUsize,
 }
 
-impl MessageRouter for EchoDevice {}
+impl MessageRouter for EchoDevice {
+    /// What `electronic_key` names
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::Unknown(342),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 2 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 1,
+            product_name: CipShortString::from("Echo".to_string()),
+        }
+    }
+}
 
 impl ImplicitDevice for EchoDevice {
     type Outputs = [u8; DATA_SIZE as usize];
@@ -286,6 +306,42 @@ fn forward_open_request(connection_serial_number: u16) -> ForwardOpenRequest {
     }
 }
 
+/// `EchoDevice`'s exact key
+fn electronic_key() -> ElectronicKey {
+    ElectronicKey {
+        vendor_id: 342,
+        device_type: 0x2b,
+        product_code: 1,
+        major_revision_compatibility: MajorRevisionCompatibility::builder()
+            .major_revision(u7::new(1))
+            .compatibility(false)
+            .build(),
+        minor_revision: 2,
+    }
+}
+
+/// `electronic_key()` with Compatibility set and revision `major`.`minor`
+fn compatible_electronic_key(major: u8, minor: u8) -> ElectronicKey {
+    ElectronicKey {
+        major_revision_compatibility: MajorRevisionCompatibility::builder()
+            .major_revision(u7::new(major))
+            .compatibility(true)
+            .build(),
+        minor_revision: minor,
+        ..electronic_key()
+    }
+}
+
+/// `forward_open_request(1)` with `electronic_key` first in its path
+fn forward_open_request_with_key(electronic_key: ElectronicKey) -> ForwardOpenRequest {
+    let mut request = forward_open_request(1);
+    request
+        .connection_path
+        .segments
+        .insert(0, LogicalPathSegment::new_electronic_key(electronic_key));
+    request
+}
+
 /// The Forward_Close of the connection `request` opened
 fn forward_close(request: &ForwardOpenRequest) -> EnIpPacket {
     RequestObjectAssembly::new_forward_close(
@@ -396,6 +452,129 @@ async fn open_echo_and_close() {
     .expect("closing a connection idles its outputs");
     // The Connection Manager takes another connection
     forward_open_response(&scanner.forward_open(forward_open_request(2)).await);
+}
+
+#[tokio::test]
+async fn a_leading_electronic_key_and_any_configuration_instance_are_accepted() {
+    let mut scanner = Scanner::connect().await;
+    let mut request = forward_open_request(1);
+    request.connection_path = CipPath::from_segments(vec![
+        LogicalPathSegment::new_electronic_key(electronic_key()),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ClassId, ASSEMBLY_CLASS_ID),
+        LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, 1278),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, OUTPUT_INSTANCE),
+        LogicalPathSegment::new_u8(LogicalSegmentType::ConnectionPoint, INPUT_INSTANCE),
+    ]);
+
+    forward_open_response(&scanner.forward_open(request).await);
+}
+
+#[tokio::test]
+async fn a_forward_open_whose_electronic_key_does_not_match_is_refused() {
+    let mut scanner = Scanner::connect().await;
+    let mismatches = [
+        (
+            ElectronicKey {
+                product_code: 2,
+                ..electronic_key()
+            },
+            ConnectionManagerExtendedStatus::VendorIdOrProductCodeMismatch,
+        ),
+        (
+            ElectronicKey {
+                device_type: 1,
+                ..electronic_key()
+            },
+            ConnectionManagerExtendedStatus::ProductTypeMismatch,
+        ),
+        (
+            ElectronicKey {
+                minor_revision: 1,
+                ..electronic_key()
+            },
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        // Compatible keys: a newer minor, another major, and zeros
+        (
+            compatible_electronic_key(1, 3),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(2, 2),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(1, 0),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(0, 2),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+    ];
+    for (key, status) in mismatches {
+        let reply = scanner
+            .forward_open(forward_open_request_with_key(key))
+            .await;
+        assert_eq!(extended_status(&reply), Some(status), "{key:?}");
+    }
+}
+
+#[tokio::test]
+async fn zero_electronic_key_fields_are_not_checked() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request_with_key(ElectronicKey {
+        vendor_id: 0,
+        device_type: 0,
+        product_code: 0,
+        major_revision_compatibility: MajorRevisionCompatibility::builder()
+            .major_revision(u7::new(0))
+            .compatibility(false)
+            .build(),
+        minor_revision: 0,
+    });
+
+    forward_open_response(&scanner.forward_open(request).await);
+}
+
+#[tokio::test]
+async fn a_compatible_electronic_key_takes_an_older_minor_revision() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request_with_key(compatible_electronic_key(1, 1));
+
+    forward_open_response(&scanner.forward_open(request).await);
+}
+
+#[tokio::test]
+async fn a_request_whose_electronic_key_does_not_match_is_refused() {
+    let mut scanner = Scanner::connect().await;
+    let get_identity = |key| {
+        RequestObjectAssembly::new_service_request(
+            SESSION_HANDLE,
+            CipPath::from_segments(vec![
+                LogicalPathSegment::new_electronic_key(key),
+                LogicalPathSegment::new_u16(LogicalSegmentType::ClassId, IDENTITY_CLASS_ID),
+                LogicalPathSegment::new_u16(LogicalSegmentType::InstanceId, IDENTITY_INSTANCE_ID),
+            ]),
+            ServiceCode::GetAttributeAll,
+            None,
+        )
+    };
+
+    let reply = scanner.request(&get_identity(electronic_key())).await;
+    assert!(reply.response().unwrap().is_success());
+    let reply = scanner
+        .request(&get_identity(ElectronicKey {
+            vendor_id: 1,
+            ..electronic_key()
+        }))
+        .await;
+    let rejection = Rejection::from_response(reply.response().unwrap()).unwrap();
+    assert_eq!(
+        rejection.general_status,
+        ResponseStatusCode::KeyFailureInPath
+    );
+    assert_eq!(rejection.additional_status, [0x0114]);
 }
 
 #[tokio::test]

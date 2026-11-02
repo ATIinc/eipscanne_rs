@@ -4,7 +4,7 @@ use std::io::Cursor;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 
-use bilge::prelude::{u4, u9};
+use bilge::prelude::{u4, u7, u9};
 use binrw::BinRead;
 use tokio::net::{TcpListener, TcpStream};
 
@@ -19,6 +19,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::identity::{
+    DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
+};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, Rejection, ResponseStatusCode};
@@ -26,8 +29,10 @@ use eipscanne_rs::cip::message::shared::ServiceCode;
 use eipscanne_rs::cip::object_ids::{
     IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID, MESSAGE_ROUTER_CLASS_ID, MESSAGE_ROUTER_INSTANCE_ID,
 };
-use eipscanne_rs::cip::path::CipPath;
-use eipscanne_rs::cip::types::{CipUdint, CipUint};
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, MajorRevisionCompatibility,
+};
+use eipscanne_rs::cip::types::{CipShortString, CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
@@ -48,6 +53,19 @@ const CONNECTION_SIZE: u16 = 504;
 struct SampleDevice;
 
 impl MessageRouter for SampleDevice {
+    /// What `a_leading_electronic_key_is_accepted` names
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::Unknown(342),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 1 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 1,
+            product_name: CipShortString::from("Sample".to_string()),
+        }
+    }
+
     fn handle_get_attributes_all(
         &self,
         _class: u16,
@@ -250,6 +268,31 @@ async fn open_request_and_close() {
     assert_eq!(reply.header.command, EnIpCommand::SendRrData);
     // The session takes another connection
     scanner.forward_open(forward_open_request(2)).await;
+}
+
+#[tokio::test]
+async fn a_leading_electronic_key_is_accepted() {
+    let mut scanner = Scanner::connect(Arc::new(ConnectedMessageRouter::new(
+        Arc::new(SampleDevice),
+        1,
+    )))
+    .await;
+    let mut request = forward_open_request(1);
+    request.connection_path.segments.insert(
+        0,
+        LogicalPathSegment::new_electronic_key(ElectronicKey {
+            vendor_id: 342,
+            device_type: 0x2b,
+            product_code: 1,
+            major_revision_compatibility: MajorRevisionCompatibility::builder()
+                .major_revision(u7::new(1))
+                .compatibility(false)
+                .build(),
+            minor_revision: 1,
+        }),
+    );
+
+    scanner.forward_open(request).await;
 }
 
 #[tokio::test]

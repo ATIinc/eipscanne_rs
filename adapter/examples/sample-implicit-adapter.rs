@@ -25,9 +25,6 @@ use eipscanne_rs::cip::connection_manager::parameters::RealTimeFormat;
 use eipscanne_rs::cip::identity::{
     DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
 };
-use eipscanne_rs::cip::message::data::CipDataOpt;
-use eipscanne_rs::cip::message::response::ResponseStatusCode;
-use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::CipShortString;
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
@@ -63,24 +60,15 @@ struct SampleImplicitAdapter {
 }
 
 impl MessageRouter for SampleImplicitAdapter {
-    fn handle_get_attributes_all(
-        &self,
-        class: u16,
-        instance: u16,
-    ) -> Result<CipDataOpt, ResponseStatusCode> {
-        match (class, instance) {
-            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
-                Ok(CipDataOpt::Typed(Box::new(IdentityResponse {
-                    vendor_id: VendorId::Unknown(0xffff),
-                    device_type: DeviceType::GenericDevice,
-                    product_code: 1,
-                    revision: Revision { major: 1, minor: 0 },
-                    status: IdentityStatusBits::default().into(),
-                    serial_number: 0x0000_0001,
-                    product_name: CipShortString::from("Sample Implicit Adapter".to_string()),
-                })))
-            }
-            _ => Err(ResponseStatusCode::ObjectDoesNotExist),
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::Unknown(0xffff),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 0 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 0x0000_0001,
+            product_name: CipShortString::from("Sample Implicit Adapter".to_string()),
         }
     }
 }

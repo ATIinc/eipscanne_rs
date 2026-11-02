@@ -10,9 +10,12 @@ use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::Instant;
 
+use eipscanne_rs::cip::identity::{
+    DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
+};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
-use eipscanne_rs::cip::types::CipUdint;
+use eipscanne_rs::cip::types::{CipShortString, CipUdint};
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand, EncapsStatusCode};
 use eipscanne_rs::eip::constants::{
     DEFAULT_ENCAPSULATION_OPTIONS, EMPTY_SENDER_CONTEXT, UNREGISTERED_SESSION_HANDLE,
@@ -31,6 +34,18 @@ const SESSION_HANDLE: CipUdint = 1;
 struct SampleDevice;
 
 impl MessageRouter for SampleDevice {
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::Unknown(342),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 1 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 1,
+            product_name: CipShortString::from("Sample".to_string()),
+        }
+    }
+
     fn handle_get_attributes_all(
         &self,
         _class: u16,

@@ -15,8 +15,12 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
-use eipscanne_rs::cip::path::{CipPath, LogicalPathSegment, LogicalSegmentType, PathData};
+use eipscanne_rs::cip::path::{
+    CipPath, ElectronicKey, LogicalPathSegment, LogicalSegmentType, PathData,
+};
 use eipscanne_rs::cip::types::CipUint;
+
+use crate::message_router::MessageRouter;
 
 // ======= Responses ========
 
@@ -42,16 +46,20 @@ pub(crate) fn connection_failure_rejection(
     service: ServiceCode,
     extended_status: ConnectionManagerExtendedStatus,
 ) -> Rejection {
-    // The status codes exist only as binrw magics, so the word is written, not cast
-    let mut word = Cursor::new([0u8; 2]);
-    extended_status
-        .write_le(&mut word)
-        .expect("an extended status is one word");
     Rejection {
         service,
         general_status: ResponseStatusCode::ConnectionFailure,
-        additional_status: vec![CipUint::from_le_bytes(word.into_inner())],
+        additional_status: vec![encoded_word_from_binrw_magic(&extended_status)],
     }
+}
+
+/// The word `code` is written as; binrw magics cannot be cast
+pub(crate) fn encoded_word_from_binrw_magic(
+    code: &impl for<'a> BinWrite<Args<'a> = ()>,
+) -> CipUint {
+    let mut word = Cursor::new([0u8; 2]);
+    code.write_le(&mut word).expect("a code is one word");
+    CipUint::from_le_bytes(word.into_inner())
 }
 
 // ======= Connection parameters ========
@@ -100,6 +108,66 @@ pub(crate) fn o2t_timeout(
 }
 
 // ======= Ids in paths ========
+
+/// `path` without its first electronic key, and that key; unlike CIP, it may sit anywhere
+pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<ElectronicKey>) {
+    let mut segments = Vec::new();
+    let mut electronic_key = None;
+    for (index, segment) in path.segments.iter().enumerate() {
+        match segment.data {
+            PathData::ElectronicKey(key) if electronic_key.is_none() => {
+                if index != 0 {
+                    tracing::warn!(
+                        index,
+                        ?path,
+                        "electronic key is not the path's first segment"
+                    );
+                }
+                electronic_key = Some(key);
+            }
+            _ => segments.push(*segment),
+        }
+    }
+    (CipPath::from_segments(segments), electronic_key)
+}
+
+/// Checks `electronic_key` against `message_router`'s identity; an error names the mismatch
+pub(crate) fn verify_electronic_key(
+    message_router: &impl MessageRouter,
+    electronic_key: &ElectronicKey,
+) -> Result<(), ConnectionManagerExtendedStatus> {
+    let identity = message_router.identity();
+
+    // Zero is a wildcard, except in a compatible key's revision
+    let vendor_id_matches = electronic_key.vendor_id == 0
+        || electronic_key.vendor_id == encoded_word_from_binrw_magic(&identity.vendor_id);
+    let product_code_matches =
+        electronic_key.product_code == 0 || electronic_key.product_code == identity.product_code;
+    let device_type_matches = electronic_key.device_type == 0
+        || electronic_key.device_type == encoded_word_from_binrw_magic(&identity.device_type);
+    let key_major_revision = electronic_key
+        .major_revision_compatibility
+        .major_revision()
+        .value();
+    let revision_matches = if electronic_key.major_revision_compatibility.compatibility() {
+        key_major_revision == identity.revision.major
+            && (1..=identity.revision.minor).contains(&electronic_key.minor_revision)
+    } else {
+        (key_major_revision == 0 || key_major_revision == identity.revision.major)
+            && (electronic_key.minor_revision == 0
+                || electronic_key.minor_revision == identity.revision.minor)
+    };
+
+    if !vendor_id_matches || !product_code_matches {
+        Err(ConnectionManagerExtendedStatus::VendorIdOrProductCodeMismatch)
+    } else if !device_type_matches {
+        Err(ConnectionManagerExtendedStatus::ProductTypeMismatch)
+    } else if !revision_matches {
+        Err(ConnectionManagerExtendedStatus::RevisionMismatch)
+    } else {
+        Ok(())
+    }
+}
 
 /// The class, instance and optional attribute of a logical path
 pub(crate) fn class_instance_and_attribute(path: &CipPath) -> Option<(u16, u16, Option<u16>)> {
