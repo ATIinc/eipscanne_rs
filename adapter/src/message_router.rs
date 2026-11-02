@@ -23,10 +23,10 @@ use crate::error::{Error, Result};
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
 pub trait MessageRouter: Send + Sync + 'static {
-    /// The Identity object electronic keys are verified against
+    /// The Identity object
     fn identity(&self) -> IdentityResponse;
 
-    /// Get_Attributes_All; by default of the Identity object only, from `identity`
+    /// Get_Attributes_All; by default the Identity object's
     fn handle_get_attributes_all(
         &self,
         class: u16,

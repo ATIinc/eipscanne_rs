@@ -53,8 +53,7 @@ pub(crate) fn connection_failure_rejection(
     }
 }
 
-/// The word `code` is written as: codes that exist only as binrw magics, like extended statuses,
-/// vendor IDs and device types, cannot be cast
+/// The word `code` is written as; binrw magics cannot be cast
 pub(crate) fn encoded_word_from_binrw_magic(
     code: &impl for<'a> BinWrite<Args<'a> = ()>,
 ) -> CipUint {
@@ -110,8 +109,7 @@ pub(crate) fn o2t_timeout(
 
 // ======= Ids in paths ========
 
-/// `path` without its first electronic key, and that key. Unlike CIP, the key may sit anywhere
-/// instead of first
+/// `path` without its first electronic key, and that key; unlike CIP, it may sit anywhere
 pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<ElectronicKey>) {
     let mut segments = Vec::new();
     let mut electronic_key = None;
@@ -133,16 +131,14 @@ pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<Electroni
     (CipPath::from_segments(segments), electronic_key)
 }
 
-/// Accepts `electronic_key` when its non-zero fields match `message_router`'s identity; with
-/// Compatibility set, its revision must name the device's major revision and a minor up to the
-/// device's. Otherwise the part that does not match
+/// Checks `electronic_key` against `message_router`'s identity; an error names the mismatch
 pub(crate) fn verify_electronic_key(
     message_router: &impl MessageRouter,
     electronic_key: &ElectronicKey,
 ) -> Result<(), ConnectionManagerExtendedStatus> {
     let identity = message_router.identity();
 
-    // Zero is not checked, except in a compatible key's revision, where it names no revision
+    // Zero is a wildcard, except in a compatible key's revision
     let vendor_id_matches = electronic_key.vendor_id == 0
         || electronic_key.vendor_id == encoded_word_from_binrw_magic(&identity.vendor_id);
     let product_code_matches =

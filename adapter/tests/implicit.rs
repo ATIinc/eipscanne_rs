@@ -62,8 +62,7 @@ const HEARTBEAT_CONNECTION_SIZE: u16 = 2;
 /// How long a test waits for a packet that is due
 const PACKET_WAIT: Duration = Duration::from_secs(2);
 
-/// An Identity object and implicit messaging: echoes its outputs as its inputs and counts its
-/// `enter_idle` calls
+/// Echoes its outputs as its inputs and counts its `enter_idle` calls
 struct EchoDevice {
     outputs: Mutex<[u8; DATA_SIZE as usize]>,
     idle_count: AtomicUsize,
@@ -307,7 +306,7 @@ fn forward_open_request(connection_serial_number: u16) -> ForwardOpenRequest {
     }
 }
 
-/// The key of `EchoDevice`'s Identity object, exact match
+/// `EchoDevice`'s exact key
 fn electronic_key() -> ElectronicKey {
     ElectronicKey {
         vendor_id: 342,
@@ -333,7 +332,7 @@ fn compatible_electronic_key(major: u8, minor: u8) -> ElectronicKey {
     }
 }
 
-/// `forward_open_request(1)` with `electronic_key` leading its connection path
+/// `forward_open_request(1)` with `electronic_key` first in its path
 fn forward_open_request_with_key(electronic_key: ElectronicKey) -> ForwardOpenRequest {
     let mut request = forward_open_request(1);
     request
@@ -495,7 +494,7 @@ async fn a_forward_open_whose_electronic_key_does_not_match_is_refused() {
             },
             ConnectionManagerExtendedStatus::RevisionMismatch,
         ),
-        // A newer minor, another major, and zeros, which name no revision
+        // Compatible keys: a newer minor, another major, and zeros
         (
             compatible_electronic_key(1, 3),
             ConnectionManagerExtendedStatus::RevisionMismatch,
