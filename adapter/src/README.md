@@ -13,6 +13,7 @@ server::serve
    ├─ Send RR Data
    │  └─ explicit::unconnected::handle_send_rr_data
    │     └─ explicit::handle_message_router_request
+   │        ├─ verify_electronic_key         a mismatched request path key is refused
    │        ├─ Get, Set
    │        │  └─ MessageRouter::handle_get_* / handle_set_*
    │        └─ Forward_Open, Forward_Close
@@ -27,8 +28,9 @@ server::serve
    └─ packet::write_packet
 
 explicit::connected::message_router::ConnectedMessageRouter    a MessageRouter plus class 3 connections
-├─ Get, Set                                  the wrapped one's
+├─ Get, Set, identity                        the wrapped one's
 ├─ handle_forward_open                       class 3, otherwise the wrapped one's
+│  └─ verify_electronic_key                  a mismatched connection path key is refused
 ├─ handle_forward_close                      its connections, otherwise the wrapped one's
 └─ extract_t2o_info_from_connected_request   its connections, otherwise the wrapped one's
 ```
@@ -40,9 +42,10 @@ implicit::message_router::ImplicitMessageRouter::bind    binds the I/O socket
 └─ implicit::o2t::route_outputs                          hands each O->T packet to its connection
 
 ImplicitMessageRouter                        an ImplicitDevice plus class 1 connections
-├─ Get, Set                                  the device's
+├─ Get, Set, identity                        the device's
 ├─ handle_forward_open
 │  ├─ implicit::connection::connection_from_forward_open
+│  │  └─ verify_electronic_key               a mismatched connection path key is refused
 │  └─ the I/O exchange task, one per connection
 │     ├─ O->T: implicit::o2t::receive_outputs
 │     │  ├─ extract_cip_io_data, packet::decode_data, ImplicitDevice::consume_outputs

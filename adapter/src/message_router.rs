@@ -10,9 +10,11 @@ use eipscanne_rs::cip::connection_manager::forward_close::{
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
+use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -21,13 +23,21 @@ use crate::error::{Error, Result};
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
 pub trait MessageRouter: Send + Sync + 'static {
-    /// Get_Attributes_All
+    /// The Identity object
+    fn identity(&self) -> IdentityResponse;
+
+    /// Get_Attributes_All; by default the Identity object's
     fn handle_get_attributes_all(
         &self,
-        _class: u16,
-        _instance: u16,
+        class: u16,
+        instance: u16,
     ) -> Result<CipDataOpt, ResponseStatusCode> {
-        Err(ResponseStatusCode::ServiceNotSupported)
+        match (class, instance) {
+            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
+                Ok(CipDataOpt::Typed(Box::new(self.identity())))
+            }
+            _ => Err(ResponseStatusCode::ObjectDoesNotExist),
+        }
     }
 
     /// Get_Attribute_Single

@@ -26,9 +26,7 @@ use eipscanne_rs::cip::identity::{
 };
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::ResponseStatusCode;
-use eipscanne_rs::cip::object_ids::{
-    ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID, IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID,
-};
+use eipscanne_rs::cip::object_ids::{ASSEMBLY_CLASS_ID, ASSEMBLY_DATA_ATTRIBUTE_ID};
 use eipscanne_rs::cip::types::{CipDint, CipInt, CipShortString, CipUsint};
 use eipscanne_rs::eip::constants::ETHERNET_IP_TCP_PORT;
 
@@ -188,24 +186,15 @@ impl SampleIoHubAdapter {
 }
 
 impl MessageRouter for SampleIoHubAdapter {
-    fn handle_get_attributes_all(
-        &self,
-        class: u16,
-        instance: u16,
-    ) -> Result<CipDataOpt, ResponseStatusCode> {
-        match (class, instance) {
-            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
-                Ok(CipDataOpt::Typed(Box::new(IdentityResponse {
-                    vendor_id: VendorId::TeknicInc,
-                    device_type: DeviceType::GenericDevice,
-                    product_code: 1,
-                    revision: Revision { major: 1, minor: 0 },
-                    status: IdentityStatusBits::default().into(),
-                    serial_number: 0x0102_0304,
-                    product_name: CipShortString::from("Sample IO-HUB".to_string()),
-                })))
-            }
-            _ => Err(ResponseStatusCode::ObjectDoesNotExist),
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::TeknicInc,
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 0 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 0x0102_0304,
+            product_name: CipShortString::from("Sample IO-HUB".to_string()),
         }
     }
 
