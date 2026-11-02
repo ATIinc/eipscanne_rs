@@ -10,6 +10,7 @@ use eipscanne_rs::cip::connection_manager::forward_close::{
 use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
+use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -21,6 +22,10 @@ use crate::error::{Error, Result};
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
 pub trait MessageRouter: Send + Sync + 'static {
+    fn identity(&self) -> Option<IdentityResponse> {
+        None
+    }
+
     /// Get_Attributes_All
     fn handle_get_attributes_all(
         &self,

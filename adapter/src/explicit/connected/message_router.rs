@@ -16,6 +16,7 @@ use eipscanne_rs::cip::connection_manager::parameters::{
     ConnectionType, Direction, TransportClass,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -26,6 +27,7 @@ use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 use crate::connection_helpers::{
     class_instance_and_attribute, connection_failure_rejection, network_connection_size,
     network_connection_type, o2t_timeout, split_electronic_key, successful_forward_open_response,
+    verify_electronic_key,
 };
 use crate::error::{Error, Result};
 use crate::explicit::connected::ExplicitConnection;
@@ -62,6 +64,10 @@ impl<M: MessageRouter> ConnectedMessageRouter<M> {
 }
 
 impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
+    fn identity(&self) -> Option<IdentityResponse> {
+        self.message_router.identity()
+    }
+
     fn handle_get_attributes_all(
         &self,
         class: u16,
@@ -173,8 +179,12 @@ impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
             u16::from(MESSAGE_ROUTER_INSTANCE_ID),
             None,
         );
-        let (connection_path, _electronic_key) =
+        let (connection_path, electronic_key) =
             split_electronic_key(&forward_open_request.connection_path);
+        if let Some(electronic_key) = electronic_key {
+            verify_electronic_key(self.message_router.as_ref(), &electronic_key)
+                .map_err(|mismatch| connection_failure_rejection(service, mismatch))?;
+        }
         if class_instance_and_attribute(&connection_path) != Some(message_router) {
             return Err(connection_failure_rejection(
                 service,

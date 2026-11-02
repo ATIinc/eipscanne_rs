@@ -63,23 +63,28 @@ struct SampleImplicitAdapter {
 }
 
 impl MessageRouter for SampleImplicitAdapter {
+    fn identity(&self) -> Option<IdentityResponse> {
+        Some(IdentityResponse {
+            vendor_id: VendorId::Unknown(0xffff),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 0 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 0x0000_0001,
+            product_name: CipShortString::from("Sample Implicit Adapter".to_string()),
+        })
+    }
+
     fn handle_get_attributes_all(
         &self,
         class: u16,
         instance: u16,
     ) -> Result<CipDataOpt, ResponseStatusCode> {
         match (class, instance) {
-            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
-                Ok(CipDataOpt::Typed(Box::new(IdentityResponse {
-                    vendor_id: VendorId::Unknown(0xffff),
-                    device_type: DeviceType::GenericDevice,
-                    product_code: 1,
-                    revision: Revision { major: 1, minor: 0 },
-                    status: IdentityStatusBits::default().into(),
-                    serial_number: 0x0000_0001,
-                    product_name: CipShortString::from("Sample Implicit Adapter".to_string()),
-                })))
-            }
+            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => self
+                .identity()
+                .map(|identity| CipDataOpt::Typed(Box::new(identity)))
+                .ok_or(ResponseStatusCode::ObjectDoesNotExist),
             _ => Err(ResponseStatusCode::ObjectDoesNotExist),
         }
     }

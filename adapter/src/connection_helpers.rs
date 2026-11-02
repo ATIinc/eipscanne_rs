@@ -20,6 +20,8 @@ use eipscanne_rs::cip::path::{
 };
 use eipscanne_rs::cip::types::CipUint;
 
+use crate::message_router::MessageRouter;
+
 // ======= Responses ========
 
 /// The response accepting `forward_open_request` as it asks
@@ -44,16 +46,21 @@ pub(crate) fn connection_failure_rejection(
     service: ServiceCode,
     extended_status: ConnectionManagerExtendedStatus,
 ) -> Rejection {
-    // The status codes exist only as binrw magics, so the word is written, not cast
-    let mut word = Cursor::new([0u8; 2]);
-    extended_status
-        .write_le(&mut word)
-        .expect("an extended status is one word");
     Rejection {
         service,
         general_status: ResponseStatusCode::ConnectionFailure,
-        additional_status: vec![CipUint::from_le_bytes(word.into_inner())],
+        additional_status: vec![encoded_word_from_binrw_magic(&extended_status)],
     }
+}
+
+/// The word `code` is written as: codes that exist only as binrw magics, like extended statuses,
+/// vendor IDs and device types, cannot be cast
+pub(crate) fn encoded_word_from_binrw_magic(
+    code: &impl for<'a> BinWrite<Args<'a> = ()>,
+) -> CipUint {
+    let mut word = Cursor::new([0u8; 2]);
+    code.write_le(&mut word).expect("a code is one word");
+    CipUint::from_le_bytes(word.into_inner())
 }
 
 // ======= Connection parameters ========
@@ -103,7 +110,8 @@ pub(crate) fn o2t_timeout(
 
 // ======= Ids in paths ========
 
-/// `path` without its first electronic key, and that key
+/// `path` without its first electronic key, and that key. Unlike CIP, the key may sit anywhere
+/// instead of first
 pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<ElectronicKey>) {
     let mut segments = Vec::new();
     let mut electronic_key = None;
@@ -111,7 +119,11 @@ pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<Electroni
         match segment.data {
             PathData::ElectronicKey(key) if electronic_key.is_none() => {
                 if index != 0 {
-                    tracing::warn!(index, ?path,"electronic key is not the path's first segment");
+                    tracing::warn!(
+                        index,
+                        ?path,
+                        "electronic key is not the path's first segment"
+                    );
                 }
                 electronic_key = Some(key);
             }
@@ -119,6 +131,47 @@ pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<Electroni
         }
     }
     (CipPath::from_segments(segments), electronic_key)
+}
+
+/// Accepts `electronic_key` when each of its non-zero fields matches `message_router`'s identity,
+/// with Compatibility set any minor revision up to the device's too; otherwise the part that does
+/// not match. A device without an identity accepts any key
+pub(crate) fn verify_electronic_key(
+    message_router: &impl MessageRouter,
+    electronic_key: &ElectronicKey,
+) -> Result<(), ConnectionManagerExtendedStatus> {
+    let Some(identity) = message_router.identity() else {
+        return Ok(());
+    };
+    let major_revision = electronic_key
+        .major_revision_compatibility
+        .major_revision()
+        .value();
+    let minor_revision_differs = if electronic_key.major_revision_compatibility.compatibility() {
+        electronic_key.minor_revision > identity.revision.minor
+    } else {
+        electronic_key.minor_revision != 0
+            && electronic_key.minor_revision != identity.revision.minor
+    };
+
+    // A zero key field is not checked
+    if (electronic_key.vendor_id != 0
+        && electronic_key.vendor_id != encoded_word_from_binrw_magic(&identity.vendor_id))
+        || (electronic_key.product_code != 0
+            && electronic_key.product_code != identity.product_code)
+    {
+        Err(ConnectionManagerExtendedStatus::VendorIdOrProductCodeMismatch)
+    } else if electronic_key.device_type != 0
+        && electronic_key.device_type != encoded_word_from_binrw_magic(&identity.device_type)
+    {
+        Err(ConnectionManagerExtendedStatus::ProductTypeMismatch)
+    } else if (major_revision != 0 && major_revision != identity.revision.major)
+        || minor_revision_differs
+    {
+        Err(ConnectionManagerExtendedStatus::RevisionMismatch)
+    } else {
+        Ok(())
+    }
 }
 
 /// The class, instance and optional attribute of a logical path

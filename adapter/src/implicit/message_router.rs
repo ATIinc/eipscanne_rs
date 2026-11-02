@@ -18,6 +18,7 @@ use eipscanne_rs::cip::connection_manager::forward_open::{
     ForwardOpenRequest, ForwardOpenResponse,
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
+use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
@@ -90,6 +91,10 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
 }
 
 impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
+    fn identity(&self) -> Option<IdentityResponse> {
+        self.device.identity()
+    }
+
     fn handle_get_attributes_all(
         &self,
         class: u16,

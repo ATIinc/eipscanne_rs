@@ -26,6 +26,7 @@ use eipscanne_rs::eip::socket_addr::SocketAddrInfo;
 use crate::connection_helpers::{
     connection_failure_rejection, network_connection_size, network_connection_size_type,
     network_connection_type, segment_id, split_electronic_key, successful_forward_open_response,
+    verify_electronic_key,
 };
 use crate::implicit::ImplicitDevice;
 
@@ -118,8 +119,13 @@ pub(crate) fn connection_from_forward_open(
         ));
     }
 
-    let Some((output_instance, input_instance)) =
-        output_and_input_instances(&forward_open_request.connection_path)
+    let (connection_path, electronic_key) =
+        split_electronic_key(&forward_open_request.connection_path);
+    if let Some(electronic_key) = electronic_key {
+        verify_electronic_key(device, &electronic_key)
+            .map_err(|mismatch| connection_failure_rejection(service, mismatch))?;
+    }
+    let Some((output_instance, input_instance)) = output_and_input_instances(&connection_path)
     else {
         return Err(connection_failure_rejection(
             service,
@@ -175,9 +181,8 @@ pub(crate) fn connection_from_forward_open(
 }
 
 /// The O->T and T->O connection points of an assembly connection path: class, configuration
-/// instance, then the two connection points, with an electronic key anywhere
+/// instance, then the two connection points
 fn output_and_input_instances(path: &CipPath) -> Option<(u16, u16)> {
-    let (path, _electronic_key) = split_electronic_key(path);
     let [class, configuration, output, input] = path.segments.as_slice() else {
         return None;
     };
