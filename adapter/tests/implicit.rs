@@ -76,7 +76,7 @@ impl MessageRouter for EchoDevice {
             vendor_id: VendorId::Unknown(342),
             device_type: DeviceType::GenericDevice,
             product_code: 1,
-            revision: Revision { major: 1, minor: 1 },
+            revision: Revision { major: 1, minor: 2 },
             status: IdentityStatusBits::default().into(),
             serial_number: 1,
             product_name: CipShortString::from("Echo".to_string()),
@@ -331,8 +331,30 @@ fn electronic_key() -> ElectronicKey {
             .major_revision(u7::new(1))
             .compatibility(false)
             .build(),
-        minor_revision: 1,
+        minor_revision: 2,
     }
+}
+
+/// `electronic_key()` with Compatibility set and revision `major`.`minor`
+fn compatible_electronic_key(major: u8, minor: u8) -> ElectronicKey {
+    ElectronicKey {
+        major_revision_compatibility: MajorRevisionCompatibility::builder()
+            .major_revision(u7::new(major))
+            .compatibility(true)
+            .build(),
+        minor_revision: minor,
+        ..electronic_key()
+    }
+}
+
+/// `forward_open_request(1)` with `electronic_key` leading its connection path
+fn forward_open_request_with_key(electronic_key: ElectronicKey) -> ForwardOpenRequest {
+    let mut request = forward_open_request(1);
+    request
+        .connection_path
+        .segments
+        .insert(0, LogicalPathSegment::new_electronic_key(electronic_key));
+    request
 }
 
 /// The Forward_Close of the connection `request` opened
@@ -482,38 +504,59 @@ async fn a_forward_open_whose_electronic_key_does_not_match_is_refused() {
         ),
         (
             ElectronicKey {
-                minor_revision: 2,
+                minor_revision: 1,
                 ..electronic_key()
             },
             ConnectionManagerExtendedStatus::RevisionMismatch,
         ),
+        // A newer minor, another major, and zeros, which name no revision
+        (
+            compatible_electronic_key(1, 3),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(2, 2),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(1, 0),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
+        (
+            compatible_electronic_key(0, 2),
+            ConnectionManagerExtendedStatus::RevisionMismatch,
+        ),
     ];
     for (key, status) in mismatches {
-        let mut request = forward_open_request(1);
-        request
-            .connection_path
-            .segments
-            .insert(0, LogicalPathSegment::new_electronic_key(key));
-        assert_eq!(
-            extended_status(&scanner.forward_open(request).await),
-            Some(status)
-        );
+        let reply = scanner
+            .forward_open(forward_open_request_with_key(key))
+            .await;
+        assert_eq!(extended_status(&reply), Some(status), "{key:?}");
     }
+}
 
-    // Zero fields are not checked; with Compatibility set an older minor revision matches
-    let mut request = forward_open_request(1);
-    request.connection_path.segments.insert(
-        0,
-        LogicalPathSegment::new_electronic_key(ElectronicKey {
-            vendor_id: 0,
-            major_revision_compatibility: MajorRevisionCompatibility::builder()
-                .major_revision(u7::new(1))
-                .compatibility(true)
-                .build(),
-            minor_revision: 0,
-            ..electronic_key()
-        }),
-    );
+#[tokio::test]
+async fn zero_electronic_key_fields_are_not_checked() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request_with_key(ElectronicKey {
+        vendor_id: 0,
+        device_type: 0,
+        product_code: 0,
+        major_revision_compatibility: MajorRevisionCompatibility::builder()
+            .major_revision(u7::new(0))
+            .compatibility(false)
+            .build(),
+        minor_revision: 0,
+    });
+
+    forward_open_response(&scanner.forward_open(request).await);
+}
+
+#[tokio::test]
+async fn a_compatible_electronic_key_takes_an_older_minor_revision() {
+    let mut scanner = Scanner::connect().await;
+    let request = forward_open_request_with_key(compatible_electronic_key(1, 1));
+
     forward_open_response(&scanner.forward_open(request).await);
 }
 

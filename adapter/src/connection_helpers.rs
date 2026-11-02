@@ -133,9 +133,9 @@ pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<Electroni
     (CipPath::from_segments(segments), electronic_key)
 }
 
-/// Accepts `electronic_key` when each of its non-zero fields matches `message_router`'s identity,
-/// with Compatibility set any minor revision up to the device's too; otherwise the part that does
-/// not match. A device without an identity accepts any key
+/// Accepts `electronic_key` when its non-zero fields match `message_router`'s identity; with
+/// Compatibility set, its revision must name the device's major revision and a minor up to the
+/// device's. Otherwise the part that does not match. A device without an identity accepts any key
 pub(crate) fn verify_electronic_key(
     message_router: &impl MessageRouter,
     electronic_key: &ElectronicKey,
@@ -147,31 +147,32 @@ pub(crate) fn verify_electronic_key(
         );
         return Ok(());
     };
-    let major_revision = electronic_key
+
+    // Zero is not checked, except in a compatible key's revision, where it names no revision
+    let vendor_id_matches = electronic_key.vendor_id == 0
+        || electronic_key.vendor_id == encoded_word_from_binrw_magic(&identity.vendor_id);
+    let product_code_matches =
+        electronic_key.product_code == 0 || electronic_key.product_code == identity.product_code;
+    let device_type_matches = electronic_key.device_type == 0
+        || electronic_key.device_type == encoded_word_from_binrw_magic(&identity.device_type);
+    let key_major_revision = electronic_key
         .major_revision_compatibility
         .major_revision()
         .value();
-    let minor_revision_differs = if electronic_key.major_revision_compatibility.compatibility() {
-        electronic_key.minor_revision > identity.revision.minor
+    let revision_matches = if electronic_key.major_revision_compatibility.compatibility() {
+        key_major_revision == identity.revision.major
+            && (1..=identity.revision.minor).contains(&electronic_key.minor_revision)
     } else {
-        electronic_key.minor_revision != 0
-            && electronic_key.minor_revision != identity.revision.minor
+        (key_major_revision == 0 || key_major_revision == identity.revision.major)
+            && (electronic_key.minor_revision == 0
+                || electronic_key.minor_revision == identity.revision.minor)
     };
 
-    // A zero key field is not checked
-    if (electronic_key.vendor_id != 0
-        && electronic_key.vendor_id != encoded_word_from_binrw_magic(&identity.vendor_id))
-        || (electronic_key.product_code != 0
-            && electronic_key.product_code != identity.product_code)
-    {
+    if !vendor_id_matches || !product_code_matches {
         Err(ConnectionManagerExtendedStatus::VendorIdOrProductCodeMismatch)
-    } else if electronic_key.device_type != 0
-        && electronic_key.device_type != encoded_word_from_binrw_magic(&identity.device_type)
-    {
+    } else if !device_type_matches {
         Err(ConnectionManagerExtendedStatus::ProductTypeMismatch)
-    } else if (major_revision != 0 && major_revision != identity.revision.major)
-        || minor_revision_differs
-    {
+    } else if !revision_matches {
         Err(ConnectionManagerExtendedStatus::RevisionMismatch)
     } else {
         Ok(())
