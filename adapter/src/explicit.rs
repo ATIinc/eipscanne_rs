@@ -40,7 +40,12 @@ pub(crate) fn handle_message_router_request(
     if let Some(electronic_key) = electronic_key
         && let Err(mismatch) = verify_electronic_key(message_router, &electronic_key)
     {
-        tracing::warn!(?service, ?mismatch, "refused a request's electronic key");
+        tracing::warn!(
+            ?service,
+            ?electronic_key,
+            ?mismatch,
+            "refused a request's electronic key"
+        );
         let response = message_router_response(
             service,
             ResponseStatusCode::KeyFailureInPath,

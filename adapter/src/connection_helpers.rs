@@ -141,6 +141,10 @@ pub(crate) fn verify_electronic_key(
     electronic_key: &ElectronicKey,
 ) -> Result<(), ConnectionManagerExtendedStatus> {
     let Some(identity) = message_router.identity() else {
+        tracing::debug!(
+            ?electronic_key,
+            "no identity to verify the electronic key against"
+        );
         return Ok(());
     };
     let major_revision = electronic_key

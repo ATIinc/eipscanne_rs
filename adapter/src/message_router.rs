@@ -22,6 +22,7 @@ use crate::error::{Error, Result};
 /// What a scanner's requests reach behind [`crate::server::serve`]; calls can overlap, and a
 /// service it leaves out is not supported
 pub trait MessageRouter: Send + Sync + 'static {
+    /// The Identity object electronic keys are verified against
     fn identity(&self) -> Option<IdentityResponse> {
         None
     }
