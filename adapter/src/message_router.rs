@@ -14,6 +14,7 @@ use eipscanne_rs::cip::identity::IdentityResponse;
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::response::{Rejection, ResponseStatusCode};
 use eipscanne_rs::cip::message::shared::ServiceCode;
+use eipscanne_rs::cip::object_ids::{IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID};
 use eipscanne_rs::cip::types::{CipUdint, CipUint};
 use eipscanne_rs::eip::socket_addr::{SocketAddrInfo, SocketAddrInfoItems};
 
@@ -23,17 +24,20 @@ use crate::error::{Error, Result};
 /// service it leaves out is not supported
 pub trait MessageRouter: Send + Sync + 'static {
     /// The Identity object electronic keys are verified against
-    fn identity(&self) -> Option<IdentityResponse> {
-        None
-    }
+    fn identity(&self) -> IdentityResponse;
 
-    /// Get_Attributes_All
+    /// Get_Attributes_All; by default of the Identity object only, from `identity`
     fn handle_get_attributes_all(
         &self,
-        _class: u16,
-        _instance: u16,
+        class: u16,
+        instance: u16,
     ) -> Result<CipDataOpt, ResponseStatusCode> {
-        Err(ResponseStatusCode::ServiceNotSupported)
+        match (class, instance) {
+            (IDENTITY_CLASS_ID, IDENTITY_INSTANCE_ID) => {
+                Ok(CipDataOpt::Typed(Box::new(self.identity())))
+            }
+            _ => Err(ResponseStatusCode::ObjectDoesNotExist),
+        }
     }
 
     /// Get_Attribute_Single

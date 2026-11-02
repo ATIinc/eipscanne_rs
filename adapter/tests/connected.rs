@@ -19,6 +19,9 @@ use eipscanne_rs::cip::connection_manager::parameters::{
 };
 use eipscanne_rs::cip::connection_manager::response::ConnectionManagerExtendedStatus;
 use eipscanne_rs::cip::connection_manager::shared::ConnectionTriad;
+use eipscanne_rs::cip::identity::{
+    DeviceType, IdentityResponse, IdentityStatusBits, Revision, VendorId,
+};
 use eipscanne_rs::cip::message::data::CipDataOpt;
 use eipscanne_rs::cip::message::request::MessageRouterRequest;
 use eipscanne_rs::cip::message::response::{MessageRouterResponse, Rejection, ResponseStatusCode};
@@ -29,7 +32,7 @@ use eipscanne_rs::cip::object_ids::{
 use eipscanne_rs::cip::path::{
     CipPath, ElectronicKey, LogicalPathSegment, MajorRevisionCompatibility,
 };
-use eipscanne_rs::cip::types::{CipUdint, CipUint};
+use eipscanne_rs::cip::types::{CipShortString, CipUdint, CipUint};
 use eipscanne_rs::eip::command::{CommandSpecificData, EnIpCommand};
 use eipscanne_rs::eip::packet::EnIpPacket;
 use eipscanne_rs::eip::socket_addr::SocketAddrInfoItems;
@@ -50,6 +53,19 @@ const CONNECTION_SIZE: u16 = 504;
 struct SampleDevice;
 
 impl MessageRouter for SampleDevice {
+    /// What `a_leading_electronic_key_is_accepted` names
+    fn identity(&self) -> IdentityResponse {
+        IdentityResponse {
+            vendor_id: VendorId::Unknown(342),
+            device_type: DeviceType::GenericDevice,
+            product_code: 1,
+            revision: Revision { major: 1, minor: 1 },
+            status: IdentityStatusBits::default().into(),
+            serial_number: 1,
+            product_name: CipShortString::from("Sample".to_string()),
+        }
+    }
+
     fn handle_get_attributes_all(
         &self,
         _class: u16,

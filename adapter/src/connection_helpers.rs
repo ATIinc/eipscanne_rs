@@ -135,18 +135,12 @@ pub(crate) fn split_electronic_key(path: &CipPath) -> (CipPath, Option<Electroni
 
 /// Accepts `electronic_key` when its non-zero fields match `message_router`'s identity; with
 /// Compatibility set, its revision must name the device's major revision and a minor up to the
-/// device's. Otherwise the part that does not match. A device without an identity accepts any key
+/// device's. Otherwise the part that does not match
 pub(crate) fn verify_electronic_key(
     message_router: &impl MessageRouter,
     electronic_key: &ElectronicKey,
 ) -> Result<(), ConnectionManagerExtendedStatus> {
-    let Some(identity) = message_router.identity() else {
-        tracing::debug!(
-            ?electronic_key,
-            "no identity to verify the electronic key against"
-        );
-        return Ok(());
-    };
+    let identity = message_router.identity();
 
     // Zero is not checked, except in a compatible key's revision, where it names no revision
     let vendor_id_matches = electronic_key.vendor_id == 0

@@ -64,7 +64,7 @@ impl<M: MessageRouter> ConnectedMessageRouter<M> {
 }
 
 impl<M: MessageRouter> MessageRouter for ConnectedMessageRouter<M> {
-    fn identity(&self) -> Option<IdentityResponse> {
+    fn identity(&self) -> IdentityResponse {
         self.message_router.identity()
     }
 

@@ -91,7 +91,7 @@ impl<D: ImplicitDevice> ImplicitMessageRouter<D> {
 }
 
 impl<D: ImplicitDevice> MessageRouter for ImplicitMessageRouter<D> {
-    fn identity(&self) -> Option<IdentityResponse> {
+    fn identity(&self) -> IdentityResponse {
         self.device.identity()
     }
 
